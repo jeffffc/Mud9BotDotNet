@@ -1,0 +1,74 @@
+using Telegram.Bot;
+using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
+using Mud9Bot.Services;
+using Mud9Bot.Services.Interfaces; // For IUserService
+
+namespace Mud9Bot.Services;
+
+// Inject IEnumerable<IBotCommand> to get ALL registered commands automatically
+public class UpdateHandler(
+    ILogger<UpdateHandler> logger, 
+    CommandRegistry commandRegistry,
+    IServiceScopeFactory scopeFactory) : IUpdateHandler // Primary Constructor
+{
+    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+    {
+        if (update.Message is not { } message) return;
+        if (message.Text is not { } messageText) return;
+        // if (!messageText.StartsWith('/')) return; // <--- REMOVE THIS if you want to track all messages for "LastSeen", otherwise keep it.
+        // For now, let's keep it to sync user on every command.
+
+        var chatId = message.Chat.Id;
+
+        // --- SCOPE CREATION ---
+        // We create a scope to resolve Scoped services like IUserService and BotDbContext
+        // Use 'scopeFactory' directly from the primary constructor
+        using var scope = scopeFactory.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        
+        // 1. Sync User & Group
+        if (message.From != null)
+        {
+            await userService.SyncUserAsync(message.From, cancellationToken);
+        }
+        if (message.Chat.Type != ChatType.Private)
+        {
+            await userService.SyncGroupAsync(message.Chat, cancellationToken);
+        }
+        // ----------------------
+
+        if (!messageText.StartsWith('/')) return; // Ignore non-commands after syncing
+
+        // ... Command Parsing & Execution Logic ...
+        
+        // --- PARSING LOGIC START ---
+        // 1. Split command and args: "/sql@Mud9Bot select * from table"
+        var parts = messageText.Split(' ', 2); // Split into 2 parts max
+        var commandPart = parts[0].Substring(1); // "sql@Mud9Bot"
+        var args = parts.Length > 1 ? parts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>(); 
+        // Note: Previous logic used string[] for args in CommandRegistry, so we split here. 
+        // If your logic expects the raw string rest, adjust accordingly. 
+        // Based on previous turn, CommandRegistry expects string[].
+
+        // 2. Remove @BotName if exists
+        var atIndex = commandPart.IndexOf('@');
+        if (atIndex > 0)
+        {
+            commandPart = commandPart.Substring(0, atIndex); // "sql"
+        }
+        // --- PARSING LOGIC END ---
+
+        logger.LogInformation($"Command detected: {commandPart}");
+
+        // FIX: Update ExecuteAsync signature in CommandRegistry to accept IServiceProvider
+        await commandRegistry.ExecuteAsync(commandPart, args, botClient, message, scope.ServiceProvider, cancellationToken);
+    }
+
+    public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
+    {
+        logger.LogError(exception, "Telegram API Error");
+        await Task.CompletedTask;
+    }
+}
