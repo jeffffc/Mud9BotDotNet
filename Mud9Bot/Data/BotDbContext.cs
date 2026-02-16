@@ -6,13 +6,27 @@ namespace Mud9Bot.Data;
 
 public class BotDbContext : DbContext
 {
-    public BotDbContext(DbContextOptions<BotDbContext> options) : base(options) { }
+    private readonly IConfiguration _configuration;
+
+    public BotDbContext(DbContextOptions<BotDbContext> options, IConfiguration configuration) : base(options)
+    {
+        _configuration = configuration;
+    }
 
     // Tables
     public DbSet<BotUser> Users { get; set; }
     public DbSet<BotGroup> Groups { get; set; }
     public DbSet<CommandLog> CommandLogs { get; set; }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            optionsBuilder.UseNpgsql(connectionString);
+        }
+    }
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Define unique indexes, default values, etc.
@@ -24,6 +38,7 @@ public class BotDbContext : DbContext
             .HasIndex(g => g.TelegramId)
             .IsUnique();
     }
+
 }
 
 [Table("users")]

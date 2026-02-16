@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Mud9Bot.Attributes;
 using Quartz;
 
@@ -34,6 +35,10 @@ public static class ServiceCollectionExtensions
 
     public static void AddBotServicesAndModules(this IServiceCollection services, Assembly assembly)
     {
+        // Create a temporary logger for the startup phase
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        var logger = loggerFactory.CreateLogger("ServiceRegistration");
+
         var types = assembly.GetTypes().Where(t => t.IsClass && !t.IsAbstract).ToList();
 
         // 1. Register Modules (Transient)
@@ -45,6 +50,7 @@ public static class ServiceCollectionExtensions
         }
 
         // 2. Register Services
+        logger.LogInformation("--- Registering Services ---");
         var serviceClasses = types.Where(t => t.Name.EndsWith("Service") && !t.Name.StartsWith("System"));
         
         foreach (var implType in serviceClasses)
@@ -66,14 +72,17 @@ public static class ServiceCollectionExtensions
                 if (needsScope)
                 {
                     services.AddScoped(interfaceType, implType);
+                    logger.LogInformation("[+] Service (Scoped):    {Interface} -> {Implementation}", interfaceType.Name, implType.Name);
                 }
                 else
                 {
                     services.AddSingleton(interfaceType, implType);
+                    logger.LogInformation("[+] Service (Singleton): {Interface} -> {Implementation}", interfaceType.Name, implType.Name);
                 }
             }
             // Note: If a service doesn't have an interface (like StartupNotificationService), 
             // it's usually a HostedService which is handled manually or via a different mechanism.
         }
+        logger.LogInformation("----------------------------");
     }
 }
