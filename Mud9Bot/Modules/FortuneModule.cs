@@ -24,7 +24,8 @@ public class FortuneModule(IFortuneService fortuneService)
             chatId: message.Chat.Id,
             text: fortune.a,
             replyMarkup: keyboard,
-            replyParameters: new ReplyParameters { MessageId = message.MessageId }
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            cancellationToken: ct
         );
     }
 }
