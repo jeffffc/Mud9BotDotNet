@@ -6,7 +6,7 @@ using Quartz;
 namespace Mud9Bot.Jobs;
 
 // Run at Midnight (00:00:00) every day
-[QuartzJob("0 0 0 * * ?")]
+[QuartzJob(Name = "QuotaResetJob", CronInterval = "0 0 0 * * ?", Description = "Reset Wine/Plastic Quota every midnight")]
 public class QuotaResetJob(IServiceScopeFactory scopeFactory, ILogger<QuotaResetJob> logger) : IJob
 {
     public async Task Execute(IJobExecutionContext context)

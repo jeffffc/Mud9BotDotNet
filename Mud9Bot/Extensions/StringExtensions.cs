@@ -13,4 +13,9 @@ public static class StringExtensions
         }
         return text;
     }
+
+    public static string GetAny(this string[] enumerable)
+    {
+        return Random.Shared.GetItems(enumerable.AsSpan(), 1)[0];
+    }
 }

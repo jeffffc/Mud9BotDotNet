@@ -2,33 +2,26 @@ using Microsoft.EntityFrameworkCore;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
 using Mud9Bot.Services.Interfaces;
+using Telegram.Bot.Extensions;
 
 namespace Mud9Bot.Services;
 
 public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService> logger) : IWinePlasticService
 {
-    public async Task<(int WineLeft, int PlasticLeft)> GetOrCreateQuotaAsync(int userId, int groupId, int defaultW, int defaultP)
+    public async Task<(int WineLeft, int PlasticLeft)> GetOrCreateQuotaAsync(int userId, int groupId)
     {
         var limit = await context.Set<DailyLimit>()
             .FirstOrDefaultAsync(d => d.UserId == userId && d.GroupId == groupId);
 
         if (limit == null)
         {
-            limit = new DailyLimit
-            {
-                UserId = userId,
-                GroupId = groupId,
-                WineLimit = defaultW,
-                PlasticLimit = defaultP
-            };
-            context.Set<DailyLimit>().Add(limit);
-            await context.SaveChangesAsync();
+            limit = await CreateDefaultLimitAsync(userId, groupId);
         }
 
         return (limit.WineLimit, limit.PlasticLimit);
     }
-
-    public async Task<string> ProcessTransactionAsync(int senderId, int targetId, int groupId, bool isWine, int defaultW, int defaultP)
+    
+    public async Task<(bool, string)> ProcessTransactionAsync(int senderId, int targetId, int groupId, bool isWine, int num)
     {
         // 1. Get Sender Quota
         var limit = await context.Set<DailyLimit>()
@@ -37,23 +30,16 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         if (limit == null)
         {
             // Create on the fly if missing
-            limit = new DailyLimit
-            {
-                UserId = senderId,
-                GroupId = groupId,
-                WineLimit = defaultW,
-                PlasticLimit = defaultP
-            };
-            context.Set<DailyLimit>().Add(limit);
+            limit = await CreateDefaultLimitAsync(senderId, groupId);
         }
 
         // 2. Check Quota
-        if (isWine && limit.WineLimit <= 0) return "今日酒奎額已用完 (No Wine Quota left).";
-        if (!isWine && limit.PlasticLimit <= 0) return "今日膠奎額已用完 (No Plastic Quota left).";
+        if (isWine && limit.WineLimit < num) return (false, $"你今日得返 `{limit.WineLimit}` 杯酒，點一次過賜 `{num}` 杯酒俾人呀？");
+        if (!isWine && limit.PlasticLimit < num) return (false, $"你今日得番 `{limit.WineLimit}` 粒膠， 點一次過派 `{num}` 粒膠俾人呀？");
 
         // 3. Deduct Quota
-        if (isWine) limit.WineLimit--;
-        else limit.PlasticLimit--;
+        if (isWine) limit.WineLimit -= num;
+        else limit.PlasticLimit -= num;
 
         // 4. Create Transaction Record
         var record = new WinePlastic
@@ -61,8 +47,8 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
             GroupId = groupId,
             UserId = targetId,   // Receiver
             GivenBy = senderId,  // Sender
-            Wine = isWine ? 1 : 0,
-            Plastic = isWine ? 0 : 1,
+            Wine = isWine ? num : 0,
+            Plastic = isWine ? 0 : num,
             TimeAdded = DateTime.UtcNow,
             Disabled = 0
         };
@@ -72,18 +58,99 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         var targetUser = await context.Set<BotUser>().FindAsync(targetId);
         if (targetUser != null)
         {
-            if (isWine) targetUser.Wine++;
-            else targetUser.Plastic++;
+            if (isWine) targetUser.Wine += num;
+            else targetUser.Plastic += num;
         }
 
         await context.SaveChangesAsync();
 
-        // 6. Return Result String
-        var icon = isWine ? "🍷" : "💊";
-        var action = isWine ? "派酒" : "派膠";
-        var totalStats = targetUser != null ? (isWine ? targetUser.Wine : targetUser.Plastic) : 0;
-        var leftQuota = isWine ? limit.WineLimit : limit.PlasticLimit;
+        var targetName = Markdown.Escape(targetUser?.FirstName);
 
-        return $"{action}成功 {icon}！\n對方累積: {totalStats}\n你今日仲有 {leftQuota} 個奎額。";
+        // 6. Return Result String
+        return (true, (isWine
+            ? (num > 1 ? $"已對*【{targetName}】*賜 `{num}` 杯酒 🍻！" : $"已對*【{targetName}】* 賜酒 🍻！")
+            : (num > 1 ? $"已對*【{targetName}】*賜 `{num}` 杯酒 🍻！" : $"已對*【{targetName}】* 派膠 🌚！")
+            )
+            );
+    }
+    
+    public async Task<(bool, string)> ProcessTransactionByTelegramIdAsync(long senderTgId, long targetTgId, long groupTgId, bool isWine, int num)
+    {
+        var senderEntity = await context.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == senderTgId);
+        var targetEntity = await context.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == targetTgId);
+        var groupEntity = await context.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == groupTgId);
+
+        if (senderEntity == null || targetEntity == null || groupEntity == null)
+        {
+            return (false, "系統錯誤: 找不到用戶資料 (可能未同步)。");
+        }
+
+        return await ProcessTransactionAsync(senderEntity.Id, targetEntity.Id, groupEntity.Id, isWine, num);
+    }
+    
+    private async Task<DailyLimit> CreateDefaultLimitAsync(int userId, int groupId)
+    {
+        // Fetch group settings to determine quota
+        var group = await context.Set<BotGroup>().FindAsync(groupId);
+        
+        var wLimit = group?.WQuota ?? Constants.WineLimit;
+        var pLimit = group?.PQuota ?? Constants.PlasticLimit;
+
+        var limit = new DailyLimit
+        {
+            UserId = userId,
+            GroupId = groupId,
+            WineLimit = wLimit,
+            PlasticLimit = pLimit
+        };
+        
+        context.Set<DailyLimit>().Add(limit);
+        // Note: We don't SaveChanges here if called from ProcessTransactionAsync as it saves later,
+        // but for safety in GetOrCreateQuotaAsync we might need to. 
+        // However, EF Core tracks the entity in the ChangeTracker, so checking Local or database is fine.
+        // For simplicity, we assume the caller will SaveChanges or the flow continues.
+        // But since GetOrCreateQuotaAsync is usually read-only flow, we save here.
+        if (context.ChangeTracker.HasChanges())
+        {
+            await context.SaveChangesAsync();
+        }
+
+        return limit;
+    }
+    
+    // NEW: Implementation for /check
+    public async Task<(int WineCount, int PlasticCount, int WineLimit, int PlasticLimit)> GetPersonalStatsAsync(long telegramUserId, long telegramGroupId)
+    {
+        // 1. Get User and Group Entities
+        var user = await context.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == telegramUserId);
+        var group = await context.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == telegramGroupId);
+
+        if (user == null || group == null)
+        {
+            // If user or group doesn't exist yet, return defaults
+            return (0, 0, Constants.WineLimit, Constants.PlasticLimit);
+        }
+
+        // 2. Calculate Group-Specific Stats from WinePlastic table
+        // Query equivalent to: SELECT SUM(wine), SUM(plastic) FROM wineplastic WHERE userid=... AND groupid=... AND disabled!=1
+        var wineCount = await context.Set<WinePlastic>()
+            .Where(wp => wp.UserId == user.Id && wp.GroupId == group.Id && wp.Disabled != 1)
+            .SumAsync(wp => wp.Wine);
+
+        var plasticCount = await context.Set<WinePlastic>()
+            .Where(wp => wp.UserId == user.Id && wp.GroupId == group.Id && wp.Disabled != 1)
+            .SumAsync(wp => wp.Plastic);
+
+        // 3. Get Daily Limit
+        var limit = await context.Set<DailyLimit>()
+            .FirstOrDefaultAsync(d => d.UserId == user.Id && d.GroupId == group.Id);
+
+        // If limit row exists, use it. If not, fallback to Group defaults (WQuota/PQuota).
+        // Note: Python code creates the row here if missing, but for a read-only Check command, 
+        // returning the effective default values is cleaner and faster.
+        var wLimit = limit?.WineLimit ?? group.WQuota;
+        var pLimit = limit?.PlasticLimit ?? group.PQuota;
+
+        return (wineCount, plasticCount, wLimit, pLimit);
     }
 }

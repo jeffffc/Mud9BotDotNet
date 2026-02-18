@@ -1,6 +1,5 @@
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Mud9Bot.Services.Registries;
 using Mud9Bot.Attributes;
 using Quartz;
 
@@ -23,13 +22,27 @@ public static class ServiceCollectionExtensions
 
             q.AddJob(job, jobKey, opts => opts.WithDescription(attr.Description));
 
-            q.AddTrigger(opts => opts
-                .ForJob(jobKey)
-                .WithIdentity($"{attr.Name}-trigger", attr.Group)
-                .WithDescription(attr.Description)
-                .WithSimpleSchedule(x => x
-                    .WithIntervalInSeconds(attr.IntervalSeconds)
-                    .RepeatForever()));
+            // FIX: Check for CronExpression before defaulting to SimpleSchedule
+            q.AddTrigger(opts =>
+            {
+                opts = opts
+                    .ForJob(jobKey)
+                    .WithIdentity($"{attr.Name}-trigger", attr.Group)
+                    .WithDescription(attr.Description);
+
+                if (!string.IsNullOrEmpty(attr.CronInterval))
+                {
+                    // Use Cron Schedule (e.g. "0 0 0 * * ?")
+                    opts.WithCronSchedule(attr.CronInterval);
+                }
+                else
+                {
+                    // Use Interval Schedule (e.g. Every 60 seconds)
+                    opts.WithSimpleSchedule(x => x
+                        .WithIntervalInSeconds(attr.IntervalSeconds)
+                        .RepeatForever());
+                }
+            });
         }
     }
 
@@ -41,8 +54,17 @@ public static class ServiceCollectionExtensions
 
         var types = assembly.GetTypes().Where(t => t.IsClass && !t.IsAbstract).ToList();
 
+        // 0. Register Registries (Singleton)
+        var registries = types.Where(t => t.Name.EndsWith("Registry") && !t.Name.StartsWith("System"));
+        foreach (var registry in registries)
+        {
+            services.AddSingleton(registry);
+        }
+        //services.AddSingleton<CommandRegistry>();       // Scan [Command] once
+        //services.AddSingleton<CallbackQueryRegistry>(); // Scan [CallbackQuery] once
+        
         // 1. Register Modules (Transient)
-        // These are resolved by CommandRegistry for every command execution.
+        // These are resolved by CommandRegistry and CallbackQueryRegistry for every command execution.
         var modules = types.Where(t => t.Name.EndsWith("Module") && !t.Name.StartsWith("System"));
         foreach (var module in modules)
         {

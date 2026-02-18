@@ -36,7 +36,7 @@ public class CallbackQueryRegistry
         // Find matching handler. 
         // We match if data starts with "prefix:" (standard convention) or is exactly "prefix".
         var handlerEntry = _handlers.FirstOrDefault(kvp => 
-            data.StartsWith(kvp.Key + ":") || data.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+            data.StartsWith(kvp.Key + "+") || data.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
 
         if (handlerEntry.Value == null) return;
 

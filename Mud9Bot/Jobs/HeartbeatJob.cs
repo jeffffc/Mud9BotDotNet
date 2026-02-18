@@ -3,7 +3,7 @@ using Quartz;
 
 namespace Mud9Bot.Jobs;
 
-[QuartzJob("HeartbeatJob", IntervalSeconds = 60, Description = "Logs a heartbeat every minute")]
+[QuartzJob(Name = "HeartbeatJob", IntervalSeconds = 60, Description = "Logs a heartbeat every minute")]
 public class HeartbeatJob(ILogger<HeartbeatJob> logger) : IJob
 {
     public Task Execute(IJobExecutionContext context)

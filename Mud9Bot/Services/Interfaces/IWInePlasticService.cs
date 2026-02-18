@@ -5,9 +5,14 @@ namespace Mud9Bot.Services.Interfaces;
 public interface IWinePlasticService
 {
     // Checks if the user has a limit row, creates if missing. Returns (WineLeft, PlasticLeft).
-    Task<(int WineLeft, int PlasticLeft)> GetOrCreateQuotaAsync(int userId, int groupId, int defaultW, int defaultP);
+    Task<(int WineLeft, int PlasticLeft)> GetOrCreateQuotaAsync(int userId, int groupId);
 
     // Executes the transaction: Deduct quota, Add Log, Update User Stats
     // Returns a success message or error string
-    Task<string> ProcessTransactionAsync(int senderId, int targetId, int groupId, bool isWine, int defaultW, int defaultP);
+    Task<(bool, string)> ProcessTransactionAsync(int senderId, int targetId, int groupId, bool isWine, int num);
+
+    Task<(bool, string)> ProcessTransactionByTelegramIdAsync(long senderTgId, long targetTgId, long groupTgId, bool isWine, int num);
+
+    Task<(int WineCount, int PlasticCount, int WineLimit, int PlasticLimit)> GetPersonalStatsAsync(long telegramUserId,
+        long telegramGroupId);
 }
