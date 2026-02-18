@@ -3,6 +3,7 @@ using Mud9Bot.Data;
 using Mud9Bot.Services.Interfaces;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Mud9Bot.Data.Entities;
 
 namespace Mud9Bot.Services;
 
@@ -11,7 +12,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
     public async Task<BotUser> SyncUserAsync(User telegramUser, CancellationToken ct = default)
     {
         // 1. Try to find the user
-        var dbUser = await dbContext.Users.FirstOrDefaultAsync(u => u.TelegramId == telegramUser.Id, ct);
+        var dbUser = await dbContext.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == telegramUser.Id, ct);
 
         if (dbUser == null)
         {
@@ -28,7 +29,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
 
             try
             {
-                dbContext.Users.Add(newUser);
+                dbContext.Set<BotUser>().Add(newUser);
                 await dbContext.SaveChangesAsync(ct);
                 logger.LogInformation($"New User Added: {telegramUser.Id} ({telegramUser.Username})");
                 return newUser;
@@ -40,7 +41,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
                 dbContext.Entry(newUser).State = EntityState.Detached;
                 
                 // Fetch the existing user again (it MUST exist now)
-                dbUser = await dbContext.Users.FirstAsync(u => u.TelegramId == telegramUser.Id, ct);
+                dbUser = await dbContext.Set<BotUser>().FirstAsync(u => u.TelegramId == telegramUser.Id, ct);
             }
         }
 
@@ -71,7 +72,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
     {
         if (telegramChat.Type == ChatType.Private) return null;
 
-        var dbGroup = await dbContext.Groups.FirstOrDefaultAsync(g => g.TelegramId == telegramChat.Id, ct);
+        var dbGroup = await dbContext.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == telegramChat.Id, ct);
 
         if (dbGroup == null)
         {
@@ -83,7 +84,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
 
             try
             {
-                dbContext.Groups.Add(newGroup);
+                dbContext.Set<BotGroup>().Add(newGroup);
                 await dbContext.SaveChangesAsync(ct);
                 logger.LogInformation($"New Group Added: {telegramChat.Id} ({telegramChat.Title})");
                 return newGroup;
@@ -92,7 +93,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
             {
                 // Race condition handled: Group already exists
                 dbContext.Entry(newGroup).State = EntityState.Detached;
-                dbGroup = await dbContext.Groups.FirstAsync(g => g.TelegramId == telegramChat.Id, ct);
+                dbGroup = await dbContext.Set<BotGroup>().FirstAsync(g => g.TelegramId == telegramChat.Id, ct);
             }
         }
 
@@ -115,7 +116,7 @@ public class UserService(BotDbContext dbContext, ILogger<UserService> logger) : 
             Args = args,
             Timestamp = DateTime.UtcNow
         };
-        dbContext.CommandLogs.Add(log);
+        dbContext.Set<CommandLog>().Add(log);
         await dbContext.SaveChangesAsync(ct);
     }
 }

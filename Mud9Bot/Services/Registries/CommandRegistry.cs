@@ -7,7 +7,7 @@ using Telegram.Bot.Types.Enums;
 using Mud9Bot.Services.Interfaces;
 using Mud9Bot.Services.Logging;
 
-namespace Mud9Bot.Services;
+namespace Mud9Bot.Services.Registries;
 
 public class CommandRegistry
 {

@@ -9,6 +9,7 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Mud9Bot.Services.Logging;
 using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Services.Registries;
 using Quartz;
 
 var builder = Host.CreateApplicationBuilder(args);

@@ -1,8 +1,12 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query.Internal;
+using Mud9Bot.Data;
+using Mud9Bot.Data.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Mud9Bot.Services;
+using Mud9Bot.Services.Registries;
 using Mud9Bot.Services.Interfaces; // For IUserService
 
 namespace Mud9Bot.Services;
@@ -11,22 +15,22 @@ namespace Mud9Bot.Services;
 public class UpdateHandler(
     ILogger<UpdateHandler> logger, 
     CommandRegistry commandRegistry,
+    CallbackQueryRegistry callbackRegistry,
     IServiceScopeFactory scopeFactory) : IUpdateHandler // Primary Constructor
 {
     private string? _botUsername;
     
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        // We handle this FIRST because the message logic below returns early if Update.Message is null
         if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery is { } callbackQuery)
         {
-            // Resolve IFortuneService manually via scope factory as requested
-            using var callbackScope = scopeFactory.CreateScope();
-            var fortuneService = callbackScope.ServiceProvider.GetRequiredService<IFortuneService>();
+            // Create a scope to resolve dependencies for the Callback Modules (FortuneService, DbContext, etc.)
+            using var cbScope = scopeFactory.CreateScope();
             
-            await HandleCallbackQueryAsync(botClient, callbackQuery, fortuneService, cancellationToken);
+            await callbackRegistry.ExecuteAsync(botClient, callbackQuery, cbScope.ServiceProvider, cancellationToken);
             return;
         }
+        
         
         if (update.Message is not { } message) return;
         if (message.Text is not { } messageText) return;
@@ -120,6 +124,68 @@ public class UpdateHandler(
                 text: "找不到該靈籤資料。", 
                 cancellationToken: cancellationToken
             );
+        }
+        
+        if (data.StartsWith("wp:") == true)
+        {
+            // Format: "wp:{action}:{senderId}:{targetId}"
+            var parts = callbackQuery.Data!.Split(':');
+            if (parts.Length != 4) return;
+
+            var action = parts[1]; // "w" or "p"
+            if (!long.TryParse(parts[2], out var originalSenderId)) return;
+            if (!long.TryParse(parts[3], out var targetTelegramId)) return;
+
+            // 1. Verify Clicker is the Original Sender
+            if (callbackQuery.From.Id != originalSenderId)
+            {
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, "你唔係發起人，無權禁掣！", cancellationToken: cancellationToken);
+                return;
+            }
+
+            // 2. Resolve Scoped Services
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+            var wpService = scope.ServiceProvider.GetRequiredService<IWinePlasticService>();
+
+            // 3. Map Telegram IDs to Internal DB Entities
+            // Note: Using Set<T>() because explicit DbSets were removed for dynamic registration
+            var senderEntity = await db.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == originalSenderId, cancellationToken);
+            var targetEntity = await db.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == targetTelegramId, cancellationToken);
+            var groupEntity = await db.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == callbackQuery.Message!.Chat.Id, cancellationToken);
+
+            if (senderEntity == null || targetEntity == null || groupEntity == null)
+            {
+                await botClient.AnswerCallbackQuery(callbackQuery.Id, "系統錯誤: 找不到用戶資料 (可能未同步)。", cancellationToken: cancellationToken);
+                return;
+            }
+
+            // 4. Process Transaction
+            var result = await wpService.ProcessTransactionAsync(
+                senderEntity.Id, 
+                targetEntity.Id, 
+                groupEntity.Id, 
+                action == "w", 
+                groupEntity.WQuota, 
+                groupEntity.PQuota
+            );
+
+            // 5. Respond
+            if (result.Contains("用完"))
+            {
+                 // If quota exceeded, show alert but keep buttons
+                 await botClient.AnswerCallbackQuery(callbackQuery.Id, result, showAlert: true, cancellationToken: cancellationToken);
+            }
+            else
+            {
+                 // Success: Edit the message to show result and remove buttons
+                 await botClient.EditMessageText(
+                     chatId: callbackQuery.Message.Chat.Id,
+                     messageId: callbackQuery.Message.MessageId,
+                     text: result,
+                     cancellationToken: cancellationToken
+                 );
+            }
         }
     }
     public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
