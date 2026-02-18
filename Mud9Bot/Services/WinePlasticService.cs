@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Interfaces;
 using Telegram.Bot.Extensions;
 
 namespace Mud9Bot.Services;

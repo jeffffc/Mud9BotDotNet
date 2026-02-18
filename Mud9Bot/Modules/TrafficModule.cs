@@ -1,6 +1,6 @@
 using Mud9Bot.Attributes;
 using Mud9Bot.Extensions;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Interfaces;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 

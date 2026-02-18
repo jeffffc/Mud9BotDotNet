@@ -4,7 +4,7 @@ using Mud9Bot.Attributes;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace Mud9Bot.Services.Registries;
+namespace Mud9Bot.Registries;
 
 public class CallbackQueryRegistry
 {

@@ -6,10 +6,10 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Mud9Bot.Services.Registries;
-using Mud9Bot.Services.Interfaces; // For IUserService
+using Mud9Bot.Registries;
+using Mud9Bot.Interfaces; // For IUserService
 
-namespace Mud9Bot.Services;
+namespace Mud9Bot.Handlers;
 
 // Inject IEnumerable<IBotCommand> to get ALL registered commands automatically
 public class UpdateHandler(

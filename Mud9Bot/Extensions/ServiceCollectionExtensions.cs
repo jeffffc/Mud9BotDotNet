@@ -1,5 +1,5 @@
 using System.Reflection;
-using Mud9Bot.Services.Registries;
+using Mud9Bot.Registries;
 using Mud9Bot.Attributes;
 using Quartz;
 

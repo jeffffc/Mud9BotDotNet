@@ -1,7 +1,7 @@
 using Mud9Bot.Attributes;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Interfaces;
 
 using Mud9Bot.Extensions;
 using Telegram.Bot;

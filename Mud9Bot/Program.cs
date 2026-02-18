@@ -7,9 +7,10 @@ using Mud9Bot.Modules; // Import your modules namespace
 using Mud9Bot.Extensions;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
-using Mud9Bot.Services.Logging;
-using Mud9Bot.Services.Interfaces;
-using Mud9Bot.Services.Registries;
+using Mud9Bot.Handlers;
+using Mud9Bot.Logging;
+using Mud9Bot.Interfaces;
+using Mud9Bot.Registries;
 using Quartz;
 
 var builder = Host.CreateApplicationBuilder(args);

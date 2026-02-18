@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Services;
 

@@ -1,4 +1,4 @@
-namespace Mud9Bot.Services.Interfaces;
+namespace Mud9Bot.Interfaces;
 
 // Define the shape of the JSON object {"a": "...", "b": "..."}
 public record FortuneItem(string a, string b);

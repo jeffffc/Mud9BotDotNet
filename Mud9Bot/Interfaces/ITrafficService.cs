@@ -1,4 +1,4 @@
-namespace Mud9Bot.Services.Interfaces;
+namespace Mud9Bot.Interfaces;
 
 public interface ITrafficService
 {

@@ -1,6 +1,6 @@
 using Telegram.Bot.Types;
 
-namespace Mud9Bot.Services.Interfaces;
+namespace Mud9Bot.Interfaces;
 
 public interface IErrorReporter
 {

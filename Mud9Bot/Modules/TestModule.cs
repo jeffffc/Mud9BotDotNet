@@ -3,8 +3,8 @@ using Mud9Bot.Extensions;
 using Mud9Bot.Services;
 using Telegram.Bot;
 using Telegram.Bot.Types;
-using Mud9Bot.Services.Logging;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Logging;
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Modules;
 

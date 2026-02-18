@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Mud9Bot.Services.Interfaces;
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Services;
 
