@@ -1,6 +1,7 @@
 using System.Reflection;
 using Mud9Bot.Registries;
 using Mud9Bot.Attributes;
+using Mud9Bot.Modules.Conversations;
 using Quartz;
 
 namespace Mud9Bot.Extensions;
@@ -105,6 +106,23 @@ public static class ServiceCollectionExtensions
             // Note: If a service doesn't have an interface (like StartupNotificationService), 
             // it's usually a HostedService which is handled manually or via a different mechanism.
         }
+        
+        // 3. Register Conversations (NEW)
+        logger.LogInformation("--- Registering Conversations ---");
+        
+        // Find all classes that implement IConversation
+        var conversationTypes = types.Where(t => typeof(IConversation).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+
+        foreach (var convType in conversationTypes)
+        {
+            // Register as 'IConversation' so we can inject IEnumerable<IConversation> later
+            services.AddSingleton(typeof(IConversation), convType);
+            logger.LogInformation("[+] Conversation: {Name}", convType.Name);
+        }
+
+        // 4. Register the Manager
+        services.AddSingleton<ConversationManager>();
+        
         logger.LogInformation("----------------------------");
     }
 }

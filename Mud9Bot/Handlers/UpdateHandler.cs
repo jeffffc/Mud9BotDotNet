@@ -1,13 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query.Internal;
-using Mud9Bot.Data;
-using Mud9Bot.Data.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Mud9Bot.Registries;
 using Mud9Bot.Interfaces; // For IUserService
+using Mud9Bot.Modules.Conversations;
 
 namespace Mud9Bot.Handlers;
 
@@ -16,12 +13,30 @@ public class UpdateHandler(
     ILogger<UpdateHandler> logger, 
     CommandRegistry commandRegistry,
     CallbackQueryRegistry callbackRegistry,
-    IServiceScopeFactory scopeFactory) : IUpdateHandler // Primary Constructor
+    IServiceScopeFactory scopeFactory,
+    ConversationManager conversationManager) : IUpdateHandler // Primary Constructor
 {
     private string? _botUsername;
     
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
+        // ---------------------------------------------------------
+        // 1. PRIORITY: Conversation Manager
+        // ---------------------------------------------------------
+        // We check this FIRST. The Manager handles:
+        // A) Active Sessions: Is the user currently in a flow? (Handles Messages AND Callbacks)
+        // B) Entry Points: Is this a command that starts a flow? (e.g. /msettings)
+        
+        if (await conversationManager.HandleUpdateAsync(update, cancellationToken))
+        {
+            return; // Handled by conversation, stop processing.
+        }
+        
+        // ---------------------------------------------------------
+        // 2. Standard Callback Queries (Fallback)
+        // ---------------------------------------------------------
+        // If we are here, the callback was NOT part of a conversation.
+        
         if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery is { } callbackQuery)
         {
             // Create a scope to resolve dependencies for the Callback Modules (FortuneService, DbContext, etc.)
@@ -31,6 +46,9 @@ public class UpdateHandler(
             return;
         }
         
+        // ---------------------------------------------------------
+        // 3. Standard Messages & Commands (Fallback)
+        // ---------------------------------------------------------
         
         if (update.Message is not { } message) return;
         if (message.Text is not { } messageText) return;
@@ -42,6 +60,7 @@ public class UpdateHandler(
         // --- SCOPE CREATION ---
         // We create a scope to resolve Scoped services like IUserService and BotDbContext
         // Use 'scopeFactory' directly from the primary constructor
+        
         using var scope = scopeFactory.CreateScope();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
         
@@ -54,10 +73,11 @@ public class UpdateHandler(
         {
             await userService.SyncGroupAsync(message.Chat, cancellationToken);
         }
+        
         // ----------------------
 
         if (!messageText.StartsWith('/')) return; // Ignore non-commands after syncing
-
+        
         // ... Command Parsing & Execution Logic ...
         
         // --- PARSING LOGIC START ---

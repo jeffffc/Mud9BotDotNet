@@ -41,14 +41,14 @@ public class BotGroup
 
     // Settings (Legacy tinyint mapped to int)
     [Column("offfortune")]
-    public int OffFortune { get; set; }
+    public bool OffFortune { get; set; }
 
     [Column("offzodiac")]
-    public int OffZodiac { get; set; }
+    public bool OffZodiac { get; set; }
 
     [Column("offlomo")]
-    public int OffLomo { get; set; }
+    public bool OffLomo { get; set; }
 
     [Column("offsimp")]
-    public int OffSimp { get; set; }
+    public bool OffSimp { get; set; }
 }
