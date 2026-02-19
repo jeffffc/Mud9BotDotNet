@@ -69,7 +69,7 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         // 6. Return Result String
         return (true, (isWine
             ? (num > 1 ? $"已對*【{targetName}】*賜 `{num}` 杯酒 🍻！" : $"已對*【{targetName}】* 賜酒 🍻！")
-            : (num > 1 ? $"已對*【{targetName}】*賜 `{num}` 杯酒 🍻！" : $"已對*【{targetName}】* 派膠 🌚！")
+            : (num > 1 ? $"已對*【{targetName}】*派 `{num}` 粒膠 🍻！" : $"已對*【{targetName}】* 派膠 🌚！")
             )
             );
     }
@@ -86,6 +86,20 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         }
 
         return await ProcessTransactionAsync(senderEntity.Id, targetEntity.Id, groupEntity.Id, isWine, num);
+    }
+    
+    public async Task<int> ResetDailyQuotasAsync()
+    {
+        // PostgreSQL specific syntax
+        var sql = @"
+            UPDATE dailylimit d
+            SET wlimit = g.wquota,
+                plimit = g.pquota
+            FROM groups g
+            WHERE d.groupid = g.groupid;
+        ";
+        
+        return await context.Database.ExecuteSqlRawAsync(sql);
     }
     
     private async Task<DailyLimit> CreateDefaultLimitAsync(int userId, int groupId)

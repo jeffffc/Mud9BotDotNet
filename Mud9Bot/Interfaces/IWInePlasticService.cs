@@ -15,4 +15,7 @@ public interface IWinePlasticService
 
     Task<(int WineCount, int PlasticCount, int WineLimit, int PlasticLimit)> GetPersonalStatsAsync(long telegramUserId,
         long telegramGroupId);
+    
+    // New method for manual reset or job execution
+    Task<int> ResetDailyQuotasAsync();
 }

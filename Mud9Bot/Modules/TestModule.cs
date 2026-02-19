@@ -14,10 +14,7 @@ public class TestModule(IHttpService httpService)
     public async Task TestHttp(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
         var url = "https://httpbin.org/get";
-        // MarkdownV2 requires escaping for '.' and other chars.
-        // We escape the URL just in case, though inside code blocks it's usually fine.
-        // Crucially, the "..." at the end MUST be escaped as "\.\.\."
-        await bot.Reply(msg, $"🔄 Testing HTTP GET to `{url}`\\.\\.\\.", ct);
+        await bot.Reply(msg, $"🔄 Testing HTTP GET to `{url}`...", ct);
 
         try
         {
@@ -32,18 +29,18 @@ public class TestModule(IHttpService httpService)
                 // but we should ensure it doesn't contain closing backticks "```".
                 // Ideally we would escape it, but for JSON inside code blocks it's usually okay as is.
                 // However, "Success!" has '!' which is reserved.
-                await bot.Reply(msg, $"✅ *Success\\!*\nResponse:\n```json\n{result}\n```", ct);
+                await bot.Reply(msg, $"✅ *Success!*\nResponse:\n```json\n{result}\n```", ct);
             }
             else
             {
                 // '!' and '.' and '-' must be escaped
-                await bot.Reply(msg, "❌ HTTP Request failed \\(returned null/empty\\)\\. Check logs\\.", ct);
+                await bot.Reply(msg, "❌ HTTP Request failed (returned null/empty). Check logs.", ct);
             }
         }
         catch (Exception ex)
         {
             // Escape exception message as it's untrusted input
-            await bot.Reply(msg, $"❌ Exception: {ex.Message.EscapeMarkdown()}", ct);
+            await bot.Reply(msg, $"❌ Exception: {ex.Message}", ct);
         }
     }
 }

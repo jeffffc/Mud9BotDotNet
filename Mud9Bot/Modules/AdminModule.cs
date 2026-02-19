@@ -20,7 +20,7 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
 
         if (string.IsNullOrWhiteSpace(query))
         {
-            await bot.Reply(msg, "Please provide a query\\. Example: `SELECT * FROM users`", ct);
+            await bot.Reply(msg, "Please provide a query. Example: `SELECT * FROM users`", ct);
             return;
         }
 
@@ -75,7 +75,7 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
             else
             {
                 var rows = await command.ExecuteNonQueryAsync(ct);
-                await bot.Reply(msg, $"*Command Executed\\.*\nRows affected: {rows}", ct);
+                await bot.Reply(msg, $"*Command Executed.*\nRows affected: {rows}", ct);
             }
         }
         catch (Exception ex)

@@ -1,4 +1,5 @@
 using Telegram.Bot;
+using Telegram.Bot.Extensions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
@@ -12,7 +13,7 @@ public static class BotExtensions
     {
         return await bot.SendMessage(
             chatId: chatId,
-            text: text,
+            text: Markdown.Escape(text),
             parseMode: ParseMode.MarkdownV2,
             cancellationToken: ct);
     }
@@ -23,7 +24,7 @@ public static class BotExtensions
     {
         return await bot.SendMessage(
             chatId: originalMessage.Chat.Id,
-            text: text,
+            text: Markdown.Escape(text),
             parseMode: ParseMode.MarkdownV2,
             replyParameters: new ReplyParameters { MessageId = originalMessage.MessageId },
             cancellationToken: ct);

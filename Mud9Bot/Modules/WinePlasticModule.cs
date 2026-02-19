@@ -85,7 +85,7 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
     [CallbackQuery("plastic")]
     public async Task HandlePlasticCallback(ITelegramBotClient bot, CallbackQuery query, CancellationToken ct)
     {
-        await HandleWinePlastic(bot, query, true, ct);
+        await HandleWinePlastic(bot, query, false, ct);
     }
 
     private async Task HandleWinePlastic(ITelegramBotClient bot, CallbackQuery query, bool isWine, CancellationToken ct)
@@ -197,6 +197,23 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
                 cancellationToken: ct
             );
             // In a real scenario, you might want to log 'ex' using injected ILogger if available
+        }
+    }
+    
+    [Command("resetquota", DevOnly = true, Description = "Manually reset daily quotas for all groups.")]
+    public async Task ResetQuotaCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        await bot.Reply(message, "🔄 Processing quota reset...", ct);
+        
+        try 
+        {
+            // Call the service method we just added
+            var rowsAffected = await wpService.ResetDailyQuotasAsync();
+            await bot.Reply(message, $"✅ Success! Quotas reset for {rowsAffected} entries.", ct);
+        }
+        catch (Exception ex)
+        {
+            await bot.Reply(message, $"❌ Error resetting quotas: {ex.Message}", ct);
         }
     }
 }

@@ -16,7 +16,7 @@ public class TrafficModule(ITrafficService trafficService)
         {
             await bot.Reply(msg, "🔄 Fetching traffic news...", ct);
             var news = await trafficService.GetTrafficNewsAsync(ct);
-            await bot.Reply(msg, $"🚦 *Traffic News*\n\n{news.EscapeMarkdown()}", ct);
+            await bot.Reply(msg, $"🚦 *Traffic News*\n\n{news}", ct);
         }
         else
         {
