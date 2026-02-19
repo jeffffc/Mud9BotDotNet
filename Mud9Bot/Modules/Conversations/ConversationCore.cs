@@ -52,20 +52,23 @@ public class ConversationManager
 
         long userId = user.Id;
 
-        // 1. CHECK FOR START COMMANDS (PRIORITY: RESTART SESSION)
-        // If user types /msettings, we restart immediately, even if they were in the middle of typing a number.
+        // 1. CHECK FOR COMMANDS
         if (update.Message?.Text is { } text && text.StartsWith("/"))
         {
             string command = ParseCommand(text);
 
+            // If the command is a trigger for a conversation, start/restart it
             if (_triggerMap.TryGetValue(command, out var targetWorkflow))
             {
-                // Force remove old session if exists
                 _userSessions.TryRemove(userId, out _);
-                
                 await StartNewSessionAsync(targetWorkflow, userId, update, ct);
                 return true;
             }
+            
+            // FIX: If the message is a command but NOT a conversation trigger,
+            // we return FALSE immediately. This allows the UpdateHandler to 
+            // pass the command to the standard CommandRegistry.
+            return false;
         }
 
         // 2. CHECK ACTIVE SESSION
@@ -84,7 +87,7 @@ public class ConversationManager
             }
         }
 
-        // 3. FALLBACK ENTRY POINTS (Non-Command triggers)
+        // 3. FALLBACK ENTRY POINTS (Non-Command triggers like Callback Buttons)
         foreach (var workflow in _workflowMap.Values)
         {
             if (workflow.IsEntryPoint(update))

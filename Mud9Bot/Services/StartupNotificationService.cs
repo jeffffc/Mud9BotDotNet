@@ -1,12 +1,14 @@
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
-using System.Reflection; // Added for version info
+using System.Reflection;
+using Mud9Bot.Interfaces; // Added for version info
 
 namespace Mud9Bot.Services;
 
 public class StartupNotificationService(
     ITelegramBotClient botClient,
     IConfiguration configuration,
+    IBotMetadataService metadata, // Injected
     ILogger<StartupNotificationService> logger) : IHostedService
 {
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
@@ -23,9 +25,14 @@ public class StartupNotificationService(
             
             var message = $"🤖 *Bot Started*\n" +
                           $"Name: `{me.FirstName}`\n" +
-                          $"Username: @{me.Username}\n" +
                           $"Version: `{version}`\n" +
-                          $"Time: `{startTime}`";
+                          $"Time: `{startTime}`\n\n" +
+                          $"📊 *Registration Stats*\n" +
+                          $"├ Commands: `{metadata.CommandCount}`\n" +
+                          $"├ Callbacks: `{metadata.CallbackCount}`\n" +
+                          $"├ Jobs: `{metadata.JobCount}`\n" +
+                          $"├ Services: `{metadata.ServiceCount}`\n" +
+                          $"└ Conversations: `{metadata.ConversationCount}`";
 
             await botClient.SendMessage(
                 chatId: _logGroupId,

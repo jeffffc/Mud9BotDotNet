@@ -1,6 +1,6 @@
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using Mud9Bot.Attributes;
+using Mud9Bot.Interfaces;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -9,9 +9,12 @@ namespace Mud9Bot.Registries;
 public class CallbackQueryRegistry
 {
     private readonly Dictionary<string, MethodInfo> _handlers = new();
+    private readonly ILogger<CallbackQueryRegistry> _logger;
 
-    public CallbackQueryRegistry()
+    public CallbackQueryRegistry(ILogger<CallbackQueryRegistry> logger, IBotMetadataService metadata)
     {
+        _logger = logger;
+        
         // Scan assembly for methods with [CallbackQuery]
         var methods = Assembly.GetExecutingAssembly().GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract)
@@ -24,8 +27,11 @@ public class CallbackQueryRegistry
             if (attr != null)
             {
                 _handlers[attr.Prefix] = method;
+                _logger.LogInformation($"Registered Callback Prefix: '{attr.Prefix}' -> {method.DeclaringType?.Name}");
             }
         }
+        
+        metadata.CallbackCount = _handlers.Count;
     }
 
     public async Task ExecuteAsync(ITelegramBotClient bot, CallbackQuery query, IServiceProvider serviceProvider, CancellationToken ct)

@@ -33,7 +33,6 @@ builder.Services.AddDbContext<BotDbContext>(options =>
 builder.Services.AddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(botToken));
 
 // 5. Register Services (The Brains)
-builder.Services.AddSingleton<CommandRegistry>();
 builder.Services.AddSingleton<IErrorReporter, ErrorReporter>(); // <--- ADD THIS LINE
 
 // --- NEW: HTTP Service Registration ---

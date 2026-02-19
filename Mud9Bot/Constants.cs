@@ -1,6 +1,6 @@
 namespace Mud9Bot;
 
-public class Constants
+public static class Constants
 {
     public static string[] NoOriginalSenderMessageList = [
         "縮手啦，唔係你嘅野就唔好掂。",
