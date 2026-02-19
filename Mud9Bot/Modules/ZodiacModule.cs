@@ -4,7 +4,6 @@ using Mud9Bot.Attributes;
 using Mud9Bot.Interfaces;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
-using Mud9Bot.Extensions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -24,10 +23,18 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
         { "money", "財運運勢" }
     };
 
+    private static readonly string[] ErrorMessages = 
+    [
+        "縮手啦，唔係你嘅野就唔好掂。",
+        "撳撳撳……就算你撳爛個 Moon 我都唔會俾你睇人地啲嘢！",
+        "撳乜鳩啊？好好玩啊依家？唔係你嘅野就咪搞啦！",
+        "係唔俾你睇人地啲嘢呀吹咩？😗"
+    ];
+
     [Command("zodiac")]
     public async Task ZodiacCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
-        // 1. Group Setting Check
+        // Respect group settings
         if (message.Chat.Type != ChatType.Private)
         {
             using var scope = scopeFactory.CreateScope();
@@ -36,18 +43,36 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
             if (group != null && group.OffZodiac) return;
         }
 
-        // 2. Build 4-column sign menu
-        var buttons = ZodiacNames.Select((name, i) => InlineKeyboardButton.WithCallbackData(name, $"ZODIAC+{i}"));
-        var keyboard = new InlineKeyboardMarkup(buttons.Chunk(4));
-
         await bot.SendMessage(
             chatId: message.Chat.Id,
             text: "<b>【今日星座運程】</b>\n你想睇邊個星座呀？",
             parseMode: ParseMode.Html,
-            replyMarkup: keyboard,
+            replyMarkup: GetMainKeyboard(),
             replyParameters: new ReplyParameters { MessageId = message.MessageId },
             cancellationToken: ct
         );
+    }
+
+    [CallbackQuery("ZODIAC_MAIN")]
+    public async Task HandleMainSelect(ITelegramBotClient bot, CallbackQuery query, CancellationToken ct)
+    {
+        if (!await IsOwner(bot, query, ct)) return;
+
+        try
+        {
+            await bot.EditMessageText(
+                chatId: query.Message!.Chat.Id,
+                messageId: query.Message.MessageId,
+                text: "<b>【今日星座運程】</b>\n你想睇邊個星座呀？",
+                parseMode: ParseMode.Html,
+                replyMarkup: GetMainKeyboard(),
+                cancellationToken: ct
+            );
+        }
+        catch (ApiRequestException ex) when (ex.Message.Contains("is not modified"))
+        {
+            await bot.AnswerCallbackQuery(query.Id, "你已經喺主選單啦！", cancellationToken: ct);
+        }
     }
 
     [CallbackQuery("ZODIAC")]
@@ -56,18 +81,25 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
         var parts = query.Data!.Split('+');
         if (parts.Length < 2 || !int.TryParse(parts[1], out int index)) return;
 
-        // Permission Check (Ensures only the person who called the command can click)
         if (!await IsOwner(bot, query, ct)) return;
 
         string text = zodiacService.GetSummary(index);
-        await bot.EditMessageText(
-            chatId: query.Message!.Chat.Id,
-            messageId: query.Message.MessageId,
-            text: text,
-            parseMode: ParseMode.Html,
-            replyMarkup: GetCategoryKeyboard(index),
-            cancellationToken: ct
-        );
+        
+        try
+        {
+            await bot.EditMessageText(
+                chatId: query.Message!.Chat.Id,
+                messageId: query.Message.MessageId,
+                text: text,
+                parseMode: ParseMode.Html,
+                replyMarkup: GetSummaryKeyboard(index),
+                cancellationToken: ct
+            );
+        }
+        catch (ApiRequestException ex) when (ex.Message.Contains("is not modified"))
+        {
+            await bot.AnswerCallbackQuery(query.Id, "你咪睇緊呢個囉，揀過個啦！", showAlert: true, cancellationToken: ct);
+        }
     }
 
     [CallbackQuery("TYPEZODIAC")]
@@ -91,7 +123,7 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
                 messageId: query.Message.MessageId,
                 text: text,
                 parseMode: ParseMode.Html,
-                replyMarkup: GetCategoryKeyboard(index),
+                replyMarkup: GetDetailKeyboard(index, type),
                 cancellationToken: ct
             );
         }
@@ -108,18 +140,44 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
         
         if (ownerId.HasValue && query.From.Id != ownerId.Value)
         {
-            // Uses your existing Cantonese random error list
-            await bot.AnswerCallbackQuery(query.Id, Constants.NoOriginalSenderMessageList.GetAny(), showAlert: true, cancellationToken: ct);
+            var random = new Random();
+            var errMsg = ErrorMessages[random.Next(ErrorMessages.Length)];
+            await bot.AnswerCallbackQuery(query.Id, errMsg, showAlert: true, cancellationToken: ct);
             return false;
         }
         return true;
     }
 
-    private InlineKeyboardMarkup GetCategoryKeyboard(int index)
+    // --- Keyboard Generators ---
+
+    private InlineKeyboardMarkup GetMainKeyboard()
     {
-        var buttons = TypeLabels.Select(kvp => 
-            InlineKeyboardButton.WithCallbackData(kvp.Value, $"TYPEZODIAC+{index}+{kvp.Key}")
-        );
+        var buttons = ZodiacNames.Select((name, i) => InlineKeyboardButton.WithCallbackData(name, $"ZODIAC+{i}"));
         return new InlineKeyboardMarkup(buttons.Chunk(4));
+    }
+
+    private InlineKeyboardMarkup GetSummaryKeyboard(int index)
+    {
+        var categoryButtons = TypeLabels.Select(kvp => 
+            InlineKeyboardButton.WithCallbackData(kvp.Value, $"TYPEZODIAC+{index}+{kvp.Key}")
+        ).Chunk(4).ToList();
+
+        // Add back button returning to the Main Zodiac List
+        categoryButtons.Add(new[] { InlineKeyboardButton.WithCallbackData("🔙 返回星座列表", "ZODIAC_MAIN") });
+
+        return new InlineKeyboardMarkup(categoryButtons);
+    }
+
+    private InlineKeyboardMarkup GetDetailKeyboard(int index, string activeType)
+    {
+        var categoryButtons = TypeLabels.Select(kvp => {
+            string label = kvp.Key == activeType ? $"📍 {kvp.Value}" : kvp.Value;
+            return InlineKeyboardButton.WithCallbackData(label, $"TYPEZODIAC+{index}+{kvp.Key}");
+        }).Chunk(4).ToList();
+
+        // Add back button returning to the Specific Zodiac's Summary
+        categoryButtons.Add(new[] { InlineKeyboardButton.WithCallbackData($"🔙 返回{ZodiacNames[index]}座", $"ZODIAC+{index}") });
+
+        return new InlineKeyboardMarkup(categoryButtons);
     }
 }

@@ -52,6 +52,18 @@ public static class ServiceCollectionExtensions
                 }
             });
             
+            // NEW: Support for modular "Run On Startup" jobs
+            var runOnStartupProp = attr.GetType().GetProperty("RunOnStartup");
+            bool runsOnStartup = runOnStartupProp != null && runOnStartupProp.GetValue(attr) is true;
+            
+            if (runsOnStartup)
+            {
+                q.AddTrigger(opts => opts
+                    .ForJob(jobKey)
+                    .WithIdentity($"{attr.Name}-startup-trigger", attr.Group)
+                    .StartNow()); // This trigger fires immediately and only once
+            }
+            
             var scheduleDisplay = string.IsNullOrEmpty(attr.CronInterval) ? $"{attr.IntervalSeconds}s" : attr.CronInterval;
             logger.LogInformation($"[+] Job Registered: {attr.Name} ({scheduleDisplay})");
         }

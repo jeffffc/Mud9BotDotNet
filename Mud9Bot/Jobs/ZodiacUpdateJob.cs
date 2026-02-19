@@ -7,7 +7,7 @@ using Telegram.Bot;
 
 namespace Mud9Bot.Jobs;
 
-[QuartzJob(Name = "ZodiacUpdateJob", CronInterval = "0 30 0 * * ?", Description = "Update Zodiac data daily at 00:30 HK time")]
+[QuartzJob(Name = "ZodiacUpdateJob", CronInterval = "0 30 0 * * ?", RunOnStartup = true, Description = "Run on startup, and Update Zodiac data daily at 00:30 HK time")]
 public class ZodiacUpdateJob(
     IZodiacService zodiacService, 
     IZodiacCrawlerService crawler, 

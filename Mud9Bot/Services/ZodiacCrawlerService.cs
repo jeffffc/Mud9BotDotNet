@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using Microsoft.Extensions.Logging;
 using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Services;
@@ -11,9 +12,6 @@ public record ZodiacScrapeResult(
 
 public interface IZodiacCrawlerService
 {
-    /// <summary>
-    /// Fetches all 12 signs for a specific date (yyyy-MM-dd)
-    /// </summary>
     Task<Dictionary<int, ZodiacScrapeResult>> FetchAllSignsAsync(string dateStr);
 }
 
@@ -25,16 +23,12 @@ public class ZodiacCrawlerService(ILogger<ZodiacCrawlerService> logger) : IZodia
     {
         var results = new Dictionary<int, ZodiacScrapeResult>();
 
-        // Porting the 0-11 loop from your Python logic
         for (int i = 0; i < 12; i++)
-        {
+        { 
             try
             {
-                var data = await FetchSignAsync(dateStr, i);
-                results[i] = data;
-                
-                // Be a good citizen: small delay between requests to avoid IP bans
-                await Task.Delay(300); 
+                results[i] = await FetchSignAsync(dateStr, i);
+                await Task.Delay(300); // Anti-ban delay
             }
             catch (Exception ex)
             {
@@ -47,7 +41,6 @@ public class ZodiacCrawlerService(ILogger<ZodiacCrawlerService> logger) : IZodia
 
     private async Task<ZodiacScrapeResult> FetchSignAsync(string date, int index)
     {
-        // URL format matches your Python find(day, zodiacnum) function
         string url = $"http://astro.click108.com.tw/daily_{index}.php?iAcDay={date}&iAstro={index}";
         
         var response = await _httpClient.GetAsync(url);
@@ -57,48 +50,58 @@ public class ZodiacCrawlerService(ILogger<ZodiacCrawlerService> logger) : IZodia
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
 
-        // 1. Lucky Info (TODAY_LUCKY)
-        var luckyNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'TODAY_LUCKY')]//span[contains(@class, 'LUCKY')]");
-        string luckyNumber = luckyNodes?[0].SelectSingleNode(".//h4")?.InnerText ?? "-";
-        string luckyColor = luckyNodes?[1].SelectSingleNode(".//h4")?.InnerText ?? "-";
-        string luckyZodiac = luckyNodes?[4].SelectSingleNode(".//h4")?.InnerText ?? "-";
-
-        // 2. Summary Word (TODAY_WORD)
-        string todayWord = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'TODAY_WORD')]//p")?.InnerText ?? "";
-
-        // 3. Scores (STAR_LIGHT) - Regex to find the star icon number (iconX.png)
-        var starNodes = doc.DocumentNode.SelectNodes("//span[contains(@class, 'STAR_LIGHT')]");
-        var scores = new List<int>();
-        if (starNodes != null)
+        // 1. Scrape Lucky Items
+        // Click108 結構通常為: <h4><span class="LUCKY">幸運數字：</span>8</h4>
+        var luckyNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'TODAY_LUCKY')]//h4");
+        
+        string ParseLuckyNode(HtmlNodeCollection? nodes, int nodeIndex)
         {
-            foreach (var node in starNodes)
-            {
-                var match = Regex.Match(node.OuterHtml, @"icon\d(\d).png");
-                if (match.Success) scores.Add(int.Parse(match.Groups[1].Value));
-            }
+            if (nodes == null || nodes.Count <= nodeIndex) return "-";
+            var text = nodes[nodeIndex].InnerText;
+            // 用全形或半形冒號切開，取最後一段內容
+            var parts = text.Split(new[] { '：', ':' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.LastOrDefault()?.Trim() ?? "-";
         }
 
-        // 4. Detailed Content (p tags inside TODAY_CONTENT)
-        // Replicating your Python logic: taking every second 'p' tag (indices 1, 3, 5, 7)
+        string luckyNumber = ParseLuckyNode(luckyNodes, 0);
+        string luckyColor = ParseLuckyNode(luckyNodes, 1);
+        string luckyZodiac = ParseLuckyNode(luckyNodes, 4);
+
+        // 2. Scrape Summary
+        string todayWord = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'TODAY_WORD')]//p")?.InnerText ?? "";
+
+        // 3 & 4. Scrape Scores and Content (COMBINED FIX)
+        // Click108 alternates <p> tags inside TODAY_CONTENT:
+        // Index 0 (Even): "整體運勢：★★★★☆" -> Contains the score
+        // Index 1 (Odd) : "實際內容..." -> Contains the text
         var contentNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'TODAY_CONTENT')]//p");
+        var scores = new List<int>();
         var contents = new List<string>();
+
         if (contentNodes != null)
         {
             for (int i = 0; i < contentNodes.Count; i++)
             {
-                if (i % 2 == 1) // This picks up the actual description text
+                string text = contentNodes[i].InnerText.Trim();
+                
+                if (i % 2 == 0) 
                 {
-                    contents.Add(contentNodes[i].InnerText.Trim());
+                    // This is a header row, extract the score by counting stars
+                    int score = text.Count(c => c == '★' || c == '⭐');
+                    scores.Add(score);
+                }
+                else 
+                {
+                    // This is a content row
+                    contents.Add(text);
                 }
             }
         }
 
         string zodiacName = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'TODAY_CONTENT')]//h3")?.InnerText ?? "";
 
-        // Build the Summary text (Matches your Python 'msg')
-        string summary = $"{zodiacName} ({date})\n今日短評: {todayWord}\n幸運數字: {luckyNumber}\n幸運顏色: {luckyColor}\n幸運星座: {luckyZodiac}";
+        string summary = $"<b>{zodiacName} ({date})</b>\n今日短評: {todayWord}\n幸運數字: {luckyNumber}\n幸運顏色: {luckyColor}\n幸運星座: {luckyZodiac}";
 
-        // Map categories to your legacy keys
         var categories = new Dictionary<string, (int Score, string Text)>
         {
             { "overall", (scores.ElementAtOrDefault(0), contents.ElementAtOrDefault(0) ?? "無資料") },

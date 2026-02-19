@@ -9,5 +9,6 @@ public class QuartzJobAttribute : Attribute
     public string CronInterval { get; set; } = ""; // e.g. "0 0 0 * * ?"
     public string Description { get; set; } = string.Empty;
     public bool Inactive { get; set; } = false;
+    public bool RunOnStartup { get; set; } = false;
     
 }
