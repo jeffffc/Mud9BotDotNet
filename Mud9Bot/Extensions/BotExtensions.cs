@@ -13,8 +13,8 @@ public static class BotExtensions
     {
         return await bot.SendMessage(
             chatId: chatId,
-            text: Markdown.Escape(text),
-            parseMode: ParseMode.MarkdownV2,
+            text: text,
+            parseMode: ParseMode.Html,
             cancellationToken: ct);
     }
 
@@ -24,8 +24,8 @@ public static class BotExtensions
     {
         return await bot.SendMessage(
             chatId: originalMessage.Chat.Id,
-            text: Markdown.Escape(text),
-            parseMode: ParseMode.MarkdownV2,
+            text: text,
+            parseMode: ParseMode.Html,
             replyParameters: new ReplyParameters { MessageId = originalMessage.MessageId },
             cancellationToken: ct);
     }
@@ -33,53 +33,64 @@ public static class BotExtensions
     // New: Centralized Exception Logging
     public static async Task LogException(this ITelegramBotClient bot, Exception ex, Message? message, long logGroupId, ILogger logger, CancellationToken ct = default)
     {
-        // 1. Log to Console/System
-        logger.LogError(ex, "Exception occurred");
+        // 1. Standard System Logging
+        logger.LogError(ex, "Exception occurred during bot operation.");
 
-        // 2. Reply to User (if message context exists)
+        // 2. User-facing Error Message
         if (message != null)
         {
             try 
             {
-                await bot.Reply(message, "⚠️ Error happened", ct);
+                await bot.SendMessage(
+                    chatId: message.Chat.Id,
+                    text: "⚠️ <b>發生系統錯誤</b>\n管理員已收到通知並會盡快處理。",
+                    parseMode: ParseMode.Html,
+                    replyParameters: new ReplyParameters { MessageId = message.MessageId },
+                    cancellationToken: ct);
             }
             catch (Exception replyEx)
             {
-                logger.LogError(replyEx, "Failed to reply to user about error.");
+                logger.LogError(replyEx, "Failed to reply to user about the exception.");
             }
         }
 
-        // 3. Send to Log Group (if configured)
+        // 3. Admin Log Group Notification
         if (logGroupId != 0)
         {
             var user = message?.From;
             var chat = message?.Chat;
             
-            // Escape values for MarkdownV2
-            var commandName = message?.Text?.Split(' ').FirstOrDefault()?.EscapeMarkdown() ?? "Unknown";
-            var userName = (user?.FirstName ?? "Unknown").EscapeMarkdown();
-            var userId = user?.Id.ToString().EscapeMarkdown() ?? "Unknown";
-            var chatTitle = (chat?.Title ?? "Private").EscapeMarkdown();
-            var chatId = chat?.Id.ToString().EscapeMarkdown() ?? "Unknown";
-            var errorText = (ex.InnerException?.Message ?? ex.Message).EscapeMarkdown();
-            var stackTrace = (ex.StackTrace ?? "No StackTrace").EscapeMarkdown();
+            // Local helper using the requested extension method
+            string Safe(string? s) => HtmlText.Escape(s ?? "Unknown");
 
-            // Truncate stack trace if too long
-            if (stackTrace.Length > 1000) stackTrace = stackTrace.Substring(0, 1000) + "\\.\\.\\.";
+            var commandName = Safe(message?.Text?.Split(' ').FirstOrDefault());
+            var userName = Safe(user?.FirstName);
+            var userId = user?.Id.ToString() ?? "Unknown";
+            var chatTitle = Safe(chat?.Title ?? "Private Chat");
+            var chatId = chat?.Id.ToString() ?? "Unknown";
+            var errorText = Safe(ex.InnerException?.Message ?? ex.Message);
+            var stackTrace = Safe(ex.StackTrace ?? "No StackTrace Available");
 
-            var logMessage = $"🚨 *Exception in Command:* {commandName}\n" +
-                             $"*User:* {userName} \\({userId}\\)\n" +
-                             $"*Chat:* {chatTitle} \\({chatId}\\)\n\n" +
-                             $"*Error:* `{errorText}`\n" +
-                             $"*Stack:* `{stackTrace}`";
+            // Truncate stack trace to stay within Telegram's message limits
+            if (stackTrace.Length > 1500) stackTrace = stackTrace.Substring(0, 1500) + "... (Truncated)";
+
+            var logMessage = $"🚨 <b>Exception in Command:</b> {commandName}\n" +
+                             $"👤 <b>User:</b> {userName} (<code>{userId}</code>)\n" +
+                             $"💬 <b>Chat:</b> {chatTitle} (<code>{chatId}</code>)\n\n" +
+                             $"❌ <b>Error:</b> <code>{errorText}</code>\n\n" +
+                             $"📑 <b>Stack Trace:</b>\n<pre>{stackTrace}</pre>";
 
             try
             {
-                await bot.Send(logGroupId, logMessage, ct);
+                await bot.SendMessage(
+                    chatId: logGroupId,
+                    text: logMessage,
+                    parseMode: ParseMode.Html,
+                    cancellationToken: ct);
             }
             catch (Exception logEx)
             {
-                logger.LogError(logEx, "Failed to send error log to group.");
+                logger.LogError(logEx, "Failed to send detailed error log to Admin Group.");
             }
         }
     }

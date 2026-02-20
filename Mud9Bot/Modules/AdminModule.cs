@@ -24,7 +24,7 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
 
         if (string.IsNullOrWhiteSpace(query))
         {
-            await bot.Reply(msg, "Please provide a query. Example: `SELECT * FROM users`", ct);
+            await bot.Reply(msg, "Please provide a query. Example: <code>SELECT * FROM users</code>", ct);
             return;
         }
 
@@ -84,7 +84,7 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
         }
         catch (Exception ex)
         {
-            await bot.Reply(msg, $"*SQL Error:*\n```\n{ex.Message}\n```", ct);
+            await bot.Reply(msg, $"*SQL Error:*\n<pre>\n{ex.Message}\n</pre>", ct);
         }
     }
     

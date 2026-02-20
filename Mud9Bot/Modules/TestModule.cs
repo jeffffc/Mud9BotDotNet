@@ -14,7 +14,7 @@ public class TestModule(IHttpService httpService)
     public async Task TestHttp(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
         var url = "https://httpbin.org/get";
-        await bot.Reply(msg, $"🔄 Testing HTTP GET to `{url}`...", ct);
+        await bot.Reply(msg, $"🔄 Testing HTTP GET to <code>{url}</code>...", ct);
 
         try
         {
@@ -29,7 +29,7 @@ public class TestModule(IHttpService httpService)
                 // but we should ensure it doesn't contain closing backticks "```".
                 // Ideally we would escape it, but for JSON inside code blocks it's usually okay as is.
                 // However, "Success!" has '!' which is reserved.
-                await bot.Reply(msg, $"✅ *Success!*\nResponse:\n```json\n{result}\n```", ct);
+                await bot.Reply(msg, $"✅ <b>Success!></b>\nResponse:\n</pre><code class=\"json\">\n{result}\n</pre>", ct);
             }
             else
             {
