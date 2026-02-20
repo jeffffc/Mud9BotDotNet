@@ -6,6 +6,10 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using System.Data;
 using System.Text;
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Telegram.Bot.Types.Enums;
 
 namespace Mud9Bot.Modules;
 
@@ -82,5 +86,37 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
         {
             await bot.Reply(msg, $"*SQL Error:*\n```\n{ex.Message}\n```", ct);
         }
+    }
+    
+    
+    [Command("raw", DevOnly = true)]
+    public async Task RawCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        // 1. Ensure it's a reply
+        if (message.ReplyToMessage == null)
+        {
+            await bot.SendMessage(
+                chatId: message.Chat.Id,
+                text: "你想睇邊條 message 嘅 Raw data？對住佢 `/raw` 啦！",
+                replyParameters: new ReplyParameters { MessageId = message.MessageId },
+                cancellationToken: ct);
+            return;
+        }
+
+        // 2. Serialize to JSON
+        var options = new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+        string json = JsonSerializer.Serialize(message.ReplyToMessage, options);
+
+        // 3. Wrap in HTML code block to handle JSON characters safely
+        string safeJson = WebUtility.HtmlEncode(json);
+        string response = $"<pre><code class=\"language-json\">{safeJson}</code></pre>";
+
+        await bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: response,
+            parseMode: ParseMode.Html,
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            cancellationToken: ct
+        );
     }
 }

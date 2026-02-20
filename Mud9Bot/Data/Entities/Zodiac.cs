@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Mud9Bot.Data.Entities;
 
 [Table("zodiacs")]
-public class ZodiacEntity
+public class Zodiac
 {
     [Key]
     public int Id { get; set; }

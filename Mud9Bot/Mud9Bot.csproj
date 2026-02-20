@@ -11,6 +11,14 @@
         <Deterministic>false</Deterministic>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <OutputPath />
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <OutputPath />
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.3" />

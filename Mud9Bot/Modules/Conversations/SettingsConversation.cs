@@ -106,7 +106,7 @@ public class SettingsConversation : IConversation
     private async Task<string> HandleCallbackLogic(ITelegramBotClient bot, long chatId, CallbackQuery query, ConversationContext context, CancellationToken ct)
     {
         var data = query.Data!; 
-        var parts = data.Split(':');
+        var parts = data.Split('+');
         
         string type = parts.Length > 2 ? parts[2] : "";
         string action = parts.Length > 3 ? parts[3] : "";
@@ -327,41 +327,41 @@ public class SettingsConversation : IConversation
         var rows = new List<IEnumerable<InlineKeyboardButton>>();
 
         // --- 1. WINE QUOTA ---
-        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonWineLimit, $"SETTINGS:{id}:NULL") });
+        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonWineLimit, $"SETTINGS+{id}+NULL") });
 
         var wineRow = new List<InlineKeyboardButton>();
         if (group.WQuota <= 1)
-            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS:{id}:NULL"));
+            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
             // Fix: Use Actions.Minus instead of hardcoded string or old constant
-            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonMinus, $"SETTINGS:{id}:{Types.WQuota}:{Actions.Minus}"));
+            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonMinus, $"SETTINGS+{id}+{Types.WQuota}+{Actions.Minus}"));
         
         // Fix: Use Actions.Change
-        wineRow.Add(InlineKeyboardButton.WithCallbackData($"{group.WQuota} {Constants.WineQuantity}", $"SETTINGS:{id}:{Types.WQuota}:{Actions.Change}"));
+        wineRow.Add(InlineKeyboardButton.WithCallbackData($"{group.WQuota} {Constants.WineQuantity}", $"SETTINGS+{id}+{Types.WQuota}+{Actions.Change}"));
 
         if (group.WQuota >= 20)
-            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS:{id}:NULL"));
+            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
             // Fix: Use Actions.Add
-            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS:{id}:{Types.WQuota}:{Actions.Plus}"));
+            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.WQuota}+{Actions.Plus}"));
         
         rows.Add(wineRow);
 
         // --- 2. PLASTIC QUOTA ---
-        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonPlasticLimit, $"SETTINGS:{id}:NULL") });
+        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonPlasticLimit, $"SETTINGS+{id}+NULL") });
 
         var plasticRow = new List<InlineKeyboardButton>();
         if (group.PQuota <= 1)
-            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS:{id}:NULL"));
+            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
-            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonMinus, $"SETTINGS:{id}:{Types.PQuota}:{Actions.Minus}"));
+            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonMinus, $"SETTINGS+{id}+{Types.PQuota}+{Actions.Minus}"));
 
-        plasticRow.Add(InlineKeyboardButton.WithCallbackData($"{group.PQuota} {Constants.PlasticQuantity}", $"SETTINGS:{id}:{Types.PQuota}:{Actions.Change}"));
+        plasticRow.Add(InlineKeyboardButton.WithCallbackData($"{group.PQuota} {Constants.PlasticQuantity}", $"SETTINGS+{id}+{Types.PQuota}+{Actions.Change}"));
 
         if (group.PQuota >= 20)
-            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS:{id}:NULL"));
+            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
-            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS:{id}:{Types.PQuota}:{Actions.Plus}"));
+            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.PQuota}+{Actions.Plus}"));
             
         rows.Add(plasticRow);
 
@@ -369,27 +369,27 @@ public class SettingsConversation : IConversation
         string GetStateText(bool isOff) => !isOff ? Constants.On : Constants.Off;
 
         rows.Add(new[] {
-            InlineKeyboardButton.WithCallbackData(Constants.ButtonFortune, $"SETTINGS:{id}:NULL"),
-            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffFortune), $"SETTINGS:{id}:{Types.Fortune}")
+            InlineKeyboardButton.WithCallbackData(Constants.ButtonFortune, $"SETTINGS+{id}+NULL"),
+            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffFortune), $"SETTINGS+{id}+{Types.Fortune}")
         });
 
         rows.Add(new[] {
-            InlineKeyboardButton.WithCallbackData(Constants.ButtonZodiac, $"SETTINGS:{id}:NULL"),
-            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffZodiac), $"SETTINGS:{id}:{Types.Zodiac}")
+            InlineKeyboardButton.WithCallbackData(Constants.ButtonZodiac, $"SETTINGS+{id}+NULL"),
+            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffZodiac), $"SETTINGS+{id}+{Types.Zodiac}")
         });
 
         rows.Add(new[] {
-            InlineKeyboardButton.WithCallbackData(Constants.ButtonLomo, $"SETTINGS:{id}:NULL"),
-            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffLomo), $"SETTINGS:{id}:{Types.Lomo}")
+            InlineKeyboardButton.WithCallbackData(Constants.ButtonLomo, $"SETTINGS+{id}+NULL"),
+            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffLomo), $"SETTINGS+{id}+{Types.Lomo}")
         });
 
         rows.Add(new[] {
-            InlineKeyboardButton.WithCallbackData(Constants.ButtonSimp, $"SETTINGS:{id}:NULL"),
-            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffSimp), $"SETTINGS:{id}:{Types.Simp}")
+            InlineKeyboardButton.WithCallbackData(Constants.ButtonSimp, $"SETTINGS+{id}+NULL"),
+            InlineKeyboardButton.WithCallbackData(GetStateText(group.OffSimp), $"SETTINGS+{id}+{Types.Simp}")
         });
 
         // --- 4. SAVE ---
-        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonDone, $"SETTINGS:{id}:SAVE") });
+        rows.Add(new[] { InlineKeyboardButton.WithCallbackData(Constants.ButtonDone, $"SETTINGS+{id}+SAVE") });
 
         return new InlineKeyboardMarkup(rows);
     }

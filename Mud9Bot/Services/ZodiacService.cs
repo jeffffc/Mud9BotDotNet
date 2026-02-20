@@ -32,7 +32,7 @@ public class ZodiacService : IZodiacService
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-            var entities = await db.Set<ZodiacEntity>()
+            var entities = await db.Set<Zodiac>()
                 .Where(z => z.DateKey == today)
                 .ToListAsync();
 
@@ -91,13 +91,13 @@ public class ZodiacService : IZodiacService
         try
         {
             // Remove old entries for this date if any
-            var existing = await db.Set<ZodiacEntity>().Where(z => z.DateKey == dateKey).ToListAsync();
-            db.Set<ZodiacEntity>().RemoveRange(existing);
+            var existing = await db.Set<Zodiac>().Where(z => z.DateKey == dateKey).ToListAsync();
+            db.Set<Zodiac>().RemoveRange(existing);
 
             foreach (var kvp in newData)
             {
                 var res = kvp.Value;
-                db.Set<ZodiacEntity>().Add(new ZodiacEntity
+                db.Set<Zodiac>().Add(new Zodiac
                 {
                     DateKey = dateKey,
                     ZodiacIndex = kvp.Key,
