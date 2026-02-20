@@ -45,30 +45,30 @@ public class ErrorReporter(
                 var chat = message?.Chat;
 
                 // Escape values for MarkdownV2 using your StringExtensions
-                var commandName = message?.Text?.Split(' ').FirstOrDefault()?.EscapeMarkdown() ?? "Unknown";
-                var userName = (user?.FirstName ?? "Unknown").EscapeMarkdown();
-                var userId = user?.Id.ToString().EscapeMarkdown() ?? "Unknown";
-                var chatTitle = (chat?.Title ?? "Private").EscapeMarkdown();
-                var chatId = chat?.Id.ToString().EscapeMarkdown() ?? "Unknown";
+                var commandName = message?.Text?.Split(' ').FirstOrDefault().EscapeHtml() ?? "Unknown";
+                var userName = (user?.FirstName ?? "Unknown").EscapeHtml();
+                var userId = user?.Id.ToString().EscapeHtml() ?? "Unknown";
+                var chatTitle = (chat?.Title ?? "Private").EscapeHtml();
+                var chatId = chat?.Id.ToString().EscapeHtml() ?? "Unknown";
                 
                 var actualEx = exception.InnerException ?? exception;
-                var errorText = actualEx.Message.EscapeMarkdown();
-                var stackTrace = (actualEx.StackTrace ?? "No StackTrace").EscapeMarkdown();
+                var errorText = actualEx.Message.EscapeHtml();
+                var stackTrace = (actualEx.StackTrace ?? "No StackTrace").EscapeHtml();
 
                 // Truncate stack trace to prevent hitting Telegram's 4096 char limit
                 if (stackTrace.Length > 1500) 
-                    stackTrace = stackTrace.Substring(0, 1500) + "\\.\\.\\.";
+                    stackTrace = stackTrace.Substring(0, 1500) + "...";
 
-                var logMessage = $"🚨 *Exception in Command:* {commandName}\n" +
-                                 $"*User:* {userName} \\({userId}\\)\n" +
-                                 $"*Chat:* {chatTitle} \\({chatId}\\)\n\n" +
-                                 $"*Error:* `{errorText}`\n" +
-                                 $"*Stack:* `{stackTrace}`";
+                var logMessage = $"🚨 <b>Exception in Command:</b> <code>{commandName}</code>\n" +
+                                 $"<b>User:</b> <code>{userName} ({userId})</code>\n" +
+                                 $"<b>Chat:</b> <code>{chatTitle} ({chatId})</code>\n\n" +
+                                 $"<b>Error:</b> <code>{errorText}</code>\n" +
+                                 $"<b>Stack:</b> <pre>{stackTrace}</pre>";
 
                 await botClient.SendMessage(
                     chatId: _logGroupId,
                     text: logMessage,
-                    parseMode: ParseMode.MarkdownV2,
+                    parseMode: ParseMode.Html,
                     cancellationToken: ct);
             }
             catch (Exception logEx)

@@ -68,10 +68,10 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
 
         await bot.SendMessage(
             message.Chat.Id,
-            $"你想對【{Markdown.Escape(target.FirstName)}】賜酒 🍻 定派膠 🌚?",
+            $"你想對【{target.FirstName.EscapeHtml()}】賜酒 🍻 定派膠 🌚?",
             replyMarkup: keyboard,
             replyParameters: new ReplyParameters { MessageId = message.MessageId },
-            parseMode: ParseMode.MarkdownV2,
+            parseMode: ParseMode.Html,
             cancellationToken: ct
         );
     }
@@ -122,7 +122,7 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
                 chatId: query.Message.Chat.Id,
                 messageId: query.Message.MessageId,
                 text: result.Item2,
-                parseMode: ParseMode.MarkdownV2,
+                parseMode: ParseMode.Html,
                 cancellationToken: ct
             );
         }
@@ -133,7 +133,7 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
                 chatId: query.Message.Chat.Id,
                 messageId: query.Message.MessageId,
                 text: result.Item2,
-                parseMode: ParseMode.MarkdownV2,
+                parseMode: ParseMode.Html,
                 cancellationToken: ct
             );
         }

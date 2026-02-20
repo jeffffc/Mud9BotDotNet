@@ -23,21 +23,21 @@ public class StartupNotificationService(
             var startTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
             
-            var message = $"🤖 *Bot Started*\n" +
-                          $"Name: `{me.FirstName}`\n" +
-                          $"Version: `{version}`\n" +
-                          $"Time: `{startTime}`\n\n" +
-                          $"📊 *Registration Stats*\n" +
-                          $"├ Commands: `{metadata.CommandCount}`\n" +
-                          $"├ Callbacks: `{metadata.CallbackCount}`\n" +
-                          $"├ Jobs: `{metadata.JobCount}`\n" +
-                          $"├ Services: `{metadata.ServiceCount}`\n" +
-                          $"└ Conversations: `{metadata.ConversationCount}`";
+            var message = $"🤖 <b>Bot Started</b>\n" +
+                          $"Name: <code>{me.FirstName}</code>\n" +
+                          $"Version: <code>{version}</code>\n" +
+                          $"Time: <code>{startTime}</code>\n\n" +
+                          $"📊 <b>Registration Stats</b>\n" +
+                          $"├ Commands: <code>{metadata.CommandCount}</code>\n" +
+                          $"├ Callbacks: <code>{metadata.CallbackCount}</code>\n" +
+                          $"├ Jobs: <code>{metadata.JobCount}</code>\n" +
+                          $"├ Services: <code>{metadata.ServiceCount}</code>\n" +
+                          $"└ Conversations: <code>{metadata.ConversationCount}</code>";
 
             await botClient.SendMessage(
                 chatId: _logGroupId,
                 text: message,
-                parseMode: ParseMode.MarkdownV2,
+                parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken);
             
             logger.LogInformation($"Startup notification sent to {_logGroupId}");
@@ -55,13 +55,13 @@ public class StartupNotificationService(
         try
         {
             var stopTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var message = $"🛑 *Bot Stopping*\n" +
-                          $"Time: `{stopTime}`";
+            var message = $"🛑 <b>Bot Stopping</b>\n" +
+                          $"Time: <code>{stopTime}</code>";
 
             await botClient.SendMessage(
                 chatId: _logGroupId,
                 text: message,
-                parseMode: ParseMode.MarkdownV2,
+                parseMode: ParseMode.Html,
                 cancellationToken: cancellationToken);
                 
             logger.LogInformation($"Shutdown notification sent to {_logGroupId}");

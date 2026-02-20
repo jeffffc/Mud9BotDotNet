@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices.ComTypes;
 using Mud9Bot.Attributes;
+using Mud9Bot.Extensions;
 using Mud9Bot.Interfaces;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -28,7 +29,7 @@ public class MiscellaneousModule(IServiceScopeFactory scopeFactory, IUserService
             await bot.SendMessage(
                 chatId: message.Chat.Id, 
                 text: "你想 block 邊個呀？對住佢 `/block` 啦！", 
-                parseMode: ParseMode.Markdown,
+                parseMode: ParseMode.Html,
                 cancellationToken: ct);
             return;
         }
@@ -48,12 +49,12 @@ public class MiscellaneousModule(IServiceScopeFactory scopeFactory, IUserService
         }
 
         // 5. Send Block Message
-        string msg = $"( Show blocked user - {replyToName} )";
+        string msg = $"( Show blocked user - {replyToName.EscapeHtml()} )";
 
         await bot.SendMessage(
             chatId: message.Chat.Id,
             text: msg,
-            parseMode: ParseMode.Markdown,
+            parseMode: ParseMode.Html,
             replyParameters: new ReplyParameters { MessageId = message.ReplyToMessage.MessageId },
             cancellationToken: ct
         );

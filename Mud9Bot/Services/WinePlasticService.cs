@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
+using Mud9Bot.Extensions;
 using Mud9Bot.Interfaces;
 using Telegram.Bot.Extensions;
 
@@ -34,8 +35,8 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         }
 
         // 2. Check Quota
-        if (isWine && limit.WineLimit < num) return (false, $"你今日得返 `{limit.WineLimit}` 杯酒，點一次過賜 `{num}` 杯酒俾人呀？");
-        if (!isWine && limit.PlasticLimit < num) return (false, $"你今日得番 `{limit.WineLimit}` 粒膠， 點一次過派 `{num}` 粒膠俾人呀？");
+        if (isWine && limit.WineLimit < num) return (false, $"你今日得返 <code>{limit.WineLimit}</code> 杯酒，點一次過賜 `{num}` 杯酒俾人呀？");
+        if (!isWine && limit.PlasticLimit < num) return (false, $"你今日得番 <code>{limit.WineLimit}</code> 粒膠， 點一次過派 `{num}` 粒膠俾人呀？");
 
         // 3. Deduct Quota
         if (isWine) limit.WineLimit -= num;
@@ -64,12 +65,12 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
 
         await context.SaveChangesAsync();
 
-        var targetName = Markdown.Escape(targetUser?.FirstName);
+        var targetName = targetUser?.FirstName.EscapeHtml();
 
         // 6. Return Result String
         return (true, (isWine
-            ? (num > 1 ? $"已對*【{targetName}】*賜 `{num}` 杯酒 🍻！" : $"已對*【{targetName}】* 賜酒 🍻！")
-            : (num > 1 ? $"已對*【{targetName}】*派 `{num}` 粒膠 🍻！" : $"已對*【{targetName}】* 派膠 🌚！")
+            ? (num > 1 ? $"已對<code>【{targetName}】</code>賜 <code>{num}</code> 杯酒 🍻！" : $"已對<code>【{targetName}】</code> 賜酒 🍻！")
+            : (num > 1 ? $"已對<code>【{targetName}】</code>派 <code>{num}</code> 粒膠 🍻！" : $"已對<code>【{targetName}】</code> 派膠 🌚！")
             )
             );
     }
