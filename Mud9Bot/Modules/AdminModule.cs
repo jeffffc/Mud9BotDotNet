@@ -16,7 +16,7 @@ namespace Mud9Bot.Modules;
 public class AdminModule(IServiceScopeFactory scopeFactory)
 {
     // Use DevOnly=true to restrict access
-    [Command("sql", Description = "Execute SQL", DevOnly = true)]
+    [Command("msql", Description = "Execute SQL", DevOnly = true)]
     public async Task ExecuteSql(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
         // Join args back to string for SQL query
