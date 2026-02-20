@@ -1,3 +1,5 @@
+using Mud9Bot.Data;
+using Mud9Bot.Data.Entities;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -14,12 +16,30 @@ public class UpdateHandler(
     CommandRegistry commandRegistry,
     CallbackQueryRegistry callbackRegistry,
     IServiceScopeFactory scopeFactory,
-    ConversationManager conversationManager) : IUpdateHandler // Primary Constructor
+    ConversationManager conversationManager,
+    IPaymentService paymentService,
+    IConfiguration configuration) : IUpdateHandler // Primary Constructor
 {
     private string? _botUsername;
+    private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
     
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
+        // ---------------------------------------------------------
+        // 0. Payment Handling (Delegated to PaymentService)
+        // ---------------------------------------------------------
+        if (update.Type == UpdateType.PreCheckoutQuery && update.PreCheckoutQuery is { } preCheckoutQuery)
+        {
+            await paymentService.HandlePreCheckoutQueryAsync(botClient, preCheckoutQuery, cancellationToken);
+            return;
+        }
+        
+        if (update.Message?.SuccessfulPayment is { } successfulPayment)
+        {
+            await paymentService.HandleSuccessfulPaymentAsync(botClient, update.Message, successfulPayment, cancellationToken);
+            return;
+        }
+        
         // ---------------------------------------------------------
         // 1. PRIORITY: Conversation Manager
         // ---------------------------------------------------------

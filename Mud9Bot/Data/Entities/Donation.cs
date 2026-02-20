@@ -22,11 +22,20 @@ public class Donation
     [Column("username")]
     public string? Username { get; set; }
 
+    /// <summary>
+    /// 原有的金額欄位 (例如用於法幣支付)
+    /// </summary>
     [Column("amount")]
     public int Amount { get; set; }
 
+    /// <summary>
+    /// 新增的 Telegram Stars 欄位 (XTR)
+    /// </summary>
+    [Column("stars")]
+    public int Stars { get; set; }
+
     [Column("time")]
-    public DateTime Time { get; set; }
+    public DateTime Time { get; set; } = DateTime.UtcNow;
 
     [Column("telegram_payment_charge_id")]
     public string? TelegramPaymentChargeId { get; set; }
