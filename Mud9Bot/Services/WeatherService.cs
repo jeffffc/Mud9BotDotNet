@@ -1,12 +1,8 @@
 using Mud9Bot.Models;
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Services;
 
-public interface IWeatherService
-{
-    void Update(WeatherData data);
-    WeatherData? GetCurrent();
-}
 
 public class WeatherService : IWeatherService
 {

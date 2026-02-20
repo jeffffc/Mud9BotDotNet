@@ -1,14 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Mud9Bot.Models;
+using Mud9Bot.Interfaces;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
 namespace Mud9Bot.Services;
-
-public interface IWeatherCrawlerService
-{
-    Task<WeatherData?> FetchWeatherAsync();
-}
 
 public class WeatherCrawlerService(ILogger<WeatherCrawlerService> logger) : IWeatherCrawlerService
 {

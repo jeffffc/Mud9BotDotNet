@@ -1,16 +1,12 @@
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using Mud9Bot.Data.Entities;
+using Mud9Bot.Interfaces;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Linq;
 
 namespace Mud9Bot.Services;
-
-public interface IMovieCrawlerService
-{
-    Task<List<Movie>> FetchCurrentMoviesAsync();
-}
 
 public class MovieCrawlerService(ILogger<MovieCrawlerService> logger) : IMovieCrawlerService
 {

@@ -1,5 +1,5 @@
 using Mud9Bot.Attributes;
-using Mud9Bot.Services;
+using Mud9Bot.Interfaces;
 using Quartz;
 
 namespace Mud9Bot.Jobs;

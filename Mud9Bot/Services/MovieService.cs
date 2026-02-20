@@ -1,17 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
+using Mud9Bot.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Mud9Bot.Services;
-
-public interface IMovieService
-{
-    List<Movie> GetCachedMovies();
-    Task UpdateMoviesAsync(List<Movie> scrapedMovies);
-    Task InitializeAsync();
-}
 
 public class MovieService(IServiceScopeFactory scopeFactory, ILogger<MovieService> logger) : IMovieService
 {
