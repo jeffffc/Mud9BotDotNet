@@ -47,8 +47,17 @@ public class CommandRegistry
                 var attr = method.GetCustomAttribute<CommandAttribute>()!;
                 if (attr.Inactive) continue;
 
-                _commands[attr.Trigger] = (method, type, attr);
-                _logger.LogInformation($"Registered command '/{attr.Trigger}' -> {type.Name}.{method.Name}");
+                // 將所有的別名 (Aliases) 都註冊到同一個處理程序
+                foreach (var trigger in attr.Triggers)
+                {
+                    if (_commands.ContainsKey(trigger))
+                    {
+                        _logger.LogWarning($"Duplicate command trigger detected: '/{trigger}' in {type.Name}. Skipping.");
+                        continue;
+                    }
+                    _commands[trigger] = (method, type, attr);
+                    _logger.LogInformation($"Registered command '/{trigger}' -> {type.Name}.{method.Name}");
+                }
             }
         }
     }
