@@ -10,3 +10,12 @@ public class WeatherData
     public List<DistrictTemperature> Districts { get; set; } = new();
     public DateTime LastFetched { get; set; } = DateTime.MinValue;
 }
+
+public record DailyForecast(string Date, string Description);
+
+public class WeatherForecast
+{
+    public string GeneralSituation { get; set; } = string.Empty;
+    public List<DailyForecast> DailyForecasts { get; set; } = new();
+    public DateTime LastFetched { get; set; } = DateTime.MinValue;
+}

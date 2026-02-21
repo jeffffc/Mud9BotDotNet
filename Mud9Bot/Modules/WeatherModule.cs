@@ -13,7 +13,7 @@ namespace Mud9Bot.Modules;
 
 public class WeatherModule(IWeatherService weatherService)
 {
-    [Command("weather", "w")]
+    [Command("weather")]
     public async Task WeatherCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         var data = weatherService.GetCurrent();
@@ -30,6 +30,39 @@ public class WeatherModule(IWeatherService weatherService)
             replyMarkup: GetSummaryKeyboard(),
             replyParameters: new ReplyParameters { MessageId = message.MessageId },
             linkPreviewOptions: new LinkPreviewOptions { IsDisabled = true },
+            cancellationToken: ct
+        );
+    }
+
+    [Command("forecast")]
+    public async Task ForecastCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        var forecast = weatherService.GetForecast();
+        if (forecast == null)
+        {
+            await bot.SendMessage(message.Chat.Id, "暫時未有預報資料，等我收下風先。", cancellationToken: ct);
+            return;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>【氣象概況】</b>");
+        sb.AppendLine(forecast.GeneralSituation.EscapeHtml());
+        sb.AppendLine();
+        sb.AppendLine("<b>【九天天氣預報】</b>");
+        
+        // 顯示前 5 天的預報內容
+        var displayCount = Math.Min(5, forecast.DailyForecasts.Count);
+        for (int i = 0; i < displayCount; i++)
+        {
+            var f = forecast.DailyForecasts[i];
+            sb.AppendLine($"<code>{f.Date.EscapeHtml()}</code>: {f.Description.EscapeHtml()}");
+        }
+
+        await bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: sb.ToString(),
+            parseMode: ParseMode.Html,
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
             cancellationToken: ct
         );
     }
