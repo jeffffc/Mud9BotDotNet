@@ -10,7 +10,7 @@ namespace Mud9Bot.Modules;
 
 public class DonationModule
 {
-    [Command("donate", "star", Description = "支持開發者 (使用 Telegram Stars)")]
+    [Command("donate", Description = "支持開發者 (使用 Telegram Stars)")]
     public async Task DonateCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         // 1. 檢查是否為私訊，若在群組則引導至私訊

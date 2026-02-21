@@ -15,6 +15,9 @@ public class CommandRegistry
     private readonly ILogger<CommandRegistry> _logger;
     private readonly IErrorReporter _errorReporter;
     private readonly HashSet<long> _devIds;
+    
+    // Expose registered triggers for statistics
+    public IEnumerable<string> RegisteredTriggers => _commands.Keys.OrderBy(k => k);
 
     public CommandRegistry(
         ILogger<CommandRegistry> logger, 

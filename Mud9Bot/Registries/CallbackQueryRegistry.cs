@@ -10,6 +10,8 @@ public class CallbackQueryRegistry
 {
     private readonly Dictionary<string, MethodInfo> _handlers = new();
     private readonly ILogger<CallbackQueryRegistry> _logger;
+    // Expose registered prefixes for statistics
+    public IEnumerable<string> RegisteredPrefixes => _handlers.Keys.OrderBy(k => k);
 
     public CallbackQueryRegistry(ILogger<CallbackQueryRegistry> logger, IBotMetadataService metadata)
     {

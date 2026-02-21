@@ -11,10 +11,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Telegram.Bot.Types.Enums;
 using Microsoft.Extensions.DependencyInjection;
+using Mud9Bot.Interfaces;
+using Mud9Bot.Registries;
 
 namespace Mud9Bot.Modules;
 
-public class AdminModule(IServiceScopeFactory scopeFactory)
+public class AdminModule(
+    IServiceScopeFactory scopeFactory, 
+    CommandRegistry commandRegistry, 
+    CallbackQueryRegistry callbackRegistry,
+    IBotMetadataService metadata)
 {
     [Command("msql", Description = "Execute raw SQL query", DevOnly = true)]
     public async Task ExecuteSql(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
@@ -127,6 +133,39 @@ public class AdminModule(IServiceScopeFactory scopeFactory)
         await bot.SendMessage(
             chatId: message.Chat.Id,
             text: response,
+            parseMode: ParseMode.Html,
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            cancellationToken: ct
+        );
+    }
+    
+    [Command("botstats", Description = "Show bot registration statistics", DevOnly = true)]
+    public async Task BotStatsCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
+        
+        var commandsList = string.Join(", ", commandRegistry.RegisteredTriggers.Select(t => $"<code>/{t}</code>"));
+        var callbacksList = string.Join(", ", callbackRegistry.RegisteredPrefixes.Select(p => $"<code>{p}</code>"));
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>📊 Bot Registration Stats</b>");
+        sb.AppendLine();
+        sb.AppendLine($"├ Version: <code>{version}</code>");
+        sb.AppendLine($"├ Commands: <b>{metadata.CommandCount}</b> (Triggers: {commandRegistry.RegisteredTriggers.Count()})");
+        sb.AppendLine($"├ Callbacks: <b>{metadata.CallbackCount}</b>");
+        sb.AppendLine($"├ Jobs: <b>{metadata.JobCount}</b>");
+        sb.AppendLine($"├ Services: <b>{metadata.ServiceCount}</b>");
+        sb.AppendLine($"└ Conversations: <b>{metadata.ConversationCount}</b>");
+        sb.AppendLine();
+        sb.AppendLine("<b>📜 Registered Triggers:</b>");
+        sb.AppendLine(commandsList);
+        sb.AppendLine();
+        sb.AppendLine("<b>🔘 Registered Callbacks:</b>");
+        sb.AppendLine(callbacksList);
+
+        await bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: sb.ToString(),
             parseMode: ParseMode.Html,
             replyParameters: new ReplyParameters { MessageId = message.MessageId },
             cancellationToken: ct
