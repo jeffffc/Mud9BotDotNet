@@ -16,7 +16,7 @@ public class TrafficModule(ITrafficService trafficService)
 {
     // --- 1. RTHK 交通消息 ---
     [Command("traffic", Description = "獲取 RTHK 即時交通消息")]
-    [TextTrigger("^交通消息$", Description = "取得 RTHK 即時交通快訊")] // 🚀 新增 TextTrigger
+    [TextTrigger("交通消息", Description = "取得 RTHK 即時交通快訊")] // 🚀 新增 TextTrigger
     public async Task GetTraffic(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
         await bot.Reply(msg, "🔄 正在獲取 RTHK 交通消息...", ct);
@@ -37,16 +37,16 @@ public class TrafficModule(ITrafficService trafficService)
         sb.AppendLine();
         sb.AppendLine(sbNews.ToString());
 
-        await bot.SendMessage(
+        await bot.EditMessageText(
             chatId: msg.Chat.Id,
             text: sb.ToString(),
             parseMode: ParseMode.Html, // 統一使用 HTML
-            replyParameters: new ReplyParameters { MessageId = msg.MessageId },
+            messageId: msg.MessageId,
             cancellationToken: ct);
     }
 
     // --- 2. 交通快拍功能 ---
-    [Command("trafficsnapshot", "snapshot", "交通", Description = "查看本港各區交通快拍")]
+    [Command("trafficsnapshot", "snapshot", Description = "查看本港各區交通快拍")]
     public async Task TrafficSnapshotCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         if (message.Chat.Type != ChatType.Private)

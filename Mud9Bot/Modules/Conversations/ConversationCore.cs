@@ -3,23 +3,23 @@ using System.Reflection;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
-using Mud9Bot.Data;
-using Mud9Bot.Extensions;
 
 namespace Mud9Bot.Modules.Conversations;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public class ConversationAttribute(string trigger) : Attribute 
+public class ConversationAttribute : Attribute
 {
-    public string Trigger { get; } = trigger;
+    public string Trigger { get; }
     public string Description { get; set; } = "";
-    public bool DevOnly { get; set; } = false; // Added DevOnly property
+    public bool DevOnly { get; set; } = false;
+    
+    public ConversationAttribute(string trigger) => Trigger = trigger.ToLower();
 }
 
 public interface IConversation
 {
     string ConversationName { get; }
+    // 用於識別按鈕數據是否屬於此對話 (例如 data.StartsWith("HELP+"))
     bool IsEntryPoint(Update update) => false;
     Task<string?> ExecuteStepAsync(ITelegramBotClient bot, Update update, ConversationContext context, CancellationToken ct);
 }
@@ -28,18 +28,20 @@ public class ConversationContext
 {
     public string CurrentState { get; set; } = "Start";
     public int MenuMessageId { get; set; } 
-    public long ChatId { get; set; } // 新增：綁定該對話發生所在的 ChatId
+    public long ChatId { get; set; } // 紀錄會話發生的 Chat
     public Dictionary<string, object> Data { get; set; } = new();
 }
 
 public class ConversationManager
 {
     private readonly ITelegramBotClient _bot;
-    private readonly Dictionary<string, IConversation> _triggerMap = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IConversation> _workflowMap = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<long, (string WorkflowName, ConversationContext Context)> _userSessions = new();
-    private readonly HashSet<long> _devIds; 
+    private readonly Dictionary<string, IConversation> _triggerMap = new();
+    private readonly List<IConversation> _allConversations = new();
     
+    // 僅用於追蹤「正在等待文字輸入」的會話
+    private readonly ConcurrentDictionary<long, (string WorkflowName, ConversationContext Context)> _activeInputSessions = new();
+    private readonly HashSet<long> _devIds;
+
     public ConversationManager(ITelegramBotClient bot, IEnumerable<IConversation> conversations, Microsoft.Extensions.Configuration.IConfiguration config)
     {
         _bot = bot;
@@ -47,7 +49,7 @@ public class ConversationManager
         
         foreach (var conv in conversations)
         {
-            _workflowMap[conv.ConversationName] = conv;
+            _allConversations.Add(conv);
             var attr = conv.GetType().GetCustomAttribute<ConversationAttribute>();
             if (attr != null) _triggerMap[attr.Trigger] = conv;
         }
@@ -57,143 +59,118 @@ public class ConversationManager
     {
         var user = update.Message?.From ?? update.CallbackQuery?.From;
         if (user == null) return false;
-
         long userId = user.Id;
-        long currentChatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
 
-        // 0. 防誤觸檢查：如果有人亂撳其他人對話中嘅按鈕，直接彈出警告！
-        if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery?.Message != null)
-        {
-            int cbMsgId = update.CallbackQuery.Message.MessageId;
-            
-            foreach (var kvp in _userSessions)
-            {
-                if (kvp.Key != userId && kvp.Value.Context.MenuMessageId == cbMsgId)
-                {
-                    var errmsg = Constants.NoOriginalSenderMessageList.GetAny();
-                    await _bot.AnswerCallbackQuery(update.CallbackQuery.Id, errmsg, showAlert: true, cancellationToken: ct);
-                    return true; 
-                }
-            }
-        }
-
-        // 1. CHECK FOR COMMANDS
+        // ---------------------------------------------------------
+        // 1. 處理指令 (優先級最高，且會中斷任何現有的輸入鎖定)
+        // ---------------------------------------------------------
         if (update.Message?.Text is { } text && text.StartsWith("/"))
         {
             var parts = text.Split(' ', 2);
             string command = parts[0].Substring(1).ToLower();
-    
-            // 🚀 NEW: Deep Link Interceptor
-            // If command is /start and has a payload, use the payload as the command
-            if (command == "start" && parts.Length > 1)
-            {
-                command = parts[1].ToLower();
-            }
 
-            // Now look up the target workflow based on the command (or deep link payload)
+            // Deep Link 支援
+            if (command == "start" && parts.Length > 1)
+                command = parts[1].ToLower();
+
             if (_triggerMap.TryGetValue(command, out var targetWorkflow))
             {
                 if (!await CheckAccessAsync(targetWorkflow, userId, update, ct)) return true;
-
-                _userSessions.TryRemove(userId, out _);
-                await StartNewSessionAsync(targetWorkflow, userId, currentChatId, update, ct);
+                
+                // 開始新對話前，清除該使用者舊的輸入鎖定
+                _activeInputSessions.TryRemove(userId, out _);
+                await StartWorkflowAsync(targetWorkflow, userId, update, ct);
                 return true;
             }
-    
+            
+            // 如果是其他普通指令 (如 /ping)，也清除輸入鎖定，讓使用者可以隨時跳出
+            _activeInputSessions.TryRemove(userId, out _);
             return false;
         }
 
-        // 2. CHECK ACTIVE SESSION
-        if (_userSessions.TryGetValue(userId, out var session))
+        // ---------------------------------------------------------
+        // 2. 處理按鈕 (無狀態路由：不論有沒有 session，只要前綴對了就處理)
+        // ---------------------------------------------------------
+        if (update.Type == UpdateType.CallbackQuery)
         {
-            // 🚀 【跨群組放行機制 (Session Trap Fix)】 🚀
-            // 如果這是一條來自「其他群組」的普通文字訊息，我們不應該攔截它，直接放行給後方的 MessageRegistry！
-            if (update.Type == UpdateType.Message && currentChatId != session.Context.ChatId && session.Context.ChatId != 0)
+            foreach (var conv in _allConversations)
+            {
+                if (conv.IsEntryPoint(update))
+                {
+                    if (!await CheckAccessAsync(conv, userId, update, ct)) return true;
+
+                    // 嘗試抓取現有的 Context (如果有的話)，否則建立新的
+                    var context = _activeInputSessions.TryGetValue(userId, out var session) && session.WorkflowName == conv.ConversationName
+                        ? session.Context 
+                        : new ConversationContext { CurrentState = "Menu" }; // 選單觸發通常視為 Menu 狀態
+
+                    var nextState = await conv.ExecuteStepAsync(_bot, update, context, ct);
+                    
+                    UpdateSession(userId, conv.ConversationName, context, nextState);
+                    return true;
+                }
+            }
+            return false; // 不是任何對話的按鈕，交給 CallbackRegistry
+        }
+
+        // ---------------------------------------------------------
+        // 3. 處理文字輸入鎖定 (只有當狀態不是 Start/Menu 時才攔截)
+        // ---------------------------------------------------------
+        if (_activeInputSessions.TryGetValue(userId, out var active))
+        {
+            // 如果狀態是 Start 或 Menu，代表對話處於「閒置/選單」模式，不應攔截普通文字
+            if (active.Context.CurrentState == "Start" || active.Context.CurrentState == "Menu")
             {
                 return false; 
             }
 
-            if (_workflowMap.TryGetValue(session.WorkflowName, out var activeWorkflow))
+            var workflow = _allConversations.FirstOrDefault(c => c.ConversationName == active.WorkflowName);
+            if (workflow != null)
             {
-                if (!await CheckAccessAsync(activeWorkflow, userId, update, ct)) 
-                {
-                    _userSessions.TryRemove(userId, out _);
-                    return true;
-                }
-
-                var nextState = await activeWorkflow.ExecuteStepAsync(_bot, update, session.Context, ct);
-
-                if (nextState == null)
-                    _userSessions.TryRemove(userId, out _);
-                else
-                    session.Context.CurrentState = nextState;
-                
-                return true;
-            }
-        }
-
-        // 3. FALLBACK ENTRY POINTS (Non-Command triggers like Callback Buttons)
-        foreach (var workflow in _workflowMap.Values)
-        {
-            if (workflow.IsEntryPoint(update))
-            {
-                if (!await CheckAccessAsync(workflow, userId, update, ct)) return true;
-
-                await StartNewSessionAsync(workflow, userId, currentChatId, update, ct);
+                var nextState = await workflow.ExecuteStepAsync(_bot, update, active.Context, ct);
+                UpdateSession(userId, active.WorkflowName, active.Context, nextState);
                 return true;
             }
         }
 
         return false;
     }
-    
-    // --- Access Control Helper ---
+
+    private void UpdateSession(long userId, string workflowName, ConversationContext context, string? nextState)
+    {
+        if (nextState == null || nextState == "Start" || nextState == "Menu")
+        {
+            // 如果對話結束或回到選單，釋放文字輸入鎖定
+            _activeInputSessions.TryRemove(userId, out _);
+        }
+        else
+        {
+            // 否則，持續鎖定該使用者的文字輸入
+            context.CurrentState = nextState;
+            _activeInputSessions[userId] = (workflowName, context);
+        }
+    }
+
+    private async Task StartWorkflowAsync(IConversation workflow, long userId, Update update, CancellationToken ct)
+    {
+        var context = new ConversationContext { CurrentState = "Start" };
+        var nextState = await workflow.ExecuteStepAsync(_bot, update, context, ct);
+        UpdateSession(userId, workflow.ConversationName, context, nextState);
+    }
+
     private async Task<bool> CheckAccessAsync(IConversation workflow, long userId, Update update, CancellationToken ct)
     {
         var attr = workflow.GetType().GetCustomAttribute<ConversationAttribute>();
         if (attr != null && attr.DevOnly && !_devIds.Contains(userId))
         {
-            try 
-            {
+            try {
                 if (update.CallbackQuery != null)
-                {
-                    await _bot.AnswerCallbackQuery(update.CallbackQuery.Id, "🚫 You are not the Dev!", showAlert: true, cancellationToken: ct);
-                }
-                else if (update.Message != null)
-                {
-                    await _bot.SendMessage(
-                        chatId: update.Message.Chat.Id, 
-                        text: "🚫 You are not the Dev!", 
-                        replyParameters: new ReplyParameters { MessageId = update.Message.MessageId }, 
-                        cancellationToken: ct);
-                }
-            }
-            catch { }
+                    await _bot.AnswerCallbackQuery(update.CallbackQuery.Id, "🚫 你無權使用此開發者功能。", showAlert: true, cancellationToken: ct);
+                else
+                    await _bot.SendMessage(update.Message!.Chat.Id, "🚫 你無權使用此開發者功能。", cancellationToken: ct);
+            } catch { }
             return false;
         }
         return true;
-    }
-
-    private async Task StartNewSessionAsync(IConversation workflow, long userId, long chatId, Update update, CancellationToken ct)
-    {
-        var context = new ConversationContext 
-        { 
-            CurrentState = "Start",
-            ChatId = chatId // 記錄開啟 Session 時所在的 ChatId
-        };
-        
-        var nextState = await workflow.ExecuteStepAsync(_bot, update, context, ct);
-
-        if (nextState != null)
-        {
-            _userSessions[userId] = (workflow.ConversationName, context);
-        }
-    }
-
-    private string ParseCommand(string text)
-    {
-        var parts = text.Split(' ');
-        var command = parts[0].Substring(1).ToLower();
-        return command.Contains('@') ? command.Split('@')[0] : command;
     }
 }

@@ -14,6 +14,7 @@ namespace Mud9Bot.Modules;
 public class MovieModule(IMovieService movieService, ILogger<MovieModule> logger)
 {
     [Command("movies")]
+    [TextTrigger("有咩戲睇",  Description = "取得 WMOOV 即日上映電影")]
     public async Task MoviesCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         var movies = movieService.GetCachedMovies();
