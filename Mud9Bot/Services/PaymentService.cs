@@ -19,7 +19,8 @@ public class PaymentService(
     IConfiguration configuration) : IPaymentService
 {
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
-
+    private readonly HashSet<long> _devIds = configuration.GetSection("BotConfiguration:DevIds").Get<HashSet<long>>() ?? new HashSet<long>();
+    
     public async Task HandlePreCheckoutQueryAsync(ITelegramBotClient bot, PreCheckoutQuery query, CancellationToken ct)
     {
         // For donations, we approve the request to allow the payment to proceed.
@@ -67,8 +68,8 @@ public class PaymentService(
                              $"🆔 <b>編號：</b> #Mud9Bot{donationId}\n" +
                              $"💳 <b>交易 ID：</b> <code>{payment.TelegramPaymentChargeId}</code>\n" +
                              $"🕒 <b>時間：</b> <code>{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</code>";
-            
-            await bot.SendMessage(_logGroupId, adminLog, parseMode: ParseMode.Html, cancellationToken: ct);
+            long[] devIds = _devIds.ToArray();
+            await bot.SendMessage(devIds[0], adminLog, parseMode: ParseMode.Html, cancellationToken: ct);
         }
     }
 }

@@ -104,7 +104,7 @@ public class HelpConversation : IConversation
             "WEATHER" => GetWeatherHelp(),
             "TRAFFIC" => GetTrafficHelp(),
             "LUCK" => GetLuckHelp(),
-            "REMIND" => GetReminderHelp(),
+            "REMIND" => await GetReminderHelp(bot, ct),
             "TOOLS" => GetToolsHelp(),
             "MISC" => GetMiscHelp(),
             "ADMIN" => GetAdminHelp(),
@@ -196,24 +196,44 @@ public class HelpConversation : IConversation
     {
         string text = "<b>【運程命理】</b>\n\n" +
                       "• <code>/fortune</code>: 黃大仙靈籤 (每日限求一籤，可解籤)\n" +
-                      "• <code>/zodiac</code>: 每日星座運程，支援整體、愛情、事業及財運詳細分析";
+                      "• <code>/zodiac</code>: 每日星座運程 (整體/愛情/事業/財運)\n" +
+                      "• <code>/mark6</code>: 最新一期六合彩開獎結果 (亦可輸入「<code>六合彩結果</code>」)";
         return (text, GetBackMarkup());
     }
 
-    private (string, InlineKeyboardMarkup) GetReminderHelp()
+    private async Task<(string, InlineKeyboardMarkup)> GetReminderHelp(ITelegramBotClient bot, CancellationToken ct)
     {
-        string text = "<b>【提醒功能】</b>\n你可以用廣東話叫我提你做嘢，支援一次性或重複提醒：\n\n" +
-                      "• <b>相對時間：</b><code>10分鐘後提我落街</code> / <code>30秒後提我睇火</code>\n" +
-                      "• <b>指定日期：</b><code>聽日 22:30 提我敷面膜</code> / <code>0305 8點半 提我</code>\n" +
-                      "• <b>重複提醒：</b><code>每日 08:00 提我食藥</code> / <code>逢星期一 10點 提我開會</code>\n\n" +
-                      "• <b>管理提醒：</b>輸入 <code>/myreminders</code> 查看或刪除生效中嘅提醒 (上限 30 條)";
+        var me = await bot.GetMe(ct);
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>【⏰ 廣東話提醒功能指南】</b>");
+        sb.AppendLine("你可以直接用廣東話叫我提你做嘢，支援多種格式：\n");
         
+        sb.AppendLine("<b>1️⃣ 相對時間 (倒數)</b>");
+        sb.AppendLine("• <code>10分鐘後提我落街</code>");
+        sb.AppendLine("• <code>2個鐘後提我食藥</code>");
+        sb.AppendLine("• <code>3日後提我還書</code>\n");
+
+        sb.AppendLine("<b>2️⃣ 指定日期 / 星期</b>");
+        sb.AppendLine("• <b>今日/聽日：</b><code>聽日 22:30 提我敷面膜</code>");
+        sb.AppendLine("• <b>星期：</b><code>星期一 10點 提我開會</code> / <code>下星期五 提我攞衫</code>");
+        sb.AppendLine("• <b>具體日子：</b><code>0305 8點半 提我</code> (支援 MMDD, YYYYMMDD)");
+        sb.AppendLine("• <b>日期格式：</b>支援 <code>/</code>, <code>-</code>, <code>.</code> 分隔符 (如 <code>2025/03/10</code> 或 <code>03-10</code>)");
+        sb.AppendLine("<i>💡 若無指定幾點，會預設「聽日呢個時間」找你。</i>\n");
+
+        sb.AppendLine("<b>3️⃣ 重複性提醒 🔄</b>");
+        sb.AppendLine("• <b>每日：</b><code>每日 08:00 提我食藥</code> / <code>逢日 23:00 填寫日誌</code>");
+        sb.AppendLine("• <b>每週：</b><code>逢星期二 18:00 提我打波</code> / <code>每星期五 提我執屋</code>\n");
+
+        sb.AppendLine("<b>4️⃣ 管理及限制</b>");
+        sb.AppendLine("• 輸入 <code>/myreminders</code> 查看或刪除生效中嘅提醒。");
+        sb.AppendLine("• 為免資源浪費，每人上限為 <b>30 條</b> 生效中嘅提醒事項。");
+
         var buttons = new List<IEnumerable<InlineKeyboardButton>>
         {
-            new[] { InlineKeyboardButton.WithCallbackData("⚙️ 立即管理我嘅提醒", "MYREMINDERS+REFRESH") },
+            new[] { InlineKeyboardButton.WithUrl("⚙️ 立即管理我嘅提醒", $"https://t.me/{me.Username}?start=myreminders") },
             new[] { InlineKeyboardButton.WithCallbackData("🔙 返回主目錄", "HELP+MAIN") }
         };
-        return (text, new InlineKeyboardMarkup(buttons));
+        return (sb.ToString(), new InlineKeyboardMarkup(buttons));
     }
 
     private (string, InlineKeyboardMarkup) GetToolsHelp()
@@ -231,11 +251,12 @@ public class HelpConversation : IConversation
         string text = "<b>【垃雜功能】</b>\n\n" +
                       "• <code>/movies</code>: 查看現在上映電影資訊及簡介\n" +
                       "• <code>/toss A B C</code>: 擲銀仔或從多個選項中隨機抽取\n" +
+                      "• <code>/dice</code>: 擲骰子 (隨機獲得 1-6 點數)\n" +
                       "• <code>/block</code> (回覆訊息): 顯示已封鎖用戶 (純屬娛樂功能)\n" +
                       "• <code>/ping</code>: 檢查機器人連線狀態\n" +
                       "• <code>/feedback 內容</code>: 向開發者提交意見或回報問題\n\n" +
                       "<b>🛡️ 被動攔截 (群組設定)：</b>\n" +
-                      "• <b>5P字過濾：</b>自動警告使用「挽、唔知、巧、禾」等 5P 字體之用戶\n" +
+                      "• <b>5P字過濾：</b>自動警告使用 5P 字體之用戶\n" +
                       "• <b>殘體字攔截：</b>自動警告使用簡體中文之用戶";
         return (text, GetBackMarkup());
     }
