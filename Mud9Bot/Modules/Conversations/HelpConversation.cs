@@ -74,10 +74,9 @@ public class HelpConversation : IConversation
 
         if (callback != null && callback.Data is { } data && data.StartsWith("HELP+"))
         {
-            if (context.MenuMessageId != 0 && callback.Message?.MessageId != context.MenuMessageId)
-            {
-                context.MenuMessageId = callback.Message?.MessageId ?? 0;
-            }
+            // 🚀 關鍵修正：不論 context 是否為新建立，均同步當前點擊的 MessageId
+            // 確保 stateless 導航時 EditMessageText 能找到目標訊息
+            context.MenuMessageId = callback.Message?.MessageId ?? 0;
 
             var parts = data.Split('+');
             string action = parts.Length > 1 ? parts[1] : "MAIN";
@@ -103,7 +102,9 @@ public class HelpConversation : IConversation
             "WINE" => GetWineHelp(),
             "WEATHER" => GetWeatherHelp(),
             "TRAFFIC" => GetTrafficHelp(),
+            "NEWS" => GetNewsHelp(),
             "LUCK" => GetLuckHelp(),
+            "MOVIES" => GetMoviesHelp(),
             "REMIND" => await GetReminderHelp(bot, ct),
             "TOOLS" => GetToolsHelp(),
             "MISC" => GetMiscHelp(),
@@ -151,8 +152,10 @@ public class HelpConversation : IConversation
         {
             InlineKeyboardButton.WithCallbackData("賜酒派膠 🍻", "HELP+WINE"),
             InlineKeyboardButton.WithCallbackData("天氣資訊 ☁️", "HELP+WEATHER"),
-            InlineKeyboardButton.WithCallbackData("交通快拍 🚗", "HELP+TRAFFIC"),
+            InlineKeyboardButton.WithCallbackData("交通消息 🚗", "HELP+TRAFFIC"),
+            InlineKeyboardButton.WithCallbackData("新聞短打 📰", "HELP+NEWS"),
             InlineKeyboardButton.WithCallbackData("運程命理 🔮", "HELP+LUCK"),
+            InlineKeyboardButton.WithCallbackData("電影資訊 🎬", "HELP+MOVIES"),
             InlineKeyboardButton.WithCallbackData("提醒功能 ⏰", "HELP+REMIND"),
             InlineKeyboardButton.WithCallbackData("實用工具 🛠️", "HELP+TOOLS"),
             InlineKeyboardButton.WithCallbackData("垃雜功能 🗑️", "HELP+MISC"),
@@ -192,12 +195,31 @@ public class HelpConversation : IConversation
         return (text, GetBackMarkup());
     }
 
+    private (string, InlineKeyboardMarkup) GetNewsHelp()
+    {
+        string text = "<b>【新聞短打】</b>\n\n" +
+                      "• <code>/news</code>: 開啟新聞分類選單\n" +
+                      "• <b>快捷關鍵字：</b>直接輸入「<code>有咩新聞</code>」可觸發\n\n" +
+                      "<b>包含分類：</b>\n" +
+                      "本地、大中華、國際、財經、體育新聞 (每類顯示 5 則最新資訊)。";
+        return (text, GetBackMarkup());
+    }
+
     private (string, InlineKeyboardMarkup) GetLuckHelp()
     {
         string text = "<b>【運程命理】</b>\n\n" +
                       "• <code>/fortune</code>: 黃大仙靈籤 (每日限求一籤，可解籤)\n" +
                       "• <code>/zodiac</code>: 每日星座運程 (整體/愛情/事業/財運)\n" +
                       "• <code>/mark6</code>: 最新一期六合彩開獎結果 (亦可輸入「<code>六合彩結果</code>」)";
+        return (text, GetBackMarkup());
+    }
+
+    private (string, InlineKeyboardMarkup) GetMoviesHelp()
+    {
+        string text = "<b>【電影資訊】</b>\n\n" +
+                      "• <code>/movies</code>: 查看現在上映電影資訊及簡介\n" +
+                      "• <b>快捷關鍵字：</b>直接輸入「<code>有咩戲睇</code>」可觸發\n\n" +
+                      "系統會自動更新本港各大院線熱映中嘅電影評價及詳情。";
         return (text, GetBackMarkup());
     }
 
@@ -249,9 +271,11 @@ public class HelpConversation : IConversation
     private (string, InlineKeyboardMarkup) GetMiscHelp()
     {
         string text = "<b>【垃雜功能】</b>\n\n" +
-                      "• <code>/movies</code>: 查看現在上映電影資訊及簡介\n" +
                       "• <code>/toss A B C</code>: 擲銀仔或從多個選項中隨機抽取\n" +
-                      "• <code>/dice</code>: 擲骰子 (隨機獲得 1-6 點數)\n" +
+                      "• <code>/dice NdS</code>: TRPG 擲骰格式 (N=粒數, S=面數)\n" +
+                      "  - <code>/dice 1d6</code> (擲 1 粒 6 面骰)\n" +
+                      "  - <code>/dice 2d20</code> (擲 2 粒 20 面骰)\n" +
+                      "  - <code>/dice 3d10 5</code> (擲 3 粒 10 面骰，重複 5 次)\n" +
                       "• <code>/block</code> (回覆訊息): 顯示已封鎖用戶 (純屬娛樂功能)\n" +
                       "• <code>/ping</code>: 檢查機器人連線狀態\n" +
                       "• <code>/feedback 內容</code>: 向開發者提交意見或回報問題\n\n" +

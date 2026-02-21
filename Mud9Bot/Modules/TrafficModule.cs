@@ -19,7 +19,7 @@ public class TrafficModule(ITrafficService trafficService)
     [TextTrigger("交通消息", Description = "取得 RTHK 即時交通快訊")] // 🚀 新增 TextTrigger
     public async Task GetTraffic(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
-        await bot.Reply(msg, "🔄 正在獲取 RTHK 交通消息...", ct);
+        var sentMsg = await bot.Reply(msg, "🔄 正在獲取 RTHK 交通消息...", ct);
         var news = await trafficService.GetTrafficNewsAsync(ct);
 
         // 使用 Split 邏輯將成對的反引號替換為 HTML <code> 標籤
@@ -41,7 +41,7 @@ public class TrafficModule(ITrafficService trafficService)
             chatId: msg.Chat.Id,
             text: sb.ToString(),
             parseMode: ParseMode.Html, // 統一使用 HTML
-            messageId: msg.MessageId,
+            messageId: sentMsg.MessageId,
             cancellationToken: ct);
     }
 

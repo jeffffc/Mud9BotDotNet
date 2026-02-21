@@ -28,7 +28,6 @@ public class ReminderManagementConversation : IConversation
         _reminderService = reminderService;
     }
 
-    // 允許透過按鈕回傳的數據重新進入對話
     public bool IsEntryPoint(Update update) 
         => update.CallbackQuery?.Data?.StartsWith("MYREMINDERS+") ?? false;
 
@@ -45,18 +44,15 @@ public class ReminderManagementConversation : IConversation
         // ---------------------------------------------------------
         if (context.CurrentState == "Start")
         {
-            // 如果是透過 Callback 進入 (舊訊息重啟 Session)，直接進入 Menu 邏輯
             if (callback != null)
             {
                 context.MenuMessageId = callback.Message?.MessageId ?? 0;
                 context.CurrentState = "Menu";
-                // 繼續往下執行 Callback 邏輯
             }
             else if (update.Message != null && update.Message.Chat.Type != ChatType.Private)
             {
                 try 
                 {
-                    // 嘗試直接發送選單給用戶私訊
                     string resultState = await SendManagementMenuAsync(bot, userId, userId, context, ct, isEdit: false);
                     await bot.Reply(update.Message, "呢啲野，我轉頭同你私底下傾啦 🙊", ct);
                     context.ChatId = userId; 
@@ -90,10 +86,14 @@ public class ReminderManagementConversation : IConversation
         if (callback != null && callback.Data is { } data && data.StartsWith("MYREMINDERS+"))
         {
             string? hint = null;
-            // 🚀 重入點邏輯：如果點擊的是舊訊息，則更新該訊息並顯示提示
+            // 🚀 重入點邏輯：如果是點擊舊訊息，自動同步 ID 並顯示提示
             if (context.MenuMessageId != 0 && callback.Message?.MessageId != context.MenuMessageId)
             {
                 hint = "⚠️ <i>你頭先撳嗰個係舊選單，我已經幫你更新咗做最新嘅資料，請再揀過。</i>\n\n";
+                context.MenuMessageId = callback.Message?.MessageId ?? 0;
+            }
+            else if (context.MenuMessageId == 0)
+            {
                 context.MenuMessageId = callback.Message?.MessageId ?? 0;
             }
 
@@ -105,10 +105,7 @@ public class ReminderManagementConversation : IConversation
             if (action == "CLOSE")
             {
                 await bot.AnswerCallbackQuery(callback.Id, "搞掂！", cancellationToken: ct);
-                try 
-                { 
-                    await bot.EditMessageText(originChatId, callback.Message!.MessageId, "搞掂，食碗麵。🔚", cancellationToken: ct); 
-                } catch {}
+                try { await bot.EditMessageText(originChatId, callback.Message!.MessageId, "搞掂，食碗麵。🔚", cancellationToken: ct); } catch {}
                 return null; 
             }
 
@@ -119,7 +116,6 @@ public class ReminderManagementConversation : IConversation
                     bool deleted = await _reminderService.DeleteReminderAsync(jobId, userId);
                     string toast = deleted ? "🗑 已刪除提醒！" : "❌ 搵唔到呢個提醒。";
                     await bot.AnswerCallbackQuery(callback.Id, toast, cancellationToken: ct);
-                    
                     return await SendManagementMenuAsync(bot, originChatId, userId, context, ct, isEdit: true, hint: hint);
                 }
             }
@@ -130,14 +126,11 @@ public class ReminderManagementConversation : IConversation
                 return await SendManagementMenuAsync(bot, originChatId, userId, context, ct, isEdit: true, hint: hint);
             }
 
-            // 如果沒有特定 Action 但被觸發 (例如單純重啟 Session)，則刷新選單
             return await SendManagementMenuAsync(bot, originChatId, userId, context, ct, isEdit: true, hint: hint);
         }
 
         return "Menu";
     }
-
-    // --- 內部輔助方法 ---
 
     private async Task<string> SendManagementMenuAsync(ITelegramBotClient bot, long chatId, long userId, ConversationContext context, CancellationToken ct, bool isEdit = false, string? hint = null)
     {
@@ -153,7 +146,7 @@ public class ReminderManagementConversation : IConversation
         if (!string.IsNullOrEmpty(hint)) sb.Append(hint);
 
         sb.AppendLine("⏰ <b>你嘅生效中提醒事項</b>");
-        sb.AppendLine($"<i>(每人上限 30 條，目前：{activeReminders.Count.ToString()}/30)</i>\n");
+        sb.AppendLine($"<i>(每人上限 30 條，目前：{activeReminders.Count}/30)</i>\n");
 
         if (!activeReminders.Any())
         {
@@ -165,7 +158,6 @@ public class ReminderManagementConversation : IConversation
             {
                 var r = activeReminders[i];
                 string timeStr;
-
                 if (!string.IsNullOrEmpty(r.Recurrence))
                 {
                     string type = r.Recurrence == "DAILY" ? "每日" : $"逢{MapWeekday(r.Recurrence)}";
@@ -177,18 +169,16 @@ public class ReminderManagementConversation : IConversation
                     var hkTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.Time, DateTimeKind.Utc), HkTimeZone);
                     timeStr = $"[{hkTime:MM/dd HH:mm}]";
                 }
-
                 string content = r.Text ?? "無內容";
                 if (content.Length > 15) content = content.Substring(0, 12) + "...";
-
-                sb.AppendLine($"<b>{(i + 1).ToString()}.</b> {timeStr} {content.EscapeHtml()}");
+                sb.AppendLine($"<b>{(i + 1)}.</b> {timeStr} {content.EscapeHtml()}");
             }
         }
 
         var buttons = new List<InlineKeyboardButton>();
         for (int i = 0; i < activeReminders.Count; i++)
         {
-            buttons.Add(InlineKeyboardButton.WithCallbackData($"🗑 刪除 {(i + 1).ToString()}", $"MYREMINDERS+DEL+{activeReminders[i].JobId.ToString()}"));
+            buttons.Add(InlineKeyboardButton.WithCallbackData($"🗑 刪除 {i + 1}", $"MYREMINDERS+DEL+{(activeReminders[i].JobId)}"));
         }
 
         var rows = buttons.Chunk(3).ToList();
@@ -197,21 +187,19 @@ public class ReminderManagementConversation : IConversation
             InlineKeyboardButton.WithCallbackData("🔚 關閉", "MYREMINDERS+CLOSE") 
         });
 
-        var markup = new InlineKeyboardMarkup(rows);
-
         try
         {
             if (isEdit && context.MenuMessageId != 0)
             {
-                await bot.EditMessageText(chatId, context.MenuMessageId, sb.ToString(), parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: ct);
+                await bot.EditMessageText(chatId, context.MenuMessageId, sb.ToString(), parseMode: ParseMode.Html, replyMarkup: new InlineKeyboardMarkup(rows), cancellationToken: ct);
             }
             else
             {
-                var msg = await bot.SendMessage(chatId, sb.ToString(), parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: ct);
+                var msg = await bot.SendMessage(chatId, sb.ToString(), parseMode: ParseMode.Html, replyMarkup: new InlineKeyboardMarkup(rows), cancellationToken: ct);
                 context.MenuMessageId = msg.MessageId;
             }
         }
-        catch (ApiRequestException) { /* 內容相同時忽略 */ }
+        catch (ApiRequestException) { }
 
         return "Menu";
     }
@@ -219,7 +207,6 @@ public class ReminderManagementConversation : IConversation
     private string MapWeekday(string code) => code switch
     {
         "MON" => "星期一", "TUE" => "星期二", "WED" => "星期三", "THU" => "星期四",
-        "FRI" => "星期五", "SAT" => "星期六", "SUN" => "星期日",
-        _ => code
+        "FRI" => "星期五", "SAT" => "星期六", "SUN" => "星期日", _ => code
     };
 }

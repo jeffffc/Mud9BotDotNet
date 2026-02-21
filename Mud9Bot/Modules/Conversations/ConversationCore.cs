@@ -3,6 +3,7 @@ using System.Reflection;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Microsoft.Extensions.Configuration;
 
 namespace Mud9Bot.Modules.Conversations;
 
@@ -42,7 +43,7 @@ public class ConversationManager
     private readonly ConcurrentDictionary<long, (string WorkflowName, ConversationContext Context)> _activeInputSessions = new();
     private readonly HashSet<long> _devIds;
 
-    public ConversationManager(ITelegramBotClient bot, IEnumerable<IConversation> conversations, Microsoft.Extensions.Configuration.IConfiguration config)
+    public ConversationManager(ITelegramBotClient bot, IEnumerable<IConversation> conversations, IConfiguration config)
     {
         _bot = bot;
         _devIds = config.GetSection("BotConfiguration:DevIds").Get<HashSet<long>>() ?? new HashSet<long>();
@@ -62,7 +63,7 @@ public class ConversationManager
         long userId = user.Id;
 
         // ---------------------------------------------------------
-        // 1. 處理指令 (優先級最高，且會中斷任何現有的輸入鎖定)
+        // 1. 處理指令 (優先級最高)
         // ---------------------------------------------------------
         if (update.Message?.Text is { } text && text.StartsWith("/"))
         {
@@ -73,6 +74,7 @@ public class ConversationManager
             if (command == "start" && parts.Length > 1)
                 command = parts[1].ToLower();
 
+            // 如果是會話觸發詞（開啟新對話或重新開始）
             if (_triggerMap.TryGetValue(command, out var targetWorkflow))
             {
                 if (!await CheckAccessAsync(targetWorkflow, userId, update, ct)) return true;
@@ -83,9 +85,15 @@ public class ConversationManager
                 return true;
             }
             
-            // 如果是其他普通指令 (如 /ping)，也清除輸入鎖定，讓使用者可以隨時跳出
-            _activeInputSessions.TryRemove(userId, out _);
-            return false;
+            // 🚀 關鍵修正：
+            // 如果指令不是會話觸發詞（例如 /cancel），且使用者目前「沒有」處於文字輸入鎖定狀態，
+            // 則視為普通指令，清除潛在 session 並放行給 CommandRegistry。
+            // 但如果使用者「正在」輸入鎖定中（例如 AwaitingAddMorning），則不在此處移除，
+            // 讓邏輯流向後面的 Part 3，由對話本身來決定如何處理該指令。
+            if (!_activeInputSessions.ContainsKey(userId))
+            {
+                return false;
+            }
         }
 
         // ---------------------------------------------------------
@@ -102,7 +110,7 @@ public class ConversationManager
                     // 嘗試抓取現有的 Context (如果有的話)，否則建立新的
                     var context = _activeInputSessions.TryGetValue(userId, out var session) && session.WorkflowName == conv.ConversationName
                         ? session.Context 
-                        : new ConversationContext { CurrentState = "Menu" }; // 選單觸發通常視為 Menu 狀態
+                        : new ConversationContext { CurrentState = "Menu" };
 
                     var nextState = await conv.ExecuteStepAsync(_bot, update, context, ct);
                     
@@ -110,7 +118,7 @@ public class ConversationManager
                     return true;
                 }
             }
-            return false; // 不是任何對話的按鈕，交給 CallbackRegistry
+            return false;
         }
 
         // ---------------------------------------------------------
@@ -138,7 +146,7 @@ public class ConversationManager
 
     private void UpdateSession(long userId, string workflowName, ConversationContext context, string? nextState)
     {
-        if (nextState == null || nextState == "Start" || nextState == "Menu")
+        if (string.IsNullOrEmpty(nextState) || nextState == "Start" || nextState == "Menu")
         {
             // 如果對話結束或回到選單，釋放文字輸入鎖定
             _activeInputSessions.TryRemove(userId, out _);
