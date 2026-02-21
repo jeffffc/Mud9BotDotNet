@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -15,9 +17,9 @@ public class SettingsConversation : IConversation
 {
     public string ConversationName => "SettingsFlow";
     
-    // FIX 1: Allow re-entry if the user clicks a button after the bot restarts
+    // Updated delimiter check to +
     public bool IsEntryPoint(Update update) 
-        => update.CallbackQuery?.Data?.StartsWith("SETTINGS:") ?? false;
+        => update.CallbackQuery?.Data?.StartsWith("SETTINGS+") ?? false;
     
     private readonly IServiceScopeFactory _scopeFactory;
 
@@ -37,16 +39,18 @@ public class SettingsConversation : IConversation
         var chatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
         var callback = update.CallbackQuery;
 
-        // FIX 2: Rehydration Logic (Fixes Restart Issue)
-        if (context.CurrentState == States.StateStart && callback != null && callback.Data is { } cbData && cbData.StartsWith("SETTINGS:"))
+        // Updated delimiter logic (Fixes Restart Issue)
+        if (context.CurrentState == States.StateStart && callback != null && callback.Data is { } cbData && cbData.StartsWith("SETTINGS+"))
         {
-            var parts = cbData.Split(':');
-            // Format: SETTINGS:{TargetGroupId}:{Type}:{Action}
+            var parts = cbData.Split('+');
+            // Format: SETTINGS+{TargetGroupId}+{Type}+{Action}
             if (parts.Length >= 2 && long.TryParse(parts[1], out long savedGroupId))
             {
+                int msgId = callback.Message?.MessageId ?? 0;
+                context.MenuMessageId = msgId; // <--- 補上這行
                 context.Data["Session"] = new SettingsSession 
                 { 
-                    MessageId = callback.Message?.MessageId ?? 0,
+                    MessageId = msgId,
                     TargetGroupId = savedGroupId 
                 };
                 context.CurrentState = States.StateMenu; 
@@ -60,7 +64,7 @@ public class SettingsConversation : IConversation
         }
 
         // 2. GLOBAL MENU HANDLER
-        if (callback != null && callback.Data is { } data && data.StartsWith("SETTINGS:"))
+        if (callback != null && callback.Data is { } data && data.StartsWith("SETTINGS+"))
         {
             // A. Validate Menu Freshness
             if (context.Data.TryGetValue("Session", out var sessionObj) && sessionObj is SettingsSession session)
@@ -74,7 +78,7 @@ public class SettingsConversation : IConversation
             }
 
             // B. Handle Save/Exit
-            if (data.EndsWith(":SAVE"))
+            if (data.EndsWith("+SAVE"))
             {
                 await bot.AnswerCallbackQuery(callback.Id, Constants.Done, cancellationToken: ct);
                 try {
@@ -129,44 +133,21 @@ public class SettingsConversation : IConversation
         switch (type)
         {
             case Types.WQuota:
-                if (action == Actions.Plus)
-                {
-                    group.WQuota++;
-                    await bot.AnswerCallbackQuery(query.Id, Constants.ButtonPlus, false, cancellationToken: ct);
-                }
-                else if (action == Actions.Minus)
-                {
-                    group.WQuota--;
-                    await bot.AnswerCallbackQuery(query.Id, Constants.ButtonMinus, false, cancellationToken: ct);
-                }
+                if (action == Actions.Add) group.WQuota++;
+                else if (action == Actions.Minus) group.WQuota--;
                 else if (action == Actions.Change)
                 {
-                    await bot.SendMessage(chatId, Constants.HowManyWine, 
-                        replyParameters: new ReplyParameters { MessageId = query.Message.MessageId }, 
-                        replyMarkup: new ForceReplyMarkup(), 
-                        cancellationToken: ct
-                    );return States.StateAwaitingWQuota; 
+                    await bot.SendMessage(chatId, Constants.HowManyWine, replyMarkup: new ForceReplyMarkup(), cancellationToken: ct);
+                    return States.StateAwaitingWQuota; 
                 }
                 break;
 
             case Types.PQuota:
-                if (action == Actions.Plus)
-                {
-                    group.PQuota++;
-                    await bot.AnswerCallbackQuery(query.Id, Constants.ButtonPlus, false, cancellationToken: ct);
-                }
-                else if (action == Actions.Minus)
-                {
-                    group.PQuota--;
-                    await bot.AnswerCallbackQuery(query.Id, Constants.ButtonMinus, false, cancellationToken: ct);
-                }
+                if (action == Actions.Add) group.PQuota++;
+                else if (action == Actions.Minus) group.PQuota--;
                 else if (action == Actions.Change)
                 {
-                    await bot.SendMessage(chatId, Constants.HowManyPlastic, 
-                        replyParameters: new ReplyParameters { MessageId = query.Message.MessageId }, 
-                        replyMarkup: new ForceReplyMarkup(), 
-                        cancellationToken: ct
-                        );
+                    await bot.SendMessage(chatId, Constants.HowManyPlastic, replyMarkup: new ForceReplyMarkup(), cancellationToken: ct);
                     return States.StateAwaitingPQuota; 
                 }
                 break;
@@ -312,6 +293,7 @@ public class SettingsConversation : IConversation
 
         var sentMsg = await bot.SendMessage(userId, text, replyMarkup: GenerateKeyboard(group), cancellationToken: ct);
 
+        context.MenuMessageId = sentMsg.MessageId; // <--- 補上這行
         context.Data["Session"] = new SettingsSession 
         { 
             MessageId = sentMsg.MessageId,
@@ -333,17 +315,14 @@ public class SettingsConversation : IConversation
         if (group.WQuota <= 1)
             wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
-            // Fix: Use Actions.Minus instead of hardcoded string or old constant
             wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonMinus, $"SETTINGS+{id}+{Types.WQuota}+{Actions.Minus}"));
         
-        // Fix: Use Actions.Change
         wineRow.Add(InlineKeyboardButton.WithCallbackData($"{group.WQuota} {Constants.WineQuantity}", $"SETTINGS+{id}+{Types.WQuota}+{Actions.Change}"));
 
         if (group.WQuota >= 20)
             wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
-            // Fix: Use Actions.Add
-            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.WQuota}+{Actions.Plus}"));
+            wineRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.WQuota}+{Actions.Add}"));
         
         rows.Add(wineRow);
 
@@ -361,7 +340,7 @@ public class SettingsConversation : IConversation
         if (group.PQuota >= 20)
             plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonEmpty, $"SETTINGS+{id}+NULL"));
         else
-            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.PQuota}+{Actions.Plus}"));
+            plasticRow.Add(InlineKeyboardButton.WithCallbackData(Constants.ButtonPlus, $"SETTINGS+{id}+{Types.PQuota}+{Actions.Add}"));
             
         rows.Add(plasticRow);
 
@@ -443,10 +422,8 @@ public class SettingsConversation : IConversation
 
     private static class Actions
     {
-        // FIX: Match standard callback conventions (Uppercase) which matches your previous expectations
-        public const string Plus = "PLUS"; 
+        public const string Add = "PLUS"; 
         public const string Minus = "MINUS";
         public const string Change = "CHANGE";
     }
-    // -----------------
 }

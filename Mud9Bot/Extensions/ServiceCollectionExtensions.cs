@@ -92,6 +92,10 @@ public static class ServiceCollectionExtensions
         metadata.CallbackCount = types.SelectMany(t => t.GetMethods())
             .Count(m => m.GetCustomAttribute<CallbackQueryAttribute>() != null);
         
+        // NEW: Eager count for Message Triggers (Regex)
+        metadata.MessageTriggerCount = types.SelectMany(t => t.GetMethods())
+            .Count(m => m.GetCustomAttribute<TextTriggerAttribute>() is { Inactive: false });
+        
         // 3. Register Registries (Singleton)
         var registries = types.Where(t => t.Name.EndsWith("Registry") && !t.Name.StartsWith("System"));
         foreach (var registry in registries)

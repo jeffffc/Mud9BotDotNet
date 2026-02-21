@@ -20,6 +20,7 @@ public class AdminModule(
     IServiceScopeFactory scopeFactory, 
     CommandRegistry commandRegistry, 
     CallbackQueryRegistry callbackRegistry,
+    MessageRegistry messageRegistry,
     IBotMetadataService metadata)
 {
     [Command("msql", Description = "Execute raw SQL query", DevOnly = true)]
@@ -146,6 +147,7 @@ public class AdminModule(
         
         var commandsList = string.Join(", ", commandRegistry.RegisteredTriggers.Select(t => $"<code>/{t}</code>"));
         var callbacksList = string.Join(", ", callbackRegistry.RegisteredPrefixes.Select(p => $"<code>{p}</code>"));
+        var messageTriggersList = string.Join(", ", messageRegistry.RegisteredPatterns.Select(p => $"<code>{p.EscapeHtml()}</code>"));
 
         var sb = new StringBuilder();
         sb.AppendLine("<b>📊 Bot Registration Stats</b>");
@@ -153,15 +155,19 @@ public class AdminModule(
         sb.AppendLine($"├ Version: <code>{version}</code>");
         sb.AppendLine($"├ Commands: <b>{metadata.CommandCount}</b> (Triggers: {commandRegistry.RegisteredTriggers.Count()})");
         sb.AppendLine($"├ Callbacks: <b>{metadata.CallbackCount}</b>");
+        sb.AppendLine($"├ Msg Triggers: <b>{metadata.MessageTriggerCount}</b>");
         sb.AppendLine($"├ Jobs: <b>{metadata.JobCount}</b>");
         sb.AppendLine($"├ Services: <b>{metadata.ServiceCount}</b>");
         sb.AppendLine($"└ Conversations: <b>{metadata.ConversationCount}</b>");
         sb.AppendLine();
-        sb.AppendLine("<b>📜 Registered Triggers:</b>");
+        sb.AppendLine("<b>📜 Registered Commands:</b>");
         sb.AppendLine(commandsList);
         sb.AppendLine();
         sb.AppendLine("<b>🔘 Registered Callbacks:</b>");
         sb.AppendLine(callbacksList);
+        sb.AppendLine();
+        sb.AppendLine("<b>💬 Registered Text Triggers:</b>");
+        sb.AppendLine(string.IsNullOrEmpty(messageTriggersList) ? "None" : messageTriggersList);
 
         await bot.SendMessage(
             chatId: message.Chat.Id,

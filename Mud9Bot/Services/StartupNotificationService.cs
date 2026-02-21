@@ -1,14 +1,14 @@
 using Telegram.Bot;
 using Telegram.Bot.Types.Enums;
 using System.Reflection;
-using Mud9Bot.Interfaces; // Added for version info
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Services;
 
 public class StartupNotificationService(
     ITelegramBotClient botClient,
     IConfiguration configuration,
-    IBotMetadataService metadata, // Injected
+    IBotMetadataService metadata, 
     ILogger<StartupNotificationService> logger) : IHostedService
 {
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
@@ -23,24 +23,26 @@ public class StartupNotificationService(
             var startTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
             
-            var message = $"🤖 <b>Bot Started</b>\n" +
-                          $"Name: <code>{me.FirstName}</code>\n" +
-                          $"Version: <code>{version}</code>\n" +
-                          $"Time: <code>{startTime}</code>\n\n" +
-                          $"📊 <b>Registration Stats</b>\n" +
-                          $"├ Commands: <code>{metadata.CommandCount}</code>\n" +
-                          $"├ Callbacks: <code>{metadata.CallbackCount}</code>\n" +
-                          $"├ Jobs: <code>{metadata.JobCount}</code>\n" +
-                          $"├ Services: <code>{metadata.ServiceCount}</code>\n" +
-                          $"└ Conversations: <code>{metadata.ConversationCount}</code>";
+            // Added Msg Triggers count to the Markdown notification
+            var message = $"🤖 *Bot Started*\n" +
+                          $"Name: `{me.FirstName}`\n" +
+                          $"Version: `{version}`\n" +
+                          $"Time: `{startTime}`\n\n" +
+                          $"📊 *Registration Stats*\n" +
+                          $"├ Commands: `{metadata.CommandCount}`\n" +
+                          $"├ Callbacks: `{metadata.CallbackCount}`\n" +
+                          $"├ Msg Triggers: `{metadata.MessageTriggerCount}`\n" +
+                          $"├ Jobs: `{metadata.JobCount}`\n" +
+                          $"├ Services: `{metadata.ServiceCount}`\n" +
+                          $"└ Conversations: `{metadata.ConversationCount}`";
 
             await botClient.SendMessage(
                 chatId: _logGroupId,
                 text: message,
-                parseMode: ParseMode.Html,
+                parseMode: ParseMode.MarkdownV2,
                 cancellationToken: cancellationToken);
             
-            logger.LogInformation($"Startup notification sent to {_logGroupId}");
+            logger.LogInformation("Startup notification sent.");
         }
         catch (Exception ex)
         {
@@ -51,24 +53,11 @@ public class StartupNotificationService(
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_logGroupId == 0) return;
-
         try
         {
             var stopTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var message = $"🛑 <b>Bot Stopping</b>\n" +
-                          $"Time: <code>{stopTime}</code>";
-
-            await botClient.SendMessage(
-                chatId: _logGroupId,
-                text: message,
-                parseMode: ParseMode.Html,
-                cancellationToken: cancellationToken);
-                
-            logger.LogInformation($"Shutdown notification sent to {_logGroupId}");
+            await botClient.SendMessage(_logGroupId, $"🛑 *Bot Stopping*\nTime: `{stopTime}`", parseMode: ParseMode.MarkdownV2, cancellationToken: cancellationToken);
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to send shutdown notification");
-        }
+        catch { }
     }
 }

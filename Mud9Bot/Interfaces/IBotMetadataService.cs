@@ -7,4 +7,5 @@ public interface IBotMetadataService
     int JobCount { get; set; }
     int ServiceCount { get; set; }
     int ConversationCount { get; set; }
+    int MessageTriggerCount { get; set; }
 }
