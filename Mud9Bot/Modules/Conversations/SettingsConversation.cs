@@ -9,6 +9,7 @@ using Telegram.Bot.Exceptions;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
 using Mud9Bot.Extensions;
+using Mud9Bot.Interfaces;
 
 namespace Mud9Bot.Modules.Conversations;
 
@@ -16,6 +17,7 @@ namespace Mud9Bot.Modules.Conversations;
 public class SettingsConversation : IConversation
 {
     public string ConversationName => "SettingsFlow";
+    private readonly IGroupService _groupService; // 新增注入
     
     // Updated delimiter check to +
     public bool IsEntryPoint(Update update) 
@@ -23,9 +25,10 @@ public class SettingsConversation : IConversation
     
     private readonly IServiceScopeFactory _scopeFactory;
 
-    public SettingsConversation(IServiceScopeFactory scopeFactory)
+    public SettingsConversation(IServiceScopeFactory scopeFactory, IGroupService groupService)
     {
         _scopeFactory = scopeFactory;
+        _groupService = groupService;
     }
 
     private class SettingsSession
@@ -183,6 +186,7 @@ public class SettingsConversation : IConversation
                 await bot.EditMessageReplyMarkup(chatId, query.Message!.MessageId, 
                     replyMarkup: GenerateKeyboard(group), 
                     cancellationToken: ct);
+                _groupService.RefreshCache(group); 
             }
             catch (Exception) { }
         }

@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot", "Mud9Bot\Mud9Bot.csproj", "{19FB786F-CCF6-4760-B98D-454506E6E7FF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChineseCharacterIdentifier", "ChineseCharacterIdentifier\ChineseCharacterIdentifier.csproj", "{E7D71A0D-78BC-48B9-81E4-764C65952717}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{19FB786F-CCF6-4760-B98D-454506E6E7FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{19FB786F-CCF6-4760-B98D-454506E6E7FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{19FB786F-CCF6-4760-B98D-454506E6E7FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7D71A0D-78BC-48B9-81E4-764C65952717}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7D71A0D-78BC-48B9-81E4-764C65952717}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7D71A0D-78BC-48B9-81E4-764C65952717}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7D71A0D-78BC-48B9-81E4-764C65952717}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

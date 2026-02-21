@@ -30,4 +30,15 @@ public class Job
 
     [Column("text")]
     public string? Text { get; set; }
+    
+    // 建議：執行 `/msql ALTER TABLE job ADD COLUMN is_processed BOOLEAN DEFAULT FALSE;`
+    // 這樣恢復邏輯才不會重複發送舊訊息
+    [Column("is_processed")]
+    public bool IsProcessed { get; set; } = false;
+    
+    /// <summary>
+    /// NULL = One-time, "DAILY" = Every day, "MON", "TUE", etc. = Weekly
+    /// </summary>
+    [Column("recurrence")]
+    public string? Recurrence { get; set; } 
 }

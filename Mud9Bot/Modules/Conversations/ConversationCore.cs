@@ -27,14 +27,14 @@ public interface IConversation
 public class ConversationContext
 {
     public string CurrentState { get; set; } = "Start";
-    public int MenuMessageId { get; set; } // 新增：追蹤該對話專屬的選單 MessageId
+    public int MenuMessageId { get; set; } 
+    public long ChatId { get; set; } // 新增：綁定該對話發生所在的 ChatId
     public Dictionary<string, object> Data { get; set; } = new();
 }
 
 public class ConversationManager
 {
     private readonly ITelegramBotClient _bot;
-    // 使用 OrdinalIgnoreCase 避免觸發詞大小寫導致配對失敗
     private readonly Dictionary<string, IConversation> _triggerMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IConversation> _workflowMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<long, (string WorkflowName, ConversationContext Context)> _userSessions = new();
@@ -59,21 +59,20 @@ public class ConversationManager
         if (user == null) return false;
 
         long userId = user.Id;
+        long currentChatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
 
         // 0. 防誤觸檢查：如果有人亂撳其他人對話中嘅按鈕，直接彈出警告！
         if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery?.Message != null)
         {
             int cbMsgId = update.CallbackQuery.Message.MessageId;
             
-            // 檢查 _userSessions 看看這個 MessageId 是否屬於其他人的 Session
             foreach (var kvp in _userSessions)
             {
                 if (kvp.Key != userId && kvp.Value.Context.MenuMessageId == cbMsgId)
                 {
-                    // 改為從集中管理的 Constants 獲取隨機警告訊息
                     var errmsg = Constants.NoOriginalSenderMessageList.GetAny();
                     await _bot.AnswerCallbackQuery(update.CallbackQuery.Id, errmsg, showAlert: true, cancellationToken: ct);
-                    return true; // 攔截！不再往下處理
+                    return true; 
                 }
             }
         }
@@ -81,30 +80,41 @@ public class ConversationManager
         // 1. CHECK FOR COMMANDS
         if (update.Message?.Text is { } text && text.StartsWith("/"))
         {
-            string command = ParseCommand(text);
+            var parts = text.Split(' ', 2);
+            string command = parts[0].Substring(1).ToLower();
+    
+            // 🚀 NEW: Deep Link Interceptor
+            // If command is /start and has a payload, use the payload as the command
+            if (command == "start" && parts.Length > 1)
+            {
+                command = parts[1].ToLower();
+            }
 
-            // If the command is a trigger for a conversation, start/restart it
+            // Now look up the target workflow based on the command (or deep link payload)
             if (_triggerMap.TryGetValue(command, out var targetWorkflow))
             {
-                if (!await CheckAccessAsync(targetWorkflow, userId, update, ct)) return true; // Reject unauthorized users
+                if (!await CheckAccessAsync(targetWorkflow, userId, update, ct)) return true;
 
                 _userSessions.TryRemove(userId, out _);
-                await StartNewSessionAsync(targetWorkflow, userId, update, ct);
+                await StartNewSessionAsync(targetWorkflow, userId, currentChatId, update, ct);
                 return true;
             }
-            
-            // FIX: If the message is a command but NOT a conversation trigger,
-            // we return FALSE immediately. This allows the UpdateHandler to 
-            // pass the command to the standard CommandRegistry.
+    
             return false;
         }
 
         // 2. CHECK ACTIVE SESSION
         if (_userSessions.TryGetValue(userId, out var session))
         {
+            // 🚀 【跨群組放行機制 (Session Trap Fix)】 🚀
+            // 如果這是一條來自「其他群組」的普通文字訊息，我們不應該攔截它，直接放行給後方的 MessageRegistry！
+            if (update.Type == UpdateType.Message && currentChatId != session.Context.ChatId && session.Context.ChatId != 0)
+            {
+                return false; 
+            }
+
             if (_workflowMap.TryGetValue(session.WorkflowName, out var activeWorkflow))
             {
-                // 如果權限在對話途中被拔除，也應該踢出
                 if (!await CheckAccessAsync(activeWorkflow, userId, update, ct)) 
                 {
                     _userSessions.TryRemove(userId, out _);
@@ -127,9 +137,9 @@ public class ConversationManager
         {
             if (workflow.IsEntryPoint(update))
             {
-                if (!await CheckAccessAsync(workflow, userId, update, ct)) return true; // Reject unauthorized users
+                if (!await CheckAccessAsync(workflow, userId, update, ct)) return true;
 
-                await StartNewSessionAsync(workflow, userId, update, ct);
+                await StartNewSessionAsync(workflow, userId, currentChatId, update, ct);
                 return true;
             }
         }
@@ -151,7 +161,6 @@ public class ConversationManager
                 }
                 else if (update.Message != null)
                 {
-                    // 改用原生 SendMessage 以確保不會因為擴充方法(Extension Method) 不相容而拋出異常
                     await _bot.SendMessage(
                         chatId: update.Message.Chat.Id, 
                         text: "🚫 You are not the Dev!", 
@@ -159,18 +168,20 @@ public class ConversationManager
                         cancellationToken: ct);
                 }
             }
-            catch 
-            { 
-                // 忽略發送警告時的 API 錯誤，避免整個 UpdateHandler 崩潰
-            }
+            catch { }
             return false;
         }
         return true;
     }
 
-    private async Task StartNewSessionAsync(IConversation workflow, long userId, Update update, CancellationToken ct)
+    private async Task StartNewSessionAsync(IConversation workflow, long userId, long chatId, Update update, CancellationToken ct)
     {
-        var context = new ConversationContext { CurrentState = "Start" };
+        var context = new ConversationContext 
+        { 
+            CurrentState = "Start",
+            ChatId = chatId // 記錄開啟 Session 時所在的 ChatId
+        };
+        
         var nextState = await workflow.ExecuteStepAsync(_bot, update, context, ct);
 
         if (nextState != null)

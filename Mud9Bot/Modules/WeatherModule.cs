@@ -14,6 +14,7 @@ namespace Mud9Bot.Modules;
 public class WeatherModule(IWeatherService weatherService)
 {
     [Command("weather")]
+    [TextTrigger("而家天氣", Description = "取得現時天氣概況")] // 🚀 新增 TextTrigger
     public async Task WeatherCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         var data = weatherService.GetCurrent();

@@ -4,6 +4,7 @@ using Mud9Bot.Attributes;
 using Mud9Bot.Interfaces;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
+using Mud9Bot.Extensions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -12,7 +13,7 @@ using Telegram.Bot.Exceptions;
 
 namespace Mud9Bot.Modules;
 
-public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory scopeFactory)
+public class ZodiacModule(IZodiacService zodiacService, IGroupService groupService)
 {
     private static readonly string[] ZodiacNames = ["白羊", "金牛", "雙子", "巨蟹", "獅子", "處女", "天秤", "天蠍", "人馬", "山羊", "水瓶", "雙魚"];
     private static readonly Dictionary<string, string> TypeLabels = new()
@@ -34,14 +35,14 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
     [Command("zodiac")]
     public async Task ZodiacCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
-        // Respect group settings
+        // 1. 檢查群組設定 (使用 RAM 快取)
         if (message.Chat.Type != ChatType.Private)
         {
-            using var scope = scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
-            var group = await db.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == message.Chat.Id, ct);
+            // ⚡ 從 RAM 獲取設定，這裡完全移除了資料庫 Scope 的開啟
+            var group = await groupService.GetGroupSettingsAsync(message.Chat.Id, ct);
             if (group != null && group.OffZodiac) return;
         }
+
 
         await bot.SendMessage(
             chatId: message.Chat.Id,
@@ -140,9 +141,7 @@ public class ZodiacModule(IZodiacService zodiacService, IServiceScopeFactory sco
         
         if (ownerId.HasValue && query.From.Id != ownerId.Value)
         {
-            var random = new Random();
-            var errMsg = ErrorMessages[random.Next(ErrorMessages.Length)];
-            await bot.AnswerCallbackQuery(query.Id, errMsg, showAlert: true, cancellationToken: ct);
+            await bot.AnswerCallbackQuery(query.Id, Constants.NoOriginalSenderMessageList.GetAny(), showAlert: true, cancellationToken: ct);
             return false;
         }
         return true;

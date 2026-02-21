@@ -12,7 +12,7 @@ using Telegram.Bot.Exceptions;
 
 namespace Mud9Bot.Modules;
 
-public class FortuneModule(IFortuneService fortuneService, IServiceScopeFactory scopeFactory)
+public class FortuneModule(IFortuneService fortuneService, IServiceScopeFactory scopeFactory, IGroupService groupService)
 {
     [Command("fortune")]
     public async Task Fortune(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
@@ -20,17 +20,25 @@ public class FortuneModule(IFortuneService fortuneService, IServiceScopeFactory 
         var chatTelegramId = message.Chat.Id;
         var userTelegramId = message.From?.Id ?? 0;
 
+        // 0. 檢查群組設定 (優先使用 RAM 快取)
+        if (message.Chat.Type != ChatType.Private)
+        {
+            var groupSettings = await groupService.GetGroupSettingsAsync(chatTelegramId, ct);
+            
+            // 如果群組關閉了求籤功能，直接結束，連資料庫 Scope 都不用開
+            if (groupSettings == null || groupSettings.OffFortune) return;
+        }
+        
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
         // 1. Check Group Settings & Daily Limit (only for non-private chats)
         if (message.Chat.Type != ChatType.Private)
         {
-            // Fetch the group and user entities to get internal IDs
-            var group = await db.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == chatTelegramId, ct);
             var user = await db.Set<BotUser>().FirstOrDefaultAsync(u => u.TelegramId == userTelegramId, ct);
+            var group = await db.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == chatTelegramId, ct);
 
-            if (group == null || group.OffFortune || user == null) return;
+            if (user == null || group == null) return;
 
             // Current date in Hong Kong
             var todayHk = DateTime.UtcNow.ToHkTime().Date;

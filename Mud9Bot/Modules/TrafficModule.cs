@@ -16,6 +16,7 @@ public class TrafficModule(ITrafficService trafficService)
 {
     // --- 1. RTHK 交通消息 ---
     [Command("traffic", Description = "獲取 RTHK 即時交通消息")]
+    [TextTrigger("^交通消息$", Description = "取得 RTHK 即時交通快訊")] // 🚀 新增 TextTrigger
     public async Task GetTraffic(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
     {
         await bot.Reply(msg, "🔄 正在獲取 RTHK 交通消息...", ct);
