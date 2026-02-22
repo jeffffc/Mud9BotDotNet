@@ -167,7 +167,7 @@ public class ReminderManagementConversation : IConversation
                 else
                 {
                     var hkTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(r.Time, DateTimeKind.Utc), HkTimeZone);
-                    timeStr = $"[{hkTime:MM/dd HH:mm}]";
+                    timeStr = $"[{hkTime:yyyy/MM/dd HH:mm}]";
                 }
                 string content = r.Text ?? "無內容";
                 if (content.Length > 15) content = content.Substring(0, 12) + "...";
