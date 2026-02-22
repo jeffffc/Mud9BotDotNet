@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Mud9Bot.Data.Entities;
 
 namespace Mud9Bot.Data;

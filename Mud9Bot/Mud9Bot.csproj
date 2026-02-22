@@ -38,5 +38,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\ChineseCharacterIdentifier\ChineseCharacterIdentifier.csproj" />
+      <ProjectReference Include="..\Mud9Bot.Data\Mud9Bot.Data.csproj" />
     </ItemGroup>
 </Project>
