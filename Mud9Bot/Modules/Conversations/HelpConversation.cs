@@ -278,6 +278,7 @@ public class HelpConversation : IConversation
                       "  - <code>/dice 3d10 5</code> (擲 3 粒 10 面骰，重複 5 次)\n" +
                       "• <code>/block</code> (回覆訊息): 顯示已封鎖用戶 (純屬娛樂功能)\n" +
                       "• <code>/ping</code>: 檢查機器人連線狀態\n" +
+                      "• <code>/info</code>: 顯示機器人資訊與更新頻道\n" +
                       "• <code>/feedback 內容</code>: 向開發者提交意見或回報問題\n\n" +
                       "<b>🛡️ 被動攔截 (群組設定)：</b>\n" +
                       "• <b>5P字過濾：</b>自動警告使用 5P 字體之用戶\n" +
@@ -289,10 +290,31 @@ public class HelpConversation : IConversation
     {
         string text = "<b>【群組管理】</b>\n(群組管理員專用指令)\n\n" +
                       "• <code>/msettings</code>: 開啟群組設定選單\n\n" +
-                      "<b>選單可控制內容包括：</b>\n" +
+                      "<b>⚙️ 選單可控制內容包括：</b>\n" +
                       "• <b>酒膠配額：</b>設定各成員每日可賜出之酒/膠總數\n" +
                       "• <b>功能開關：</b>個別啟用或禁用求籤、星座功能\n" +
-                      "• <b>內容過濾：</b>開啟或關閉「5P字過濾」及「殘體字攔截」系統";
+                      "• <b>內容過濾：</b>開啟或關閉「5P字過濾」及「殘體字攔截」系統\n\n" +
+                      "<b>👋 設定歡迎訊息：</b>\n" +
+                      "• <code>/welcome [內容]</code>: 設定群組嘅歡迎訊息。每當有用戶加入或被邀請入群時，就會發送呢條訊息。如果內容輸入 <code>no</code> 或 <code>-</code>，則會停用歡迎訊息。\n" +
+                      "<i>💡 你亦可以對住一則包含相片或 GIF 嘅訊息回覆 /welcome，將其設為附帶媒體嘅歡迎訊息。</i>\n\n" +
+                      "<b>歡迎訊息內可以使用以下變數：</b>\n" +
+                      "<code>$name</code> - 新成員名稱\n" +
+                      "<code>$username</code> - 新成員 Username\n" +
+                      "<code>$id</code> - 新成員 ID\n" +
+                      "<code>$title</code> - 群組名稱\n" +
+                      "<code>$language</code> - 語言代碼\n\n" +
+                      "<b>🎨 支援 HTML 格式排版：</b>\n" +
+                      "• 粗體：<code>&lt;b&gt;文字&lt;/b&gt;</code>\n" +
+                      "• 斜體：<code>&lt;i&gt;文字&lt;/i&gt;</code>\n" +
+                      "• 底線：<code>&lt;u&gt;文字&lt;/u&gt;</code>\n" +
+                      "• 刪除線：<code>&lt;s&gt;文字&lt;/s&gt;</code>\n" +
+                      "• 劇透/防雷：<code>&lt;tg-spoiler&gt;文字&lt;/tg-spoiler&gt;</code>\n" +
+                      "• 超連結：<code>&lt;a href=\"網址\"&gt;文字&lt;/a&gt;</code>\n" +
+                      "• 單行代碼：<code>&lt;code&gt;文字&lt;/code&gt;</code>\n" +
+                      "• 多行代碼塊：<code>&lt;pre&gt;文字&lt;/pre&gt;</code>\n" +
+                      "• 引用區塊：<code>&lt;blockquote&gt;文字&lt;/blockquote&gt;</code>\n\n" +
+                      "<b>📝 例子：</b>\n" +
+                      "<code>/welcome 歡迎 &lt;b&gt;$name&lt;/b&gt; 來到 &lt;i&gt;$title&lt;/i&gt;！請先閱讀 &lt;a href=\"https://t.me/telegram\"&gt;群規&lt;/a&gt;。</code>";
         return (text, GetBackMarkup());
     }
 
