@@ -177,4 +177,14 @@ public class AdminModule(
             cancellationToken: ct
         );
     }
+    
+    [Command("restart", DevOnly = true, Description = "Restart the bot (requires systemd/systemctl)")]
+    public async Task RestartCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        await bot.Reply(message, "🔄 收到！而家即刻重新啟動 Mud9Bot...", ct: ct);
+        
+        // Forcefully exit the application with a non-zero exit code.
+        // systemd will catch this and automatically restart the service.
+        Environment.Exit(1);
+    }
 }

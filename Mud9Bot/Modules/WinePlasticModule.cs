@@ -2,7 +2,6 @@ using Mud9Bot.Attributes;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
 using Mud9Bot.Interfaces;
-
 using Mud9Bot.Extensions;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -20,12 +19,12 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
         // 1. Validation: Must be a reply in group
         if (message.Chat.Type == ChatType.Private)
         {
-            await bot.Reply(message, "呢度用唔到，要群組先用到 `/z`。", ct);
+            await bot.Reply(message, "呢度用唔到，要群組先用到 <code>/z</code>。", ct);
             return;
         }
         if (message.ReplyToMessage == null)
         {
-            await bot.Reply(message, "你想賜酒 🍻 ／派膠 🌚 俾邊個呀？對住佢用 `/z` 啦！", ct);
+            await bot.Reply(message, "你想賜酒 🍻 ／派膠 🌚 俾邊個呀？對住佢用 <code>/z</code> 啦！", ct);
             return;
         }
 
@@ -45,7 +44,6 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
         int num = 1; // default value = 1
         
         // 3. Check wine/plastic amount
-        
         if (args.Length > 0 && args[0].All(char.IsDigit)) // args exist and first arg is a number
         {
             num = int.Parse(args[0]);
@@ -59,7 +57,6 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
         // 4. Construct Buttons
         // Callback Format: "wine+{senderId}+{targetId}+number" or "plastic+{senderId}+{targetId}+number"
         // We need senderId to verify the clicker is the original commander.
-        
         var keyboard = new InlineKeyboardMarkup(new [] {
                 InlineKeyboardButton.WithCallbackData(num == 1 ? "賜酒 🍻" : $"賜 {num} 杯酒 🍻", $"wine+{sender.Id}+{target.Id}+{num}"),
                 InlineKeyboardButton.WithCallbackData(num == 1 ? "派膠 🌚" : $"派 {num} 粒膠 🌚", $"plastic+{sender.Id}+{target.Id}+{num}")
@@ -97,7 +94,6 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
         if (!long.TryParse(parts[1], out var originalSenderId)) return;
         if (!long.TryParse(parts[2], out var targetTelegramId)) return;
         if (!int.TryParse(parts[3], out var num)) return;
-        
         
         // 1. Verify Clicker is the Original Sender
         if (query.From.Id != originalSenderId)
@@ -145,7 +141,12 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
         // 1. Group Check
         if (message.Chat.Type == ChatType.Private)
         {
-            await bot.SendMessage(message.Chat.Id, "呢度用唔到，要群組先用到 `/check`。", replyParameters: new ReplyParameters { MessageId = message.MessageId }, cancellationToken: ct);
+            await bot.SendMessage(
+                message.Chat.Id, 
+                "呢度用唔到，要群組先用到 <code>/check</code>。", 
+                parseMode: ParseMode.Html, 
+                replyParameters: new ReplyParameters { MessageId = message.MessageId }, 
+                cancellationToken: ct);
             return;
         }
 
@@ -168,11 +169,9 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
             // 4. Format Message (Using HTML as per legacy logic for name safety)
             var fullName = user.FirstName + (user.LastName != null ? " " + user.LastName : "");
             
-            // Simple HTML escape helpers
-            string EscapeHtml(string text) => text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
-            
-            var safeName = EscapeHtml(fullName);
-            var safeTitle = EscapeHtml(chatTitle);
+            // 使用內建 Extension Method 代替自訂 Escape
+            var safeName = fullName.EscapeHtml();
+            var safeTitle = chatTitle.EscapeHtml();
 
             var checkMsg = $"<b>【{safeName}】</b>，喺<b>【{safeTitle}】</b>呢度︰\n" +
                            $"你收過 <code>{wine}</code> 杯酒同 <code>{plastic}</code> 粒膠；\n" +
@@ -196,7 +195,6 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
                 text: errorMsg,
                 cancellationToken: ct
             );
-            // In a real scenario, you might want to log 'ex' using injected ILogger if available
         }
     }
     
