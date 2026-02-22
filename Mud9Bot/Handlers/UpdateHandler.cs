@@ -70,7 +70,6 @@ public class UpdateHandler(
         // ---------------------------------------------------------
         // 確保這是一個包含文字的普通訊息
         if (update.Message is not { } message) return;
-        if (message.Text is not { } messageText) return;
 
         var chatId = message.Chat.Id;
 
@@ -89,6 +88,23 @@ public class UpdateHandler(
         {
             await userService.SyncGroupAsync(message.Chat, cancellationToken);
         }
+        
+        // --- 🚀 NEW CHAT MEMBERS EVENT (Intercept before Text check) ---
+        if (message.NewChatMembers?.Any() == true)
+        {
+            var welcomeService = scope.ServiceProvider.GetRequiredService<IWelcomeService>();
+            await welcomeService.HandleNewChatMembersAsync(botClient, message, cancellationToken);
+            return;
+        }
+        
+        if (message.LeftChatMember != null)
+        {
+            var welcomeService = scope.ServiceProvider.GetRequiredService<IWelcomeService>();
+            await welcomeService.HandleLeftChatMemberAsync(botClient, message, cancellationToken);
+            return; // 處理完退群事件就結束
+        }
+        
+        if (message.Text is not { } messageText) return;
         
         // ---------------------------------------------------------
         // 5. Text Triggers (Regex / Passive Listeners)

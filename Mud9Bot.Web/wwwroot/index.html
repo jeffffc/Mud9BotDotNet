@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BotName - Live Statistics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        /* Glowing text effect for big numbers */
+        .glow-text {
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+        }
+
+        /* Number change animation */
+        @keyframes pop {
+            0% { transform: scale(1); color: #38bdf8; }
+            50% { transform: scale(1.1); color: #7dd3fc; }
+            100% { transform: scale(1); color: white; }
+        }
+        .update-anim {
+            animation: pop 0.4s ease-out forwards;
+        }
+
+        /* Live feed entrance animation */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .feed-item {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden">
+
+<!-- Navbar -->
+<nav class="border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.4)]">
+                <i data-lucide="zap" class="text-white w-5 h-5"></i>
+            </div>
+            <span class="font-bold text-xl tracking-wide">NexusBot</span>
+        </div>
+        <a href="https://t.me/yourbot" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-full font-medium transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 text-sm">
+            Add to Telegram <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+    </div>
+</nav>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+
+    <!-- Hero Section -->
+    <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium mb-4">
+                <span class="relative flex h-2.5 w-2.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+            All Systems Operational
+        </div>
+        <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-slate-400">
+            Processing the world's messages in real-time.
+        </h1>
+        <p class="text-slate-400 text-lg md:text-xl">
+            Trusted by thousands of groups. Watch our live metrics update every 5 seconds.
+        </p>
+    </div>
+
+    <!-- Big Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <!-- Stat 1 -->
+        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
+            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="message-square" class="w-32 h-32"></i>
+            </div>
+            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Total Messages Processed</p>
+            <div class="text-5xl font-bold text-white glow-text" id="stat-messages">0</div>
+        </div>
+
+        <!-- Stat 2 -->
+        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
+            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="users" class="w-32 h-32"></i>
+            </div>
+            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Active Groups</p>
+            <div class="text-5xl font-bold text-white glow-text" id="stat-groups">0</div>
+        </div>
+
+        <!-- Stat 3 -->
+        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
+            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                <i data-lucide="cpu" class="w-32 h-32"></i>
+            </div>
+            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Avg. Response Time</p>
+            <div class="text-5xl font-bold text-white glow-text flex items-baseline gap-2">
+                <span id="stat-latency">0</span> <span class="text-2xl text-slate-500">ms</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Feed Section -->
+    <div class="max-w-3xl mx-auto bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
+            <h3 class="font-semibold flex items-center gap-2 text-slate-200">
+                <i data-lucide="activity" class="w-5 h-5 text-blue-400"></i> Live Global Activity
+            </h3>
+            <span class="text-xs text-slate-500 font-mono" id="last-updated">Updating in 5s...</span>
+        </div>
+
+        <div class="p-6">
+            <!-- This list will be populated by JS -->
+            <ul id="live-feed" class="space-y-4">
+                <li class="text-center text-slate-500 py-8">Waiting for live data...</li>
+            </ul>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    lucide.createIcons();
+
+    // --- Mock Data Setup (To simulate your .NET Backend) ---
+    let totalMessages = 15420930;
+    let totalGroups = 4205;
+    let baseLatency = 45;
+
+    const fakeCountries = ['🇺🇸', '🇬🇧', '🇪🇸', '🇮🇳', '🇧🇷', '🇩🇪', '🇯🇵', '🇦🇺'];
+    const fakeActions = ['requested the weather', 'generated a meme', 'started a game', 'checked crypto prices', 'used /help'];
+
+    function fetchMockData() {
+        // Simulate incoming traffic
+        const newMessages = Math.floor(Math.random() * 50) + 10;
+        totalMessages += newMessages;
+
+        if(Math.random() > 0.8) totalGroups += 1;
+
+        const currentLatency = baseLatency + Math.floor(Math.random() * 15) - 5;
+
+        // Generate 1-2 new fake events
+        const newEventsCount = Math.floor(Math.random() * 2) + 1;
+        const events = [];
+        for(let i=0; i<newEventsCount; i++) {
+            const isGroup = Math.random() > 0.4;
+            events.push({
+                flag: fakeCountries[Math.floor(Math.random() * fakeCountries.length)],
+                entity: isGroup ? 'A group of members' : 'A user',
+                action: fakeActions[Math.floor(Math.random() * fakeActions.length)],
+                time: new Date().toLocaleTimeString()
+            });
+        }
+
+        return {
+            messages: totalMessages,
+            groups: totalGroups,
+            latency: currentLatency,
+            newEvents: events
+        };
+    }
+
+    // --- UI Update Logic ---
+
+    function animateValue(id, newValue) {
+        const el = document.getElementById(id);
+        const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
+
+        if (currentValue !== newValue) {
+            el.innerText = newValue.toLocaleString();
+            el.classList.remove('update-anim');
+            void el.offsetWidth; // Trigger reflow
+            el.classList.add('update-anim');
+        }
+    }
+
+    function prependFeedItem(event) {
+        const feed = document.getElementById('live-feed');
+
+        // Remove initial placeholder if it exists
+        if(feed.innerHTML.includes('Waiting for live data')) {
+            feed.innerHTML = '';
+        }
+
+        const li = document.createElement('li');
+        li.className = 'feed-item flex items-start gap-4 p-3 rounded-xl bg-slate-800/20 border border-slate-700/30';
+        li.innerHTML = `
+                <div class="text-2xl mt-1">${event.flag}</div>
+                <div class="flex-1">
+                    <p class="text-slate-300 text-sm">
+                        <span class="font-semibold text-white">${event.entity}</span> just ${event.action}.
+                    </p>
+                    <p class="text-xs text-slate-500 mt-1 font-mono">${event.time}</p>
+                </div>
+            `;
+
+        feed.insertBefore(li, feed.firstChild);
+
+        // Keep only the last 6 items to prevent the page from growing forever
+        if (feed.children.length > 6) {
+            feed.removeChild(feed.lastChild);
+        }
+    }
+
+    // --- Main Loop ---
+
+    async function updateDashboard() {
+        // IN REALITY: 
+        // const response = await fetch('/api/public-stats');
+        // const data = await response.json();
+
+        const data = fetchMockData();
+
+        animateValue('stat-messages', data.messages);
+        animateValue('stat-groups', data.groups);
+        animateValue('stat-latency', data.latency);
+
+        data.newEvents.forEach(event => prependFeedItem(event));
+
+        // Visual countdown for next update
+        let countdown = 5;
+        const timerEl = document.getElementById('last-updated');
+
+        clearInterval(window.countdownInterval);
+        window.countdownInterval = setInterval(() => {
+            countdown--;
+            if(countdown > 0) {
+                timerEl.innerText = `Updating in ${countdown}s...`;
+            } else {
+                timerEl.innerText = `Syncing...`;
+            }
+        }, 1000);
+    }
+
+    // Start
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
+
+</script>
+</body>
+</html>

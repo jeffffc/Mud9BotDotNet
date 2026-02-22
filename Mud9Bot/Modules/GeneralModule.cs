@@ -279,4 +279,19 @@ public class GeneralModule(
             await bot.Reply(message, "用乜撚嘢殘體啊，當呢度大陸啊？", ct: ct);
         }
     }
+    
+    [Command("info", Description = "顯示機器人資訊與更新頻道")]
+    public async Task InfoCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        string infoText = "發現問題／諗到建議？<code>/feedback Your Feedback</code>\n" +
+                          "想緊貼我嘅更新？@Mud9BotDev";
+
+        await bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: infoText,
+            parseMode: ParseMode.Html,
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            cancellationToken: ct
+        );
+    }
 }

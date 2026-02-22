@@ -29,9 +29,15 @@ public class BotGroup
 
     [Column("welcome")]
     public long Welcome { get; set; } // Legacy was bigint
+    
+    [Column("welcometext")]
+    public string? WelcomeText { get; set; }
 
     [Column("welcomegif")]
     public string? WelcomeGif { get; set; }
+    
+    [Column("welcomephoto")]
+    public string? WelcomePhoto { get; set; }
 
     [Column("pinned_id")]
     public int PinnedId { get; set; }

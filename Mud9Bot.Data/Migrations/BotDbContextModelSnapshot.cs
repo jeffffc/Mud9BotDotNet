@@ -84,6 +84,14 @@ namespace Mud9Bot.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("welcomegif");
 
+                    b.Property<string>("WelcomePhoto")
+                        .HasColumnType("text")
+                        .HasColumnName("welcomephoto");
+
+                    b.Property<string>("WelcomeText")
+                        .HasColumnType("text")
+                        .HasColumnName("welcometext");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TelegramId")

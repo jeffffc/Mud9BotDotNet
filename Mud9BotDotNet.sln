@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.MigrationTool", "Mu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Data", "Mud9Bot.Data\Mud9Bot.Data.csproj", "{F4E41BA0-61EF-47A5-9B2B-229ACE4FB209}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Web", "Mud9Bot.Web\Mud9Bot.Web.csproj", "{0A45494F-5B47-468B-978D-7A2CF05691C3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{F4E41BA0-61EF-47A5-9B2B-229ACE4FB209}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F4E41BA0-61EF-47A5-9B2B-229ACE4FB209}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F4E41BA0-61EF-47A5-9B2B-229ACE4FB209}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A45494F-5B47-468B-978D-7A2CF05691C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A45494F-5B47-468B-978D-7A2CF05691C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A45494F-5B47-468B-978D-7A2CF05691C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A45494F-5B47-468B-978D-7A2CF05691C3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
