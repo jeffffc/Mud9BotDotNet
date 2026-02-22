@@ -22,7 +22,8 @@ public class UpdateHandler(
     IServiceScopeFactory scopeFactory,
     ConversationManager conversationManager,
     IPaymentService paymentService,
-    IConfiguration configuration) : IUpdateHandler
+    IConfiguration configuration,
+    IInlineQueryHandler inlineQueryHandler) : IUpdateHandler
 {
     private string? _botUsername;
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
@@ -30,7 +31,16 @@ public class UpdateHandler(
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
         // ---------------------------------------------------------
-        // 0. Payment Handling (Highest Priority)
+        // 0. Inline Query Handling
+        // ---------------------------------------------------------
+        if (update.Type == UpdateType.InlineQuery && update.InlineQuery is { } inlineQuery)
+        {
+            await inlineQueryHandler.HandleAsync(botClient, inlineQuery, cancellationToken);
+            return;
+        }
+        
+        // ---------------------------------------------------------
+        // 0.1. Payment Handling (Highest Priority)
         // ---------------------------------------------------------
         // 處理支付相關的 API 請求，避免被後續邏輯誤擋
         if (update.Type == UpdateType.PreCheckoutQuery && update.PreCheckoutQuery is { } preCheckoutQuery)
