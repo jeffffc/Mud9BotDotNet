@@ -68,7 +68,11 @@ public class ConversationManager
         if (update.Message?.Text is { } text && text.StartsWith("/"))
         {
             var parts = text.Split(' ', 2);
-            string command = parts[0].Substring(1).ToLower();
+            string rawCommand = parts[0].Substring(1); // 取得 '/' 後的內容
+
+            // 🚀 解析 @BotName 尾綴
+            int atIndex = rawCommand.IndexOf('@');
+            string command = (atIndex > 0 ? rawCommand.Substring(0, atIndex) : rawCommand).ToLower();
 
             // Deep Link 支援
             if (command == "start" && parts.Length > 1)
