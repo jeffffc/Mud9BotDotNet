@@ -5,6 +5,8 @@
 
 # mud9bot project
 appsettings.Development.json
+Mud9Bot.MigrationTool/*
+
 
 # User-specific files
 *.rsuser
