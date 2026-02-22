@@ -49,6 +49,7 @@ builder.Services.AddBotServicesAndModules(Assembly.GetExecutingAssembly());
 // ----------------------------
 
 // 7. Register Handler & Worker
+builder.Services.AddSingleton<IInlineQueryHandler, InlineQueryHandler>();
 builder.Services.AddSingleton<IUpdateHandler, UpdateHandler>();
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<StartupNotificationService>();
