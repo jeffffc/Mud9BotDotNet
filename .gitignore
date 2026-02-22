@@ -15,6 +15,24 @@ Mud9Bot.MigrationTool/*
 *.userosscache
 *.sln.docstates
 
+# === JetBrains Rider Specifics ===
+
+# 1. ALWAYS IGNORE: Personal state & high-churn files
+.idea/**/workspace.xml
+.idea/**/projectSettingsUpdate.xml
+
+# 2. ALWAYS IGNORE: Sensitive Connection Info (Security Risk)
+.idea/**/sshConfigs.xml
+.idea/**/webservers.xml
+.idea/**/deployment.xml
+
+# 3. OPTIONAL: If you want a perfectly clean repo, 
+# ignore the internal .gitignore JetBrains creates
+.idea/**/.gitignore
+
+# Note: Keep 'vcs.xml' and 'indexLayout.xml' UNTRACKED 
+# (do not add them here) so they can be shared with the team.
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
