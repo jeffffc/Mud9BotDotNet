@@ -8,9 +8,21 @@ using System.Linq;
 
 namespace Mud9Bot.Services;
 
-public class MovieCrawlerService(ILogger<MovieCrawlerService> logger) : IMovieCrawlerService
+public class MovieCrawlerService : IMovieCrawlerService
 {
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<MovieCrawlerService> _logger;
+
+    public MovieCrawlerService(ILogger<MovieCrawlerService> logger)
+    {
+        _logger = logger;
+        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        
+        // 🚀 Production Fix: Headers are required to avoid 403 Forbidden on the server
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
+        _httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
+        _httpClient.DefaultRequestHeaders.Add("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7");
+    }
 
     public async Task<List<Movie>> FetchCurrentMoviesAsync()
     {
@@ -23,7 +35,11 @@ public class MovieCrawlerService(ILogger<MovieCrawlerService> logger) : IMovieCr
             doc.LoadHtml(html);
 
             var movieNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'each')]");
-            if (movieNodes == null) return movies;
+            if (movieNodes == null) 
+            {
+                _logger.LogWarning("Wmoov HTML structure might have changed or access denied in Production.");
+                return movies;
+            }
 
             foreach (var node in movieNodes.Take(12)) 
             {
@@ -60,13 +76,13 @@ public class MovieCrawlerService(ILogger<MovieCrawlerService> logger) : IMovieCr
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to parse a movie entry.");
+                    _logger.LogWarning(ex, "Failed to parse a movie entry.");
                 }
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to scrape movies from wmoov.");
+            _logger.LogError(ex, "Failed to scrape movies from wmoov.");
         }
 
         return movies;
@@ -115,7 +131,7 @@ public class MovieCrawlerService(ILogger<MovieCrawlerService> logger) : IMovieCr
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to fetch details for movie: {Title}", movie.Title);
+            _logger.LogWarning(ex, "Failed to fetch details for movie: {Title}", movie.Title);
         }
     }
 }
