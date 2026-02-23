@@ -272,6 +272,7 @@ public class HelpConversation : IConversation
                       "• <code>/ch 字</code>: 查詢中文字倉頡碼 (一次最多 20 字)\n" +
                       "• <code>/t 內容</code>: 翻譯文字 (支援回覆訊息、直接輸入或英漢自動偵測)\n" +
                       "• <code>/speech</code>: (回覆語音) 語音轉文字辨識功能\n" +
+                      "• <code>/gas</code>: 查詢本港各大油站即時油價 (無鉛、特級、柴油)\n" +
                       "• <b>匯率轉換：</b>直接輸入 <code>100 usd to hkd</code> 即時查詢國際即時匯率";
         return (text, GetBackMarkup());
     }

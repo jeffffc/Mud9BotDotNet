@@ -48,6 +48,7 @@
       "grp_inline": "🔍 行內搜尋功能",
       "grp_input": "✍️ 對話內容輸入",
       "grp_help": "📚 指令使用教學",
+      "grp_gas": "⛽ 油站即時油價",
       "cmd_ignore": "🛡️ 過濾名單管理",
       "cmd_welcome": "👋 歡迎訊息設定",
       "cmd_block": "🚫 封鎖用戶",
@@ -63,6 +64,7 @@
       "cmd_translate": "💬 翻譯文字",
       "cmd_toss": "🎲 隨機抽籤",
       "cmd_help": "📚 指令使用教學",
+      "cmd_gas": "⛽ 油站即時油價",
       "footer_desc": "一個陪伴咗大家多年，而家滿血回歸嘅廣東話機器人項目。",
       "footer_links": "官方連結",
       "footer_dev": "最新公告頻道",
@@ -117,6 +119,7 @@
       "grp_inline": "🔍 Inline Queries",
       "grp_input": "✍️ Manual Chat Input",
       "grp_help": "📚 Help Manual",
+      "grp_gas": "⛽ Gasoline Prices",
       "cmd_ignore": "🛡️ Filter List Mgmt",
       "cmd_welcome": "👋 Welcome Message",
       "cmd_block": "🚫 Block User",
@@ -132,6 +135,7 @@
       "cmd_translate": "💬 Translate Text",
       "cmd_toss": "🎲 Random Toss",
       "cmd_help": "📚 Help Manual",
+      "cmd_gas": "⛽ Gasoline Price",
       "footer_desc": "A legacy Cantonese bot project, now revived with modern infrastructure.",
       "footer_links": "Official Links",
       "footer_dev": "Announcements",
@@ -165,7 +169,8 @@
     "toss": "cmd_toss",
     "welcome": "cmd_welcome",
     "zodiac": "grp_zodiac",
-    "msettings": "grp_settings"
+    "msettings": "grp_settings",
+    "gas": "cmd_gas", "oil": "cmd_gas"
   },
   "callbackPrefixMap": {
     "DISTRICTWEATHER": "grp_weather", "WEATHER_LIST": "grp_weather", "WEATHER_SUMM": "grp_weather",
