@@ -178,13 +178,21 @@ public class AdminModule(
         );
     }
     
-    [Command("restart", DevOnly = true, Description = "Restart the bot (requires systemd/systemctl)")]
+    [Command("restart", DevOnly = true, Description = "安全重啟機器人")]
     public async Task RestartCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
-        await bot.Reply(message, "🔄 收到！而家即刻重新啟動 Mud9Bot...", ct: ct);
-        
-        // Forcefully exit the application with a non-zero exit code.
-        // systemd will catch this and automatically restart the service.
-        Environment.Exit(1);
+        // 1. 必須 Await 這個回覆，確保 Telegram 伺服器成功接收到訊息
+        await bot.Reply(message, "🔄 收到！正在安全重啟 Mud9Bot... (Offset 已更新)", ct);
+
+        // 2. 使用背景 Task 延遲執行退出邏輯
+        // 這樣 RestartCommand 會立即回傳 Task.Completed，讓 UpdateHandler 完成該次更新循環
+        _ = Task.Run(async () =>
+        {
+            // 給予足夠時間讓機器人核心完成更新 Offset 的動作
+            await Task.Delay(1000);
+            
+            // 退出程序，讓 systemd 偵測到並重啟
+            Environment.Exit(1);
+        });
     }
 }
