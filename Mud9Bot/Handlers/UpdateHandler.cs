@@ -23,13 +23,17 @@ public class UpdateHandler(
     ConversationManager conversationManager,
     IPaymentService paymentService,
     IConfiguration configuration,
-    IInlineQueryHandler inlineQueryHandler) : IUpdateHandler
+    IInlineQueryHandler inlineQueryHandler,
+    IBotStatsService botStatsService) : IUpdateHandler
 {
     private string? _botUsername;
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
     
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
+        //  🚀 流量統計：任何更新進入 Bot 都計入總數 (Summary only)
+        await botStatsService.RecordUpdateAsync(update, cancellationToken);
+        
         // ---------------------------------------------------------
         // 0. Inline Query Handling
         // ---------------------------------------------------------
