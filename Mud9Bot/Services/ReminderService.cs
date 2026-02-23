@@ -18,6 +18,7 @@ public class ReminderService(
     ILogger<ReminderService> logger) : IReminderService
 {
     private static readonly TimeZoneInfo HkTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+    private static readonly DateTime MaxSupportedUtc = new(9999, 12, 31, 23, 59, 59, DateTimeKind.Utc);
     private const int MaxRemindersPerUser = 30;
 
     public ReminderRequest? ParseReminder(string text)
@@ -25,29 +26,44 @@ public class ReminderService(
         var nowUtc = DateTime.UtcNow;
         var nowHk = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, HkTimeZone);
         
-        // 1. 相對時間處理 (X秒/分鐘/個鐘/日後) - 不支援重複
-        var relativeMatch = Regex.Match(text, @"^(\d+)\s*(秒|分鐘|個?鐘|日)後提我(.+)", RegexOptions.IgnoreCase);
+        // --- 1. 相對時間處理 (支援 秒/分鐘/鐘/日/個月/年) ---
+        // 範例：10個月後提我、2年後提我換車
+        var relativeMatch = Regex.Match(text, @"^(\d+)\s*(秒|分鐘|個?鐘|日|個月|年)後提我(.+)", RegexOptions.IgnoreCase);
         if (relativeMatch.Success)
         {
             int value = int.Parse(relativeMatch.Groups[1].Value);
             string unit = relativeMatch.Groups[2].Value;
             string content = relativeMatch.Groups[3].Value.Trim();
 
-            DateTime targetUtc = unit switch
+            DateTime targetUtc;
+            try 
             {
-                "秒" => nowUtc.AddSeconds(value),
-                "分鐘" => nowUtc.AddMinutes(value),
-                "個鐘" or "鐘" => nowUtc.AddHours(value),
-                "日" => nowUtc.AddDays(value),
-                _ => nowUtc
-            };
+                targetUtc = unit switch
+                {
+                    "秒" => nowUtc.AddSeconds(value),
+                    "分鐘" => nowUtc.AddMinutes(value),
+                    "個鐘" or "鐘" => nowUtc.AddHours(value),
+                    "日" => nowUtc.AddDays(value),
+                    "個月" => nowUtc.AddMonths(value),
+                    "年" => nowUtc.AddYears(value),
+                    _ => nowUtc
+                };
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                targetUtc = MaxSupportedUtc;
+            }
+
+            if (targetUtc > MaxSupportedUtc) targetUtc = MaxSupportedUtc;
 
             var targetHkDisplay = TimeZoneInfo.ConvertTimeFromUtc(targetUtc, HkTimeZone);
-            return new ReminderRequest(targetUtc, content, $"{value}{unit}後 ({targetHkDisplay:HH:mm})");
+            return new ReminderRequest(targetUtc, content, $"{value}{unit}後 ({targetHkDisplay:yyyy/MM/dd HH:mm})");
         }
 
-        // 2. 複雜日期/時間組合處理 (支援每日、逢/每星期幾)
-        var complexPattern = @"^(?:(每日|逢?每?日|聽日|後日|[每逢下]?星期[一二三四五六日天]|(?:\d{2,4}[-/.]?)?\d{2}[-/.]?\d{2})\s*)?(?:(\d{1,2})(?:[:.]?(\d{2}))?\s*[點時])?\s*(?:(\d{2})[:.]?(\d{2}))?\s*提我(.+)";
+        // --- 2. 複雜日期/時間與重複性質處理 ---
+        // 日期格式：YYYYMMDD 或 YYYY/MM/DD 或 YYYY-MM-DD (必須 8 位數字)
+        // 時間格式：HHmm (4 位數字) 或 HH:mm
+        var complexPattern = @"^(?:(今日|每日|逢?每?日|聽日|後日|[每逢下]?星期[一二三四五六日天]|(?:\d{4}[-/.]?\d{2}[-/.]?\d{2}))\s*)?(?:(\d{1,2})(?:[:.]?(\d{2}))?\s*[點時])?\s*(?:(\d{2})[:.]?(\d{2}))?\s*提我(.+)";
         var m = Regex.Match(text, complexPattern, RegexOptions.IgnoreCase);
 
         if (m.Success && (!string.IsNullOrEmpty(m.Groups[1].Value) || !string.IsNullOrEmpty(m.Groups[2].Value) || !string.IsNullOrEmpty(m.Groups[4].Value)))
@@ -61,7 +77,6 @@ public class ReminderService(
             bool dateProcessed = false;
             string? recurrence = null;
 
-            // --- A. 日期與重複處理 ---
             if (datePart.Contains("日") && (datePart.StartsWith("每") || datePart.StartsWith("逢")))
             {
                 recurrence = "DAILY";
@@ -86,6 +101,10 @@ public class ReminderService(
                 targetHk = targetHk.AddDays(2);
                 dateProcessed = true;
             }
+            else if (datePart == "今日")
+            {
+                dateProcessed = true;
+            }
             else if (!string.IsNullOrEmpty(datePart) && Regex.IsMatch(datePart, @"\d"))
             {
                 if (TryParseFlexibleDate(datePart, nowHk, out var parsedDate))
@@ -95,7 +114,6 @@ public class ReminderService(
                 }
             }
 
-            // --- B. 時間處理 ---
             if (!string.IsNullOrEmpty(hourPart))
             {
                 int h = int.Parse(hourPart);
@@ -103,26 +121,24 @@ public class ReminderService(
                 
                 targetHk = targetHk.AddHours(h).AddMinutes(min);
                 
-                // 如果沒指定具體日期且時間已過，則預設為明天
-                if (!dateProcessed && targetHk < nowHk)
+                if ((!dateProcessed || datePart == "今日") && targetHk < nowHk)
                 {
                     targetHk = targetHk.AddDays(1);
                 }
             }
             else
             {
-                // 🚀 修正：如果無指定時間，預設使用「現在呢個時間」
                 targetHk = targetHk.AddHours(nowHk.Hour).AddMinutes(nowHk.Minute);
-                
-                // 如果連日期都無（純粹講「提我 xxx」），且時間已經過咗，則預設聽日
-                if (!dateProcessed && targetHk <= nowHk)
+                if ((!dateProcessed || datePart == "今日") && targetHk <= nowHk)
                 {
                     targetHk = targetHk.AddDays(1);
                 }
             }
 
             var targetUtc = TimeZoneInfo.ConvertTimeToUtc(targetHk, HkTimeZone);
-            return new ReminderRequest(targetUtc, content, recurrence != null ? $"重複 ({datePart} {targetHk:HH:mm})" : targetHk.ToString("MM/dd HH:mm"), recurrence);
+            if (targetUtc > MaxSupportedUtc) targetUtc = MaxSupportedUtc;
+
+            return new ReminderRequest(targetUtc, content, recurrence != null ? $"重複 ({datePart} {targetHk:HH:mm})" : targetHk.ToString("yyyy/MM/dd HH:mm"), recurrence);
         }
 
         return null;
@@ -250,17 +266,12 @@ public class ReminderService(
     private bool TryParseFlexibleDate(string input, DateTime nowHk, out DateTime result)
     {
         string clean = Regex.Replace(input, @"[-/.]", "");
-        string[] formats = { "yyyyMMdd", "ddMMyyyy", "MMdd" };
+        string[] formats = { "yyyyMMdd", "ddMMyyyy" };
 
         foreach (var fmt in formats)
         {
             if (DateTime.TryParseExact(clean, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
             {
-                if (fmt == "MMdd")
-                {
-                    dt = new DateTime(nowHk.Year, dt.Month, dt.Day);
-                    if (dt < nowHk.Date) dt = dt.AddYears(1);
-                }
                 result = dt;
                 return true;
             }

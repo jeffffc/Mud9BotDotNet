@@ -134,6 +134,35 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         return limit;
     }
     
+    public async Task<(List<GroupStatEntry> WineTop, List<GroupStatEntry> PlasticTop)> GetGroupStatsAsync(long telegramGroupId)
+    {
+        var group = await context.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == telegramGroupId);
+        if (group == null) return (new List<GroupStatEntry>(), new List<GroupStatEntry>());
+
+        // 1. Wine Top 5 (使用 Sum 累加數量)
+        var wineTop = await context.Set<WinePlastic>()
+            .Where(wp => wp.GroupId == group.Id && wp.Disabled != 1 && wp.Wine > 0)
+            .GroupBy(wp => wp.UserId)
+            .Select(g => new { UserId = g.Key, Total = g.Sum(wp => wp.Wine) })
+            .OrderByDescending(x => x.Total)
+            .Take(5)
+            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(u.FirstName, x.Total))
+            .ToListAsync();
+
+        // 2. Plastic Top 5 (使用 Sum 累加數量)
+        var plasticTop = await context.Set<WinePlastic>()
+            .Where(wp => wp.GroupId == group.Id && wp.Disabled != 1 && wp.Plastic > 0)
+            .GroupBy(wp => wp.UserId)
+            .Select(g => new { UserId = g.Key, Total = g.Sum(wp => wp.Plastic) })
+            .OrderByDescending(x => x.Total)
+            .Take(5)
+            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(u.FirstName, x.Total))
+            .ToListAsync();
+
+        return (wineTop, plasticTop);
+    }
+    
+    
     // NEW: Implementation for /check
     public async Task<(int WineCount, int PlasticCount, int WineLimit, int PlasticLimit)> GetPersonalStatsAsync(long telegramUserId, long telegramGroupId)
     {

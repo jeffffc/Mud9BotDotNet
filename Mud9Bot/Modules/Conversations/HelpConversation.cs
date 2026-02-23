@@ -228,27 +228,35 @@ public class HelpConversation : IConversation
         var me = await bot.GetMe(ct);
         var sb = new StringBuilder();
         sb.AppendLine("<b>【⏰ 廣東話提醒功能指南】</b>");
-        sb.AppendLine("你可以直接用廣東話叫我提你做嘢，支援多種格式：\n");
+        sb.AppendLine("你可以直接用廣東話叫我提你做嘢，格式非常彈性：\n");
         
         sb.AppendLine("<b>1️⃣ 相對時間 (倒數)</b>");
         sb.AppendLine("• <code>10分鐘後提我落街</code>");
         sb.AppendLine("• <code>2個鐘後提我食藥</code>");
-        sb.AppendLine("• <code>3日後提我還書</code>\n");
+        sb.AppendLine("• <code>5個月後提我續約</code>");
+        sb.AppendLine("• <code>1年後提我換車</code>\n");
 
         sb.AppendLine("<b>2️⃣ 指定日期 / 星期</b>");
-        sb.AppendLine("• <b>今日/聽日：</b><code>聽日 22:30 提我敷面膜</code>");
+        sb.AppendLine("• <b>今日/聽日/後日：</b><code>今日 16:30 提我買奶茶</code>");
+        sb.AppendLine("<i>(註：「今日」為可選項目，例如直接講「16:30 提我」亦可)</i>");
         sb.AppendLine("• <b>星期：</b><code>星期一 10點 提我開會</code> / <code>下星期五 提我攞衫</code>");
-        sb.AppendLine("• <b>具體日子：</b><code>0305 8點半 提我</code> (支援 MMDD, YYYYMMDD)");
-        sb.AppendLine("• <b>日期格式：</b>支援 <code>/</code>, <code>-</code>, <code>.</code> 分隔符 (如 <code>2025/03/10</code> 或 <code>03-10</code>)");
-        sb.AppendLine("<i>💡 若無指定幾點，會預設「聽日呢個時間」找你。</i>\n");
+        sb.AppendLine("• <b>具體日期：</b>支援 8 位數字 YYYYMMDD (如 <code>20260210 提我</code>)");
+        sb.AppendLine("• <b>支援分隔符：</b>日期可加入 <code>/</code>, <code>-</code>, <code>.</code> (如 <code>2026/02/10 提我</code>)\n");
 
-        sb.AppendLine("<b>3️⃣ 重複性提醒 🔄</b>");
+        sb.AppendLine("<b>3️⃣ 時間格式與區分規則</b>");
+        sb.AppendLine("• <b>4 位純數字：</b>永遠視為時間 (HHmm)。例如 <code>0210 提我</code> 即係凌晨 02:10。");
+        sb.AppendLine("• <b>8 位純數字：</b>永遠視為日期 (YYYYMMDD)。");
+        sb.AppendLine("• <b>過期處理：</b>若指定時間已經過咗，我會幫你設為<b>聽日</b>。");
+        sb.AppendLine("• <b>缺省時間：</b>若冇講幾點 (如「聽日提我」)，我會喺<b>聽日嘅宜家呢個時間</b>搵你。\n");
+
+        sb.AppendLine("<b>4️⃣ 重複性提醒 🔄</b>");
         sb.AppendLine("• <b>每日：</b><code>每日 08:00 提我食藥</code> / <code>逢日 23:00 填寫日誌</code>");
         sb.AppendLine("• <b>每週：</b><code>逢星期二 18:00 提我打波</code> / <code>每星期五 提我執屋</code>\n");
 
-        sb.AppendLine("<b>4️⃣ 管理及限制</b>");
+        sb.AppendLine("<b>5️⃣ 管理及限制</b>");
         sb.AppendLine("• 輸入 <code>/myreminders</code> 查看或刪除生效中嘅提醒。");
-        sb.AppendLine("• 為免資源浪費，每人上限為 <b>30 條</b> 生效中嘅提醒事項。");
+        sb.AppendLine("• 為免資源浪費，每人上限為 <b>30 條</b> 提醒事項。");
+        sb.AppendLine("• 系統最高支援排程至公元 <b>9999年12月31日</b>。");
 
         var buttons = new List<IEnumerable<InlineKeyboardButton>>
         {

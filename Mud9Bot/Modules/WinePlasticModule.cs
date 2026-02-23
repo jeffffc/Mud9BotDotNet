@@ -1,3 +1,4 @@
+using System.Text;
 using Mud9Bot.Attributes;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
@@ -196,6 +197,45 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
                 cancellationToken: ct
             );
         }
+    }
+    
+    [Command("groupstat", Description = "查看群組酒膠排行榜")]
+    public async Task GroupStatCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        if (message.Chat.Type == ChatType.Private)
+        {
+            await bot.SendMessage(message.Chat.Id, "呢度用唔到，要群組先用到 <code>/groupstat</code>。", parseMode: ParseMode.Html, cancellationToken: ct);
+            return;
+        }
+
+        var (wineTop, plasticTop) = await wpService.GetGroupStatsAsync(message.Chat.Id);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<b>📊 【群組酒膠排行榜】</b>\n");
+
+        sb.AppendLine("<b>🍷 賜酒 Top 5：</b>");
+        if (!wineTop.Any()) sb.AppendLine("<i>(暫無紀錄)</i>");
+        else 
+        {
+            for (int i = 0; i < wineTop.Count; i++)
+                sb.AppendLine($"{i + 1}. {wineTop[i].Name.EscapeHtml()} - <code>{wineTop[i].Total}</code> 杯");
+        }
+
+        sb.AppendLine("\n<b>🌚 派膠 Top 5：</b>");
+        if (!plasticTop.Any()) sb.AppendLine("<i>(暫無紀錄)</i>");
+        else 
+        {
+            for (int i = 0; i < plasticTop.Count; i++)
+                sb.AppendLine($"{i + 1}. {plasticTop[i].Name.EscapeHtml()} - <code>{plasticTop[i].Total}</code> 粒");
+        }
+
+        await bot.SendMessage(
+            chatId: message.Chat.Id,
+            text: sb.ToString(),
+            parseMode: ParseMode.Html,
+            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            cancellationToken: ct
+        );
     }
     
     [Command("resetquota", DevOnly = true, Description = "Manually reset daily quotas for all groups.")]

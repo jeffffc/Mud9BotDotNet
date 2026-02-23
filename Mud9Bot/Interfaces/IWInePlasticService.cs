@@ -2,6 +2,8 @@ using Mud9Bot.Data.Entities;
 
 namespace Mud9Bot.Interfaces;
 
+public record GroupStatEntry(string Name, int Total);
+
 public interface IWinePlasticService
 {
     // Checks if the user has a limit row, creates if missing. Returns (WineLeft, PlasticLeft).
@@ -15,6 +17,11 @@ public interface IWinePlasticService
 
     Task<(int WineCount, int PlasticCount, int WineLimit, int PlasticLimit)> GetPersonalStatsAsync(long telegramUserId,
         long telegramGroupId);
+    
+    /// <summary>
+    /// 獲取群組內的酒膠排行統計 (Top 5)
+    /// </summary>
+    Task<(List<GroupStatEntry> WineTop, List<GroupStatEntry> PlasticTop)> GetGroupStatsAsync(long telegramGroupId);
     
     // New method for manual reset or job execution
     Task<int> ResetDailyQuotasAsync();
