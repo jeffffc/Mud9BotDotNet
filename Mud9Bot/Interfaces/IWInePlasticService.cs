@@ -2,7 +2,8 @@ using Mud9Bot.Data.Entities;
 
 namespace Mud9Bot.Interfaces;
 
-public record GroupStatEntry(string Name, int Total);
+// 🚀 更新：加入 Username 以便產生 Markdown 連結
+public record GroupStatEntry(string Name, string? Username, int Total);
 
 public interface IWinePlasticService
 {

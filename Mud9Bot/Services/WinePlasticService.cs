@@ -139,24 +139,29 @@ public class WinePlasticService(BotDbContext context, ILogger<WinePlasticService
         var group = await context.Set<BotGroup>().FirstOrDefaultAsync(g => g.TelegramId == telegramGroupId);
         if (group == null) return (new List<GroupStatEntry>(), new List<GroupStatEntry>());
 
-        // 1. Wine Top 5 (使用 Sum 累加數量)
+        // 🚀 核心邏輯：使用 Sum 累加數量，並獲取 Username
         var wineTop = await context.Set<WinePlastic>()
             .Where(wp => wp.GroupId == group.Id && wp.Disabled != 1 && wp.Wine > 0)
             .GroupBy(wp => wp.UserId)
             .Select(g => new { UserId = g.Key, Total = g.Sum(wp => wp.Wine) })
             .OrderByDescending(x => x.Total)
             .Take(5)
-            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(u.FirstName, x.Total))
+            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(
+                (u.FirstName + (string.IsNullOrEmpty(u.LastName) ? "" : " " + u.LastName)).Trim(),
+                u.Username,
+                x.Total))
             .ToListAsync();
 
-        // 2. Plastic Top 5 (使用 Sum 累加數量)
         var plasticTop = await context.Set<WinePlastic>()
             .Where(wp => wp.GroupId == group.Id && wp.Disabled != 1 && wp.Plastic > 0)
             .GroupBy(wp => wp.UserId)
             .Select(g => new { UserId = g.Key, Total = g.Sum(wp => wp.Plastic) })
             .OrderByDescending(x => x.Total)
             .Take(5)
-            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(u.FirstName, x.Total))
+            .Join(context.Set<BotUser>(), x => x.UserId, u => u.Id, (x, u) => new GroupStatEntry(
+                (u.FirstName + (string.IsNullOrEmpty(u.LastName) ? "" : " " + u.LastName)).Trim(),
+                u.Username,
+                x.Total))
             .ToListAsync();
 
         return (wineTop, plasticTop);

@@ -204,36 +204,56 @@ public class WinePlasticModule(IWinePlasticService wpService, IUserService userS
     {
         if (message.Chat.Type == ChatType.Private)
         {
-            await bot.SendMessage(message.Chat.Id, "呢度用唔到，要群組先用到 <code>/groupstat</code>。", parseMode: ParseMode.Html, cancellationToken: ct);
+            await bot.SendMessage(message.Chat.Id, "呢度用唔到，要群組先用到 <code>/groupstat</code> 。", parseMode: ParseMode.Html, cancellationToken: ct);
             return;
         }
 
+        var sent = await bot.SendMessage(message.Chat.Id, "請等等，我繽Ｘ樂緊……", replyParameters: new ReplyParameters { MessageId = message.MessageId }, cancellationToken: ct);
+
         var (wineTop, plasticTop) = await wpService.GetGroupStatsAsync(message.Chat.Id);
+        
+        string chatName = (message.Chat.Title ?? "呢個群").EscapeHtml();
 
         var sb = new StringBuilder();
-        sb.AppendLine("<b>📊 【群組酒膠排行榜】</b>\n");
+        sb.AppendLine($"喺<b>【{chatName}】</b>呢個群，");
+        sb.AppendLine("最多酒嘅五個人係︰");
 
-        sb.AppendLine("<b>🍷 賜酒 Top 5：</b>");
-        if (!wineTop.Any()) sb.AppendLine("<i>(暫無紀錄)</i>");
-        else 
+        foreach (var row in wineTop)
         {
-            for (int i = 0; i < wineTop.Count; i++)
-                sb.AppendLine($"{i + 1}. {wineTop[i].Name.EscapeHtml()} - <code>{wineTop[i].Total}</code> 杯");
+            string name = row.Name.EscapeHtml();
+            if (string.IsNullOrEmpty(row.Username))
+            {
+                sb.AppendLine($"【{name}】︰<code>{row.Total}</code> 杯酒");
+            }
+            else
+            {
+                string username = row.Username.EscapeHtml();
+                sb.AppendLine($"【<a href=\"http://telegram.me/{username}\">{name}</a>】︰<code>{row.Total}</code> 杯酒");
+            }
         }
 
-        sb.AppendLine("\n<b>🌚 派膠 Top 5：</b>");
-        if (!plasticTop.Any()) sb.AppendLine("<i>(暫無紀錄)</i>");
-        else 
+        sb.AppendLine("\n而最多膠嘅五個人係︰");
+
+        foreach (var row in plasticTop)
         {
-            for (int i = 0; i < plasticTop.Count; i++)
-                sb.AppendLine($"{i + 1}. {plasticTop[i].Name.EscapeHtml()} - <code>{plasticTop[i].Total}</code> 粒");
+            string name = row.Name.EscapeHtml();
+            if (string.IsNullOrEmpty(row.Username))
+            {
+                sb.AppendLine($"【{name}】︰<code>{row.Total}</code> 粒膠");
+            }
+            else
+            {
+                string username = row.Username.EscapeHtml();
+                sb.AppendLine($"【<a href=\"http://telegram.me/{username}\">{name}</a>】︰<code>{row.Total}</code> 粒膠");
+            }
         }
 
-        await bot.SendMessage(
+        await bot.EditMessageText(
             chatId: message.Chat.Id,
+            messageId: sent.MessageId,
             text: sb.ToString(),
             parseMode: ParseMode.Html,
-            replyParameters: new ReplyParameters { MessageId = message.MessageId },
+            linkPreviewOptions: new LinkPreviewOptions { IsDisabled = true },
             cancellationToken: ct
         );
     }
