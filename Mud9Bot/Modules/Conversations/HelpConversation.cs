@@ -332,7 +332,7 @@ public class HelpConversation : IConversation
         string text = "<b>【贊助及條款】</b>\n\n" +
                       "• <code>/donate [金額]</code>: 使用 Telegram Stars 支持機器人運作 (例如 <code>/donate 50</code>)\n" +
                       "• <code>/terms</code>: 查看贊助相關詳細條款及細則 (T&C)\n\n" +
-                      "多謝你支持 Mud9Bot 嘅開發同伺服器支出！🙇🏻‍♂️";
+                      "🙇🏻‍♂️ 多謝你支持 Mud9Bot 嘅開發同伺服器支出！🙇🏻‍♂️";
         return (text, GetBackMarkup());
     }
 
