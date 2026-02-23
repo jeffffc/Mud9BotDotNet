@@ -35,6 +35,10 @@ builder.Services.AddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(bo
 // 5. Register Services (The Brains)
 builder.Services.AddSingleton<IErrorReporter, ErrorReporter>(); // <--- ADD THIS LINE
 
+// 6. HTTP Service Registration
+// Standard HttpClient for general use (e.g., GitHubService, GasService)
+builder.Services.AddHttpClient(); 
+
 // --- NEW: HTTP Service Registration ---
 builder.Services.AddHttpClient("Mud9BotClient", client =>
 {
