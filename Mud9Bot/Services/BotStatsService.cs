@@ -11,9 +11,11 @@ namespace Mud9Bot.Services;
 
 public class BotStatsService(IServiceScopeFactory scopeFactory, ILogger<BotStatsService> logger) : IBotStatsService
 {
-    // Memory buffer using a tuple key for grouping
+    // Key: (EventType, Metadata, ChatType), Value: Incremental Count
     private readonly ConcurrentDictionary<(string type, string meta, string chat), long> _buffer = new();
-    private const int FlushThreshold = 500;
+    
+    // 🚀 除錯建議：將閾值暫時改為 1，確保每一條訊息都會立即寫入資料庫
+    private const int FlushThreshold = 1; 
 
     public async Task RecordUpdateAsync(Update update, CancellationToken ct)
     {
@@ -25,11 +27,13 @@ public class BotStatsService(IServiceScopeFactory scopeFactory, ILogger<BotStats
         var chatType = GetChatType(update);
         var key = (eventType, metadata ?? "none", chatType);
 
+        // 原子化增加 RAM 中的計數
         _buffer.AddOrUpdate(key, 1, (_, val) => val + 1);
 
+        // 檢查是否達到寫入資料庫的門檻
         if (_buffer.Values.Sum() >= FlushThreshold)
         {
-            // Fire and forget background flush
+            // 使用背景任務執行，不阻塞機器人處理流程
             _ = Task.Run(() => FlushAsync(), ct);
         }
         await Task.CompletedTask;
@@ -39,7 +43,7 @@ public class BotStatsService(IServiceScopeFactory scopeFactory, ILogger<BotStats
     {
         if (_buffer.IsEmpty) return;
 
-        // Take a snapshot and clear the buffer
+        // 取得快照並清空緩衝，確保執行緒安全
         var snapshot = _buffer.ToArray();
         foreach (var item in snapshot) _buffer.TryRemove(item.Key, out _);
 
@@ -53,9 +57,8 @@ public class BotStatsService(IServiceScopeFactory scopeFactory, ILogger<BotStats
                 var (type, meta, chat) = item.Key;
                 long count = item.Value;
 
-                // Even with EF Code First, for high-frequency UPSERTs, 
-                // raw SQL is the most efficient way to handle PostgreSQL's ON CONFLICT.
-                // This updates existing rows by adding the new count or inserts a new row.
+                // 🚀 關鍵修正：確保資料表名稱為 bot_event_logs 以對應 EF Core 實體
+                // 使用 PostgreSQL 的 ON CONFLICT 語法實現高效率 UPSERT
                 var sql = @"
                     INSERT INTO bot_event_logs (event_type, metadata, chat_type, count)
                     VALUES ({0}, {1}, {2}, {3})
@@ -64,10 +67,13 @@ public class BotStatsService(IServiceScopeFactory scopeFactory, ILogger<BotStats
 
                 await db.Database.ExecuteSqlRawAsync(sql, type, meta, chat, count);
             }
+            
+            logger.LogDebug("Successfully flushed {Count} records to bot_event_logs.", snapshot.Length);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to flush aggregated bot stats to DB.");
+            // 如果 SQL 報錯，會記錄在這裡
+            logger.LogError(ex, "Failed to flush bot stats summary to database. Please check if table 'bot_event_logs' exists.");
         }
     }
 

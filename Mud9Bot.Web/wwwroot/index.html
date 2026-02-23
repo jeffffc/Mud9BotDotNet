@@ -1,250 +1,318 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-HK" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BotName - Live Statistics</title>
+    <title>Mud9Bot Live Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { darkBg: '#0f172a', lightBg: '#f8fafc' }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
-            color: #f8fafc;
-            min-height: 100vh;
-        }
-
-        /* Glowing text effect for big numbers */
-        .glow-text {
-            text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
-        }
-
-        /* Number change animation */
-        @keyframes pop {
-            0% { transform: scale(1); color: #38bdf8; }
-            50% { transform: scale(1.1); color: #7dd3fc; }
-            100% { transform: scale(1); color: white; }
-        }
-        .update-anim {
-            animation: pop 0.4s ease-out forwards;
-        }
-
-        /* Live feed entrance animation */
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .feed-item {
-            animation: slideIn 0.3s ease-out forwards;
-        }
+        @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .data-pulse { animation: pulse-soft 2s infinite; }
+        .blur-bg { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .error-banner { display: none; }
+        body { transition: background-color 0.3s, color 0.3s; }
+        [data-i18n] { transition: opacity 0.2s; }
     </style>
 </head>
-<body class="antialiased overflow-x-hidden">
+<body class="bg-lightBg dark:bg-darkBg text-slate-800 dark:text-slate-200 font-sans selection:bg-blue-500/30">
 
-<!-- Navbar -->
-<nav class="border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.4)]">
-                <i data-lucide="zap" class="text-white w-5 h-5"></i>
+<div id="error-banner" class="error-banner bg-red-500 text-white text-center py-3 px-4 text-sm font-bold blur-bg sticky top-0 z-[70] shadow-lg">
+    <i class="fas fa-exclamation-triangle mr-2"></i> <span data-i18n="error_msg">無法獲取數據：請確保 API 伺服器已啟動。</span>
+</div>
+
+<!-- 導覽列 -->
+<nav class="border-b border-slate-200 dark:border-slate-800 py-6 px-4 sticky top-0 bg-white/80 dark:bg-darkBg/80 blur-bg z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <div id="logo-container" class="w-14 h-14 rounded-2xl overflow-hidden shadow-lg flex items-center justify-center bg-blue-600">
+                <img id="bot-logo" src="mud9bot_logo.jpg" alt="Mud9Bot" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='flex';">
+                <div id="logo-fallback" class="hidden text-3xl">🤖</div>
             </div>
-            <span class="font-bold text-xl tracking-wide">NexusBot</span>
+            <div>
+                <h1 class="text-2xl font-black tracking-tight leading-none text-slate-900 dark:text-white">Mud9Bot <span class="text-blue-500">Live</span></h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 font-bold" data-i18n="nav_subtitle">Real-time Dashboard</p>
+            </div>
         </div>
-        <a href="https://t.me/yourbot" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-full font-medium transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 text-sm">
-            Add to Telegram <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </a>
+
+        <div class="flex items-center space-x-2 md:space-x-4">
+            <button onclick="toggleLang()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-black uppercase tracking-tighter hover:ring-2 ring-blue-500 transition-all">
+                <i class="fas fa-language mr-1 text-blue-500"></i> <span id="lang-label">EN</span>
+            </button>
+
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-yellow-400 hover:ring-2 ring-blue-500 transition-all">
+                <i id="theme-icon" class="fas fa-moon"></i>
+            </button>
+
+            <div class="hidden sm:flex flex-col items-end">
+                <div class="flex items-center text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full border border-blue-500/20">
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-2 data-pulse"></span>
+                    <span id="refresh-timer">60s</span>
+                </div>
+                <span class="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-tighter" data-i18n="refresh_notice">Refreshes every minute</span>
+            </div>
+        </div>
     </div>
 </nav>
 
-<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+<main class="max-w-7xl mx-auto p-4 md:p-8 space-y-12">
 
-    <!-- Hero Section -->
-    <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium mb-4">
-                <span class="relative flex h-2.5 w-2.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-            All Systems Operational
+    <!-- Section 1: 歷史里程碑 (2017) -->
+    <section class="space-y-6">
+        <div class="space-y-4">
+            <div class="bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 flex items-center space-x-3">
+                <div class="text-amber-500 text-xl"><i class="fas fa-history"></i></div>
+                <p class="text-sm font-medium text-amber-700 dark:text-amber-400" data-i18n="banner_milestone">
+                    歷史里程碑數據自 <b>2017/01/01</b> 起累積計算。
+                </p>
+            </div>
+            <div class="flex items-center justify-between px-2">
+                <h2 class="text-xl font-black flex items-center"><i class="fas fa-trophy text-yellow-500 mr-3"></i> <span data-i18n="milestone_title">歷史累計里程碑</span></h2>
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global Totals</span>
+            </div>
         </div>
-        <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-slate-400">
-            Processing the world's messages in real-time.
-        </h1>
-        <p class="text-slate-400 text-lg md:text-xl">
-            Trusted by thousands of groups. Watch our live metrics update every 5 seconds.
-        </p>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 text-[10px] uppercase font-black mb-1" data-i18n="m_users">👥 總用戶數</div>
+                <div class="text-2xl font-black text-slate-900 dark:text-white" id="global-users">--</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 text-[10px] uppercase font-black mb-1" data-i18n="m_groups">🏘️ 服務群組</div>
+                <div class="text-2xl font-black text-slate-900 dark:text-white" id="global-groups">--</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 text-[10px] uppercase font-black mb-1" data-i18n="m_wine">🍻 累計賜酒</div>
+                <div class="text-2xl font-black text-blue-500" id="global-wine">--</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 text-[10px] uppercase font-black mb-1" data-i18n="m_plastic">🌚 累計派膠</div>
+                <div class="text-2xl font-black text-purple-500" id="global-plastic">--</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: 近期運作指標 (2026) -->
+    <section class="space-y-6">
+        <div class="space-y-4">
+            <div class="bg-blue-600/5 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 rounded-2xl p-4 flex items-center space-x-3">
+                <div class="text-blue-500 text-xl"><i class="fas fa-rocket"></i></div>
+                <p class="text-sm font-medium text-blue-700 dark:text-blue-300" data-i18n="banner_ops">
+                    運作指標統計自 <b>2026/02/23</b> (Mud9Bot 史詩回歸日) 開始。
+                </p>
+            </div>
+            <div class="flex items-center justify-between px-2">
+                <h2 class="text-xl font-black flex items-center"><i class="fas fa-chart-line text-blue-500 mr-3"></i> <span data-i18n="ops_title">近期運作指標</span></h2>
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Revival Metrics</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group">
+                <div class="text-slate-500 text-xs uppercase tracking-widest font-black mb-2" data-i18n="metric_total">📨 近期處理總量</div>
+                <div class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter" id="stat-total">--</div>
+                <div class="mt-4 text-[10px] text-slate-400" data-i18n="sub_total">系統原始處理量快照</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group">
+                <div class="text-slate-500 text-xs uppercase tracking-widest font-black mb-2" data-i18n="metric_cmds">⌨️ 指令執行</div>
+                <div class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter" id="stat-cmds">--</div>
+                <div class="mt-4 text-[10px] text-slate-400" data-i18n="sub_cmds">用戶發起之指令</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group">
+                <div class="text-slate-500 text-xs uppercase tracking-widest font-black mb-2" data-i18n="metric_clicks">🔘 互動次數</div>
+                <div class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter" id="stat-clicks">--</div>
+                <div class="mt-4 text-[10px] text-slate-400" data-i18n="sub_clicks">內嵌按鈕點擊與互動</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: 排行與分佈 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 space-y-4">
+            <h2 class="text-xl font-black px-2 flex justify-between items-center">
+                <span data-i18n="rank_title">🔥 熱門功能排行</span>
+                <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-3 py-1 rounded-full font-bold uppercase">Top 10</span>
+            </h2>
+            <div class="bg-white/50 dark:bg-slate-800/20 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden blur-bg shadow-sm">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[10px] uppercase font-black border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                        <th class="px-8 py-5" data-i18n="th_feature">功能</th>
+                        <th class="px-8 py-5 text-right" data-i18n="th_count">次數</th>
+                    </tr>
+                    </thead>
+                    <tbody id="rank-body" class="divide-y divide-slate-100 dark:divide-slate-800/50 text-sm font-mono">
+                    <tr><td colspan="2" class="px-8 py-10 text-center text-slate-400 italic" data-i18n="loading">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h2 class="text-xl font-black px-2" data-i18n="dist_title">📍 來源分佈</h2>
+            <div id="dist-container" class="bg-white/50 dark:bg-slate-800/20 p-10 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-8 blur-bg shadow-sm">
+                <div class="text-center text-slate-400 py-12 italic text-sm" data-i18n="waiting">等待數據...</div>
+            </div>
+        </div>
     </div>
-
-    <!-- Big Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-        <!-- Stat 1 -->
-        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
-            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <i data-lucide="message-square" class="w-32 h-32"></i>
-            </div>
-            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Total Messages Processed</p>
-            <div class="text-5xl font-bold text-white glow-text" id="stat-messages">0</div>
-        </div>
-
-        <!-- Stat 2 -->
-        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
-            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <i data-lucide="users" class="w-32 h-32"></i>
-            </div>
-            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Active Groups</p>
-            <div class="text-5xl font-bold text-white glow-text" id="stat-groups">0</div>
-        </div>
-
-        <!-- Stat 3 -->
-        <div class="relative group bg-slate-800/40 border border-slate-700/50 rounded-3xl p-8 overflow-hidden backdrop-blur-sm hover:bg-slate-800/60 transition-colors">
-            <div class="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <i data-lucide="cpu" class="w-32 h-32"></i>
-            </div>
-            <p class="text-slate-400 font-medium mb-2 uppercase tracking-wider text-sm">Avg. Response Time</p>
-            <div class="text-5xl font-bold text-white glow-text flex items-baseline gap-2">
-                <span id="stat-latency">0</span> <span class="text-2xl text-slate-500">ms</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Live Feed Section -->
-    <div class="max-w-3xl mx-auto bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-            <h3 class="font-semibold flex items-center gap-2 text-slate-200">
-                <i data-lucide="activity" class="w-5 h-5 text-blue-400"></i> Live Global Activity
-            </h3>
-            <span class="text-xs text-slate-500 font-mono" id="last-updated">Updating in 5s...</span>
-        </div>
-
-        <div class="p-6">
-            <!-- This list will be populated by JS -->
-            <ul id="live-feed" class="space-y-4">
-                <li class="text-center text-slate-500 py-8">Waiting for live data...</li>
-            </ul>
-        </div>
-    </div>
-
 </main>
 
+<footer class="max-w-7xl mx-auto p-12 text-center text-[10px] text-slate-400 dark:text-slate-600 uppercase font-black tracking-[0.2em]">
+    &copy; 2026 Mud9Bot Revival Project &bull; Live Infrastructure Monitoring
+</footer>
+
 <script>
-    lucide.createIcons();
-
-    // --- Mock Data Setup (To simulate your .NET Backend) ---
-    let totalMessages = 15420930;
-    let totalGroups = 4205;
-    let baseLatency = 45;
-
-    const fakeCountries = ['🇺🇸', '🇬🇧', '🇪🇸', '🇮🇳', '🇧🇷', '🇩🇪', '🇯🇵', '🇦🇺'];
-    const fakeActions = ['requested the weather', 'generated a meme', 'started a game', 'checked crypto prices', 'used /help'];
-
-    function fetchMockData() {
-        // Simulate incoming traffic
-        const newMessages = Math.floor(Math.random() * 50) + 10;
-        totalMessages += newMessages;
-
-        if(Math.random() > 0.8) totalGroups += 1;
-
-        const currentLatency = baseLatency + Math.floor(Math.random() * 15) - 5;
-
-        // Generate 1-2 new fake events
-        const newEventsCount = Math.floor(Math.random() * 2) + 1;
-        const events = [];
-        for(let i=0; i<newEventsCount; i++) {
-            const isGroup = Math.random() > 0.4;
-            events.push({
-                flag: fakeCountries[Math.floor(Math.random() * fakeCountries.length)],
-                entity: isGroup ? 'A group of members' : 'A user',
-                action: fakeActions[Math.floor(Math.random() * fakeActions.length)],
-                time: new Date().toLocaleTimeString()
-            });
+    const translations = {
+        'zh-HK': {
+            'nav_subtitle': '即時參與度追蹤',
+            'refresh_notice': '每分鐘自動刷新',
+            'banner_milestone': '歷史里程碑數據自 <b>2017/01/01</b> 起累積計算。',
+            'banner_ops': '運作指標統計自 <b>2026/02/23</b> (Mud9Bot 史詩回歸日) 開始。',
+            'milestone_title': '🏆 歷史累計里程碑',
+            'ops_title': '📊 近期運作指標',
+            'm_users': '👥 總用戶數',
+            'm_groups': '🏘️ 服務群組',
+            'm_wine': '🍻 累計賜酒',
+            'm_plastic': '🌚 累計派膠',
+            'metric_total': '📨 近期處理總量',
+            'metric_cmds': '⌨️ 指令執行',
+            'metric_clicks': '🔘 互動次數',
+            'sub_total': '系統原始處理量快照',
+            'sub_cmds': '用戶發起之指令',
+            'sub_clicks': '內嵌按鈕點擊與互動',
+            'rank_title': '🔥 熱門功能排行',
+            'dist_title': '📍 來源分佈',
+            'th_feature': '功能名稱',
+            'th_count': '使用次數',
+            'loading': '載入中...',
+            'waiting': '等待數據...',
+            'error_msg': '無法獲取數據：請確保 API 伺服器已啟動。'
+        },
+        'en': {
+            'nav_subtitle': 'Real-time Engagement Tracking',
+            'refresh_notice': 'Auto-refreshes every min',
+            'banner_milestone': 'Historical milestones are accumulated since <b>2017/01/01</b>.',
+            'banner_ops': 'Operational metrics are tracked since <b>2026/02/23</b> (Revival Day).',
+            'milestone_title': '🏆 Historical Milestones',
+            'ops_title': '📊 Operational Metrics',
+            'm_users': '👥 Total Users',
+            'm_groups': '🏘️ Groups Served',
+            'm_wine': '🍻 Total Beer',
+            'm_plastic': '🌚 Total Plastic',
+            'metric_total': '📨 Recent Volume',
+            'metric_cmds': '⌨️ Commands',
+            'metric_clicks': '🔘 Interactions',
+            'sub_total': 'System raw volume snapshot',
+            'sub_cmds': 'User initiated commands',
+            'sub_clicks': 'Inline button clicks & interactions',
+            'rank_title': '🔥 Feature Rankings',
+            'dist_title': '📍 Origin Distribution',
+            'th_feature': 'Feature Name',
+            'th_count': 'Usage Count',
+            'loading': 'Loading...',
+            'waiting': 'Waiting for data...',
+            'error_msg': 'Fetch failed: Ensure API server is running.'
         }
+    };
 
-        return {
-            messages: totalMessages,
-            groups: totalGroups,
-            latency: currentLatency,
-            newEvents: events
-        };
+    let currentLang = localStorage.getItem('lang') || 'zh-HK';
+    let timeLeft = 60;
+    const errorBanner = document.getElementById('error-banner');
+
+    function updateLanguageUI() {
+        const langData = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (langData[key]) el.innerHTML = langData[key];
+        });
+        document.getElementById('lang-label').innerText = currentLang === 'zh-HK' ? 'EN' : '中文';
+        document.documentElement.setAttribute('lang', currentLang);
     }
 
-    // --- UI Update Logic ---
-
-    function animateValue(id, newValue) {
-        const el = document.getElementById(id);
-        const currentValue = parseInt(el.innerText.replace(/,/g, '')) || 0;
-
-        if (currentValue !== newValue) {
-            el.innerText = newValue.toLocaleString();
-            el.classList.remove('update-anim');
-            void el.offsetWidth; // Trigger reflow
-            el.classList.add('update-anim');
-        }
+    function toggleLang() {
+        currentLang = currentLang === 'zh-HK' ? 'en' : 'zh-HK';
+        localStorage.setItem('lang', currentLang);
+        updateLanguageUI();
     }
 
-    function prependFeedItem(event) {
-        const feed = document.getElementById('live-feed');
-
-        // Remove initial placeholder if it exists
-        if(feed.innerHTML.includes('Waiting for live data')) {
-            feed.innerHTML = '';
-        }
-
-        const li = document.createElement('li');
-        li.className = 'feed-item flex items-start gap-4 p-3 rounded-xl bg-slate-800/20 border border-slate-700/30';
-        li.innerHTML = `
-                <div class="text-2xl mt-1">${event.flag}</div>
-                <div class="flex-1">
-                    <p class="text-slate-300 text-sm">
-                        <span class="font-semibold text-white">${event.entity}</span> just ${event.action}.
-                    </p>
-                    <p class="text-xs text-slate-500 mt-1 font-mono">${event.time}</p>
-                </div>
-            `;
-
-        feed.insertBefore(li, feed.firstChild);
-
-        // Keep only the last 6 items to prevent the page from growing forever
-        if (feed.children.length > 6) {
-            feed.removeChild(feed.lastChild);
-        }
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        document.getElementById('theme-icon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
     }
 
-    // --- Main Loop ---
-
-    async function updateDashboard() {
-        // IN REALITY: 
-        // const response = await fetch('/api/public-stats');
-        // const data = await response.json();
-
-        const data = fetchMockData();
-
-        animateValue('stat-messages', data.messages);
-        animateValue('stat-groups', data.groups);
-        animateValue('stat-latency', data.latency);
-
-        data.newEvents.forEach(event => prependFeedItem(event));
-
-        // Visual countdown for next update
-        let countdown = 5;
-        const timerEl = document.getElementById('last-updated');
-
-        clearInterval(window.countdownInterval);
-        window.countdownInterval = setInterval(() => {
-            countdown--;
-            if(countdown > 0) {
-                timerEl.innerText = `Updating in ${countdown}s...`;
-            } else {
-                timerEl.innerText = `Syncing...`;
-            }
-        }, 1000);
+    // Initialize Theme & Lang
+    if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('theme-icon').className = 'fas fa-moon';
+    } else {
+        document.getElementById('theme-icon').className = 'fas fa-sun';
     }
+    updateLanguageUI();
 
-    // Start
-    updateDashboard();
-    setInterval(updateDashboard, 5000);
+    const fetchStats = async () => {
+        try {
+            const apiUrl = new URL('/api/stats', window.location.origin || window.location.href).href;
+            const res = await fetch(apiUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            errorBanner.style.display = 'none';
 
+            document.getElementById('stat-total').innerText = (data.summary?.totalVolume || 0).toLocaleString();
+            document.getElementById('stat-cmds').innerText = (data.summary?.commandUsage || 0).toLocaleString();
+            document.getElementById('stat-clicks').innerText = (data.summary?.buttonClicks || 0).toLocaleString();
+
+            document.getElementById('global-users').innerText = (data.global?.totalUsers || 0).toLocaleString();
+            document.getElementById('global-groups').innerText = (data.global?.totalGroups || 0).toLocaleString();
+            document.getElementById('global-wine').innerText = (data.global?.totalWine || 0).toLocaleString();
+            document.getElementById('global-plastic').innerText = (data.global?.totalPlastic || 0).toLocaleString();
+
+            const tbody = document.getElementById('rank-body');
+            tbody.innerHTML = data.rankings.map(r => `
+                    <tr class="hover:bg-blue-500/5 dark:hover:bg-blue-500/10 transition-colors">
+                        <td class="px-8 py-5 text-blue-600 dark:text-blue-400 font-black">/${r.command}</td>
+                        <td class="px-8 py-5 text-right font-black text-slate-700 dark:text-slate-300">${r.count.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+
+            const distBox = document.getElementById('dist-container');
+            const total = data.distribution.reduce((acc, curr) => acc + curr.count, 0);
+            distBox.innerHTML = data.distribution.map(d => {
+                const percent = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                return `
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-[11px] font-black uppercase">
+                                <span class="text-slate-500 dark:text-slate-400 tracking-tighter">${d.type}</span>
+                                <span class="text-slate-900 dark:text-white">${percent}%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-700/50 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-blue-500 h-full transition-all duration-1000 ease-in-out" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+            }).join('');
+
+        } catch (err) {
+            console.error(err);
+            errorBanner.style.display = 'block';
+        }
+    };
+
+    setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) { fetchStats(); timeLeft = 60; }
+        document.getElementById('refresh-timer').innerText = `${timeLeft}s`;
+    }, 1000);
+
+    fetchStats();
 </script>
 </body>
 </html>
