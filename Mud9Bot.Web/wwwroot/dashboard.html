@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-HK" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- 🚀 Basic SEO & Meta Tags -->
+    <title>Mud9Bot Live Dashboard | 廣東話機器人即時數據</title>
+    <meta name="description" content="Mud9Bot 滿血回歸！即時查看全域運作指標、熱門指令排行同用戶互動數據。一個陪伴咗大家多年嘅廣東話 Telegram 機器人。">
+    <meta name="keywords" content="Mud9Bot, Telegram Bot, 廣東話機器人, 賜酒派膠, 香港 Telegram Bot, 數據儀表板, Dashboard">
+    <meta name="author" content="Mud9Bot Revival Project">
+    <meta name="robots" content="index, follow">
+
+    <!-- 🚀 Favicon (Browser Tab Icon) -->
+    <!-- You can use the same logo image as your favicon -->
+    <link rel="icon" href="mud9bot_logo.jpg" type="image/jpeg">
+    <link rel="apple-touch-icon" href="mud9bot_logo.jpg">
+
+    <!-- 🚀 Open Graph / Facebook / WhatsApp / Telegram Link Previews -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://stats.mud9bot.info/">
+    <meta property="og:title" content="Mud9Bot Live Dashboard">
+    <meta property="og:description" content="Mud9Bot 滿血回歸！即時查看全域運作指標、熱門指令排行同用戶互動數據。">
+    <!-- Make sure this points to the absolute URL of your image -->
+    <meta property="og:image" content="https://stats.mud9bot.info/mud9bot_logo.jpg">
+
+    <!-- 🚀 Twitter Cards (Also used by some apps like Telegram for large previews) -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://stats.mud9bot.info/">
+    <meta name="twitter:title" content="Mud9Bot Live Dashboard">
+    <meta name="twitter:description" content="Mud9Bot 滿血回歸！即時查看全域運作指標、熱門指令排行同用戶互動數據。">
+    <meta name="twitter:image" content="https://stats.mud9bot.info/mud9bot_logo.jpg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { darkBg: '#0f172a', lightBg: '#f8fafc' }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .data-pulse { animation: pulse-soft 1.5s infinite ease-in-out; }
+        .blur-bg { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .error-banner { display: none; }
+        body { transition: background-color 0.3s, color 0.3s; }
+        [data-i18n] { transition: opacity 0.2s; }
+
+        /* 數字跳動與高亮動畫 */
+        .value-changed {
+            animation: flashHighlight 1s ease-out forwards;
+            display: inline-block;
+        }
+        @keyframes flashHighlight {
+            0% { color: #3b82f6; transform: scale(1.05); }
+            100% { color: inherit; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-lightBg dark:bg-darkBg text-slate-800 dark:text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col min-h-screen">
+
+<div id="error-banner" class="error-banner bg-red-500 text-white text-center py-3 px-4 text-sm font-bold blur-bg sticky top-0 z-[70] shadow-lg">
+    <i class="fas fa-exclamation-triangle mr-2"></i> <span id="error-text">無法獲取數據，請確保服務已啟動。</span>
+</div>
+
+<!-- 導覽列 -->
+<nav class="border-b border-slate-200 dark:border-slate-800 py-3 px-4 sticky top-0 bg-white/80 dark:bg-darkBg/80 blur-bg z-50 shadow-sm">
+    <div class="w-full lg:w-[80%] max-w-7xl mx-auto flex justify-between items-center gap-2">
+        <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
+            <div class="w-8 h-8 md:w-10 md:h-10 rounded-xl overflow-hidden shadow-lg flex items-center justify-center bg-blue-600 flex-shrink-0">
+                <img id="bot-logo" src="mud9bot_logo.jpg" alt="Mud9Bot" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=Mud9Bot&background=2563eb&color=fff'">
+            </div>
+            <div class="min-w-0">
+                <h1 class="text-sm md:text-lg font-black tracking-tight leading-none text-slate-900 dark:text-white truncate">Mud9Bot <span class="text-blue-500">Live</span></h1>
+                <p class="text-[8px] md:text-[9px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-0.5 md:mt-1 font-bold truncate" data-i18n="nav_subtitle">即時參與度追蹤</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5 md:space-x-2 flex-shrink-0">
+            <!-- 🚀 加我入谷按鈕 (統一高度設定 h-8 / md:h-9) -->
+            <a href="https://t.me/Mud9Bot?startgroup=start" target="_blank" class="h-8 md:h-9 px-3 rounded-xl bg-blue-600 text-white text-[9px] md:text-[11px] font-black uppercase hover:bg-blue-700 transition-all flex items-center justify-center shadow-md shadow-blue-500/20 whitespace-nowrap flex-shrink-0">
+                <i class="fab fa-telegram mr-1 md:mr-1.5 text-[11px] md:text-sm"></i>
+                <span data-i18n="btn_add">加我入谷 🚀</span>
+            </a>
+
+            <!-- 🚀 刷新計時器 (統一高度設定 h-8 / md:h-9) -->
+            <div class="h-8 md:h-9 px-1.5 flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                <div class="flex items-center text-[9px] md:text-[10px] font-bold text-blue-600 dark:text-blue-400 px-1">
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 data-pulse"></span>
+                    <span id="refresh-timer">60s</span>
+                </div>
+                <button onclick="fetchStats()" id="btn-refresh" class="w-6 h-6 md:w-7 md:h-7 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center text-slate-500">
+                    <i class="fas fa-sync-alt text-[10px] md:text-xs"></i>
+                </button>
+            </div>
+
+            <!-- 💻 桌面版：獨立的語言與主題切換按鈕 -->
+            <button onclick="toggleLang()" class="hidden md:flex h-9 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-tighter hover:ring-2 ring-blue-500 transition-all border border-slate-200 dark:border-slate-700 items-center justify-center flex-shrink-0">
+                <i class="fas fa-language mr-1 text-blue-500"></i> <span id="lang-label">EN</span>
+            </button>
+            <button onclick="toggleTheme()" class="hidden md:flex w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 items-center justify-center text-slate-600 dark:text-yellow-400 hover:ring-2 ring-blue-500 transition-all border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                <i id="theme-icon" class="fas fa-moon"></i>
+            </button>
+
+            <!-- 📱 行動版：齒輪設定子選單 (統一高度設定 w-8 h-8) -->
+            <div class="relative md:hidden flex items-center flex-shrink-0">
+                <button id="gear-btn" onclick="toggleMobileMenu()" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:ring-2 ring-blue-500 transition-all border border-slate-200 dark:border-slate-700">
+                    <i class="fas fa-cog text-[10px]"></i>
+                </button>
+                <!-- 下拉選單 -->
+                <div id="mobile-menu" class="hidden absolute right-0 top-full mt-2 w-28 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
+                    <button onclick="toggleLang(); toggleMobileMenu()" class="w-full px-4 py-3 text-left text-xs font-bold border-b border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <span><i class="fas fa-language text-blue-500 mr-2"></i>語言</span>
+                        <span id="lang-label-mobile" class="text-[10px] text-slate-400">EN</span>
+                    </button>
+                    <button onclick="toggleTheme(); toggleMobileMenu()" class="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <span><i id="theme-icon-mobile" class="fas fa-moon text-yellow-500 mr-2"></i>主題</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="w-full lg:w-[80%] max-w-7xl mx-auto p-4 md:px-0 pb-12 space-y-10 md:space-y-12 flex-grow mt-4 md:mt-6">
+
+    <!-- Section 1: 歷史里程碑 -->
+    <section class="space-y-6">
+        <div class="space-y-4">
+            <div class="bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 flex items-center space-x-3">
+                <div class="text-amber-500 text-xl"><i class="fas fa-history"></i></div>
+                <p class="text-sm font-medium text-amber-700 dark:text-amber-400" data-i18n="banner_milestone">
+                    歷史里程碑數據自 <b>2017/01/01</b> 起累積計算。
+                </p>
+            </div>
+            <div class="flex items-center justify-between px-2">
+                <h2 class="text-xl font-black flex items-center text-slate-800 dark:text-white">
+                    <i class="fas fa-trophy text-yellow-500 mr-3"></i> <span data-i18n="milestone_title">歷史累計里程碑</span>
+                </h2>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div class="bg-white dark:bg-slate-800/40 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 dark:text-slate-400 text-[10px] md:text-[11px] uppercase font-black mb-1" data-i18n="m_users">👥 總用戶數</div>
+                <div class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white data-pulse" id="global-users">...</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 dark:text-slate-400 text-[10px] md:text-[11px] uppercase font-black mb-1" data-i18n="m_groups">🏘️ 服務群組</div>
+                <div class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white data-pulse" id="global-groups">...</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 dark:text-slate-400 text-[10px] md:text-[11px] uppercase font-black mb-1" data-i18n="m_wine">🍻 累計賜酒</div>
+                <div class="text-2xl md:text-3xl font-black text-blue-500 data-pulse" id="global-wine">...</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-all hover:border-blue-500/20">
+                <div class="text-slate-500 dark:text-slate-400 text-[10px] md:text-[11px] uppercase font-black mb-1" data-i18n="m_plastic">🌚 累計派膠</div>
+                <div class="text-2xl md:text-3xl font-black text-purple-500 data-pulse" id="global-plastic">...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: 近期運作指標 -->
+    <section class="space-y-6">
+        <div class="space-y-4">
+            <div class="bg-blue-600/5 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 rounded-2xl p-4 flex items-center space-x-3">
+                <div class="text-blue-500 text-xl"><i class="fas fa-rocket"></i></div>
+                <p class="text-sm font-medium text-blue-700 dark:text-blue-300" data-i18n="banner_ops">
+                    運作指標統計自 <b>2026/02/23</b> (Mud9Bot 史詩回歸日) 開始。
+                </p>
+            </div>
+            <div class="flex items-center justify-between px-2">
+                <h2 class="text-xl font-black flex items-center text-slate-800 dark:text-white">
+                    <i class="fas fa-chart-line text-blue-500 mr-3"></i> <span data-i18n="ops_title">近期運作指標</span>
+                </h2>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 md:gap-6">
+            <div class="bg-white dark:bg-slate-800/40 p-3 md:p-8 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group flex flex-col justify-center text-center md:text-left">
+                <div class="text-slate-500 text-[9px] md:text-xs uppercase tracking-widest font-black mb-1 md:mb-2 truncate" data-i18n="metric_total">📨 處理總量</div>
+                <div class="text-lg sm:text-2xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter data-pulse truncate" id="stat-total">...</div>
+                <div class="mt-1 md:mt-4 text-[9px] md:text-[10px] text-slate-400 hidden md:block" data-i18n="sub_total">系統原始處理量快照</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-3 md:p-8 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group flex flex-col justify-center text-center md:text-left">
+                <div class="text-slate-500 text-[9px] md:text-xs uppercase tracking-widest font-black mb-1 md:mb-2 truncate" data-i18n="metric_cmds">⌨️ 指令執行</div>
+                <div class="text-lg sm:text-2xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter data-pulse truncate" id="stat-cmds">...</div>
+                <div class="mt-1 md:mt-4 text-[9px] md:text-[10px] text-slate-400 hidden md:block" data-i18n="sub_cmds">用戶發起之指令</div>
+            </div>
+            <div class="bg-white dark:bg-slate-800/40 p-3 md:p-8 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-slate-800 hover:shadow-xl transition-all group flex flex-col justify-center text-center md:text-left">
+                <div class="text-slate-500 text-[9px] md:text-xs uppercase tracking-widest font-black mb-1 md:mb-2 truncate" data-i18n="metric_clicks">🔘 互動參與</div>
+                <div class="text-lg sm:text-2xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter data-pulse truncate" id="stat-clicks">...</div>
+                <div class="mt-1 md:mt-4 text-[9px] md:text-[10px] text-slate-400 hidden md:block" data-i18n="sub_clicks">按鈕點擊及對話互動</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: 排行與分析 (並排顯示) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- 指令排行 -->
+        <div class="space-y-4">
+            <h2 class="text-xl font-black px-2 flex justify-between items-center text-slate-800 dark:text-white">
+                <span><i class="fas fa-fire text-orange-500 mr-2"></i> <span data-i18n="rank_title">熱門功能排行</span></span>
+                <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-3 py-1 rounded-full font-bold uppercase tracking-widest">Top 10</span>
+            </h2>
+            <div class="bg-white/50 dark:bg-slate-800/20 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden blur-bg shadow-sm">
+                <!-- 加入 table-fixed 強制鎖定寬度，避免數字增長時表格抖動 -->
+                <table class="w-full text-left border-collapse table-fixed">
+                    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[10px] uppercase font-black border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                        <th class="w-1/3 px-5 md:px-6 py-4 md:py-5" data-i18n="th_cmd_code">代碼</th>
+                        <th class="w-1/3 px-5 md:px-6 py-4 md:py-5" data-i18n="th_feature">功能名稱</th>
+                        <th class="w-1/3 px-5 md:px-6 py-4 md:py-5 text-right" data-i18n="th_count">次數</th>
+                    </tr>
+                    </thead>
+                    <tbody id="rank-body" class="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs md:text-sm">
+                    <tr><td colspan="3" class="px-8 py-10 text-center text-slate-400 italic data-pulse" data-i18n="loading">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 互動分析 -->
+        <div class="space-y-4">
+            <h2 class="text-xl font-black px-2 flex justify-between items-center text-slate-800 dark:text-white">
+                <span><i class="fas fa-fingerprint text-purple-500 mr-2"></i> <span data-i18n="interaction_title">互動參與度分析</span></span>
+                <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-3 py-1 rounded-full font-bold uppercase tracking-widest">Top 10</span>
+            </h2>
+            <div class="bg-white/50 dark:bg-slate-800/20 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden blur-bg shadow-sm">
+                <!-- 加入 table-fixed 強制鎖定寬度 -->
+                <table class="w-full text-left border-collapse table-fixed">
+                    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 text-[10px] uppercase font-black border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                        <th class="w-1/2 px-5 md:px-6 py-4 md:py-5" data-i18n="th_interaction">參與類別</th>
+                        <th class="w-1/2 px-5 md:px-6 py-4 md:py-5 text-right" data-i18n="th_count">次數</th>
+                    </tr>
+                    </thead>
+                    <tbody id="interaction-body" class="divide-y divide-slate-100 dark:divide-slate-800/50 text-xs md:text-sm">
+                    <tr><td colspan="2" class="px-8 py-10 text-center text-slate-400 italic data-pulse" data-i18n="loading">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系統狀態 -->
+    <div class="p-6 bg-blue-600/5 dark:bg-blue-500/10 rounded-3xl border border-blue-500/20 space-y-3 mt-8">
+        <h3 class="text-xs font-black uppercase text-blue-500 flex items-center">
+            <i class="fas fa-server mr-2"></i> <span data-i18n="status_title">系統狀態</span>
+        </h3>
+        <p class="text-[10px] leading-relaxed text-slate-500 dark:text-blue-400/80 font-medium" data-i18n="status_msg">
+            數據每分鐘由 RAM 快取同步一次。所有核心基礎建設運行正常。
+        </p>
+    </div>
+
+</main>
+
+<!-- Footer -->
+<footer class="bg-slate-100 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 mt-auto">
+    <div class="w-full lg:w-[80%] max-w-7xl mx-auto py-12 px-4 md:px-0">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
+            <div>
+                <h4 class="text-[11px] font-black uppercase tracking-widest mb-4 text-slate-500 dark:text-slate-400">Mud9Bot Revival</h4>
+                <p class="text-[10px] text-slate-500 leading-relaxed" data-i18n="footer_desc">一個陪伴咗大家多年，而家滿血回歸嘅廣東話機器人項目。</p>
+            </div>
+            <div class="flex flex-col space-y-3 items-center md:items-start">
+                <h4 class="text-[11px] font-black uppercase tracking-widest mb-1 text-slate-500 dark:text-slate-400" data-i18n="footer_links">官方連結</h4>
+                <a href="https://t.me/Mud9Bot" target="_blank" class="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center">
+                    <i class="fab fa-telegram-plane mr-2 text-blue-500"></i>Mud9Bot
+                </a>
+                <a href="https://t.me/Mud9BotDev" target="_blank" class="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center">
+                    <i class="fas fa-bullhorn mr-2 text-blue-500"></i><span data-i18n="footer_dev">最新公告頻道</span>
+                </a>
+            </div>
+            <div class="flex flex-col space-y-3 items-center md:items-start">
+                <h4 class="text-[11px] font-black uppercase tracking-widest mb-1 text-slate-500 dark:text-slate-400" data-i18n="footer_support">支援與反饋</h4>
+                <a href="https://t.me/Mud9BotSupport" target="_blank" class="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center">
+                    <i class="fas fa-question-circle mr-2 text-blue-500"></i><span data-i18n="footer_group">技術支援群組</span>
+                </a>
+                <p class="text-[9px] text-slate-400 mt-6">&copy; 2026 Mud9Bot Project. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- ========================================== -->
+<!-- ⚙️ 系統邏輯                                 -->
+<!-- ========================================== -->
+<script>
+    let appConfig = null;
+    let currentLang = localStorage.getItem('lang') || 'zh-HK';
+    let timeLeft = 60;
+    const errorBanner = document.getElementById('error-banner');
+
+    // 儲存排行榜之前的數值，以便進行動畫滾動
+    window.prevCmdCounts = window.prevCmdCounts || {};
+    window.prevIntCounts = window.prevIntCounts || {};
+
+    function updateLanguageUI() {
+        if (!appConfig) return;
+        const langData = appConfig.translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (langData[key]) el.innerHTML = langData[key];
+        });
+
+        document.getElementById('lang-label').innerText = currentLang === 'zh-HK' ? 'EN' : '中文';
+        const mobileLangLabel = document.getElementById('lang-label-mobile');
+        if(mobileLangLabel) mobileLangLabel.innerText = currentLang === 'zh-HK' ? 'EN' : '中文';
+
+        document.documentElement.setAttribute('lang', currentLang);
+        if (window.lastData) {
+            renderRankings(window.lastData.rankings);
+            renderInteractions(window.lastData.interactions);
+        }
+    }
+
+    function toggleLang() {
+        currentLang = currentLang === 'zh-HK' ? 'en' : 'zh-HK';
+        localStorage.setItem('lang', currentLang);
+        updateLanguageUI();
+    }
+
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+
+        const iconClass = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        document.getElementById('theme-icon').className = iconClass;
+
+        const mobileIcon = document.getElementById('theme-icon-mobile');
+        if(mobileIcon) mobileIcon.className = iconClass + ' text-yellow-500 mr-2';
+    }
+
+    function toggleMobileMenu() {
+        const menu = document.getElementById('mobile-menu');
+        menu.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('mobile-menu');
+        const gearBtn = document.getElementById('gear-btn');
+        if (menu && !menu.classList.contains('hidden') && !menu.contains(event.target) && !gearBtn.contains(event.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    // 🚀 核心動畫邏輯：模擬角子機 / 數字滾動效果
+    function animateValue(obj, start, end, duration) {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            const current = Math.floor(easeProgress * (end - start) + start);
+            obj.innerText = current.toLocaleString();
+
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                obj.innerText = end.toLocaleString();
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
+
+    // 🚀 全域的更新元素與套用動畫函式
+    window.updateEl = (id, val) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('data-pulse');
+
+        const currentText = el.innerText.replace(/,/g, '').replace(/[^0-9-]/g, '');
+        let currentVal = parseInt(currentText, 10);
+        const targetVal = val || 0;
+
+        if (isNaN(currentVal) || el.innerText === '...') {
+            currentVal = 0;
+        }
+
+        if (currentVal !== targetVal) {
+            el.classList.remove('value-changed');
+            void el.offsetWidth;
+            el.classList.add('value-changed');
+
+            animateValue(el, currentVal, targetVal, 1000);
+        } else {
+            el.innerText = targetVal.toLocaleString();
+        }
+    };
+
+    const fetchStats = async () => {
+        const btn = document.getElementById('btn-refresh');
+        if (btn) btn.classList.add('animate-spin');
+
+        try {
+            const res = await fetch('/api/stats');
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            window.lastData = data;
+            errorBanner.style.display = 'none';
+
+            window.updateEl('stat-total', data.summary?.totalVolume);
+            window.updateEl('stat-cmds', data.summary?.commandUsage);
+            window.updateEl('stat-clicks', data.summary?.buttonClicks);
+
+            window.updateEl('global-users', data.global?.totalUsers);
+            window.updateEl('global-groups', data.global?.totalGroups);
+            window.updateEl('global-wine', data.global?.totalWine);
+            window.updateEl('global-plastic', data.global?.totalPlastic);
+
+            if (appConfig) {
+                renderRankings(data.rankings);
+                renderInteractions(data.interactions);
+            }
+
+            timeLeft = 60;
+            document.getElementById('dist-container')?.querySelector('.data-pulse')?.classList.remove('data-pulse');
+        } catch (err) {
+            errorBanner.style.display = 'block';
+        } finally {
+            if (btn) setTimeout(() => btn.classList.remove('animate-spin'), 1000);
+        }
+    };
+
+    function renderRankings(rankings) {
+        if (!rankings || !appConfig) return;
+        const lang = appConfig.translations[currentLang];
+        const map = appConfig.cmdNameMap;
+        const tbody = document.getElementById('rank-body');
+
+        tbody.innerHTML = rankings.map(r => {
+            const labelKey = map[r.command];
+            const label = labelKey && lang[labelKey] ? lang[labelKey] : `🤖 ${r.command}`;
+            const safeId = 'cmd_' + r.command.replace(/[^a-zA-Z0-9]/g, '_');
+            const oldVal = window.prevCmdCounts[safeId] || 0;
+
+            return `
+                    <tr class="hover:bg-blue-500/5 dark:hover:bg-blue-500/10 transition-colors">
+                        <td class="px-5 md:px-6 py-4 md:py-5 text-blue-600 dark:text-blue-400 font-bold font-mono truncate">/${r.command}</td>
+                        <td class="px-5 md:px-6 py-4 md:py-5 text-slate-600 dark:text-slate-400 font-medium truncate">${label}</td>
+                        <td class="px-5 md:px-6 py-4 md:py-5 text-right font-black text-slate-700 dark:text-slate-300 font-mono truncate">
+                            <span id="${safeId}">${oldVal === 0 ? "..." : oldVal.toLocaleString()}</span>
+                        </td>
+                    </tr>
+                `;
+        }).join('');
+
+        rankings.forEach(r => {
+            const safeId = 'cmd_' + r.command.replace(/[^a-zA-Z0-9]/g, '_');
+            window.updateEl(safeId, r.count);
+            window.prevCmdCounts[safeId] = r.count;
+        });
+    }
+
+    function renderInteractions(interactions) {
+        if (!interactions || !appConfig) return;
+        const groups = {};
+        const lang = appConfig.translations[currentLang];
+        const cMap = appConfig.callbackPrefixMap;
+        const rMap = appConfig.regexKeywordsMap;
+
+        interactions.forEach(item => {
+            let foundKey = null;
+            const rawName = item.function;
+
+            if (rawName.startsWith('regex_')) {
+                const cleanDesc = rawName.replace('regex_', '');
+                for (const rm of rMap) {
+                    if (rm.keywords.some(kw => cleanDesc.includes(kw))) {
+                        foundKey = rm.key;
+                        break;
+                    }
+                }
+            }
+            else if (rawName === 'inline_query') foundKey = 'grp_inline';
+            else if (rawName === 'conversation_input') foundKey = 'grp_input';
+            else if (rawName.startsWith('button_')) {
+                const cleanPrefix = rawName.replace('button_', '');
+                for (const [prefix, mappedKey] of Object.entries(cMap)) {
+                    if (cleanPrefix.startsWith(prefix)) {
+                        foundKey = mappedKey;
+                        break;
+                    }
+                }
+            }
+
+            const label = foundKey && lang[foundKey] ? lang[foundKey] : rawName.replace('button_', '🔘 ').replace('regex_', '🔍 ');
+            groups[label] = (groups[label] || 0) + item.count;
+        });
+
+        const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const intBody = document.getElementById('interaction-body');
+
+        intBody.innerHTML = sorted.map(([label, count]) => {
+            const safeId = 'int_' + encodeURIComponent(label).replace(/%/g, '_');
+            const oldVal = window.prevIntCounts[safeId] || 0;
+
+            return `
+                    <tr class="hover:bg-purple-500/5 dark:hover:bg-purple-500/10 transition-colors">
+                        <td class="px-5 md:px-6 py-4 md:py-5 text-purple-600 dark:text-purple-400 font-bold truncate">${label}</td>
+                        <td class="px-5 md:px-6 py-4 md:py-5 text-right font-black text-slate-700 dark:text-slate-300 font-mono truncate">
+                            <span id="${safeId}">${oldVal === 0 ? "..." : oldVal.toLocaleString()}</span>
+                        </td>
+                    </tr>
+                `;
+        }).join('');
+
+        sorted.forEach(([label, count]) => {
+            const safeId = 'int_' + encodeURIComponent(label).replace(/%/g, '_');
+            window.updateEl(safeId, count);
+            window.prevIntCounts[safeId] = count;
+        });
+    }
+
+    async function initApp() {
+        if (localStorage.getItem('theme') === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('theme-icon').className = 'fas fa-moon';
+            const mobileIcon = document.getElementById('theme-icon-mobile');
+            if(mobileIcon) mobileIcon.className = 'fas fa-moon text-yellow-500 mr-2';
+        } else {
+            document.getElementById('theme-icon').className = 'fas fa-sun';
+            const mobileIcon = document.getElementById('theme-icon-mobile');
+            if(mobileIcon) mobileIcon.className = 'fas fa-sun text-yellow-500 mr-2';
+        }
+
+        try {
+            const res = await fetch('config.json');
+            if (!res.ok) throw new Error("Config not found");
+            appConfig = await res.json();
+
+            updateLanguageUI();
+            await fetchStats();
+
+            setInterval(() => {
+                timeLeft--;
+                if (timeLeft <= 0) { fetchStats(); timeLeft = 60; }
+                const timer = document.getElementById('refresh-timer');
+                if (timer) timer.innerText = `${timeLeft}s`;
+            }, 1000);
+        } catch (error) {
+            console.error("Initialization error:", error);
+            document.getElementById('error-text').innerText = '載入設定檔失敗，請確認 config.json 是否存在。';
+            errorBanner.style.display = 'block';
+        }
+    }
+
+    initApp();
+</script>
+</body>
+</html>

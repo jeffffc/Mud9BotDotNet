@@ -42,6 +42,9 @@ public class ConversationManager
     // 僅用於追蹤「正在等待文字輸入」的會話
     private readonly ConcurrentDictionary<long, (string WorkflowName, ConversationContext Context)> _activeInputSessions = new();
     private readonly HashSet<long> _devIds;
+    
+    // 🚀 新增：供外部檢查指令是否為有效的會話觸發詞
+    public bool HasTrigger(string command) => _triggerMap.ContainsKey(command.ToLower());
 
     public ConversationManager(ITelegramBotClient bot, IEnumerable<IConversation> conversations, IConfiguration config)
     {

@@ -15,6 +15,7 @@ public class MessageRegistry
     private readonly List<(Regex Regex, MethodInfo Method, Type Type, TextTriggerAttribute Attribute)> _handlers = new();
     private readonly ILogger<MessageRegistry> _logger;
     private readonly IErrorReporter _errorReporter;
+    private readonly IBotStatsService _botStatsService; // 🚀 注入統計服務
     private readonly HashSet<long> _devIds;
 
     public IEnumerable<string> RegisteredPatterns => _handlers.Select(h => h.Attribute.Pattern).OrderBy(p => p);
@@ -23,10 +24,12 @@ public class MessageRegistry
         ILogger<MessageRegistry> logger,
         IConfiguration configuration,
         IErrorReporter errorReporter,
-        IBotMetadataService metadata)
+        IBotMetadataService metadata,
+        IBotStatsService botStatsService)
     {
         _logger = logger;
         _errorReporter = errorReporter;
+        _botStatsService = botStatsService;
         _devIds = configuration.GetSection("BotConfiguration:DevIds").Get<HashSet<long>>() ?? [];
 
         ScanForMessageTriggers();
@@ -92,6 +95,12 @@ public class MessageRegistry
                 } 
                 catch { continue; }
             }
+            
+            // 🚀 關鍵修正：紀錄 Regex 觸發事件 (分類為 interaction，名稱帶有 regex 前綴)
+            // 將 Update 包裝回 Update 對象傳遞給統計服務
+            var dummyUpdate = new Update { Message = message };
+            await _botStatsService.RecordEventAsync("interaction", $"regex_{attr.Description ?? method.Name}", dummyUpdate, ct);
+
 
             object? instance = method.IsStatic ? null : scopedProvider.GetService(type);
             if (!method.IsStatic && instance == null) continue;

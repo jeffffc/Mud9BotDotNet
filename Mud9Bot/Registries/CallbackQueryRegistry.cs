@@ -33,7 +33,8 @@ public class CallbackQueryRegistry
             }
         }
         
-        metadata.CallbackCount = _handlers.Count;
+        // 🚀 確保元數據與實際註冊的按鈕處理程序同步
+        metadata.CallbackCount = _handlers.Values.Distinct().Count();
     }
 
     public async Task ExecuteAsync(ITelegramBotClient bot, CallbackQuery query, IServiceProvider serviceProvider, CancellationToken ct)

@@ -18,6 +18,7 @@ public class CommandRegistry
     
     // Expose registered triggers for statistics
     public IEnumerable<string> RegisteredTriggers => _commands.Keys.OrderBy(k => k);
+    
 
     public CommandRegistry(
         ILogger<CommandRegistry> logger, 
@@ -32,8 +33,11 @@ public class CommandRegistry
         ScanForCommands();
         
         // Ensure metadata is in sync with actual registered commands
-        metadata.CommandCount = _commands.Count;
+        metadata.CommandCount = _commands.Values.Distinct().Count();
     }
+    
+    // 🚀 新增：檢查指令是否為已註冊的有效指令
+    public bool IsRegistered(string trigger) => _commands.ContainsKey(trigger);
 
     private void ScanForCommands()
     {

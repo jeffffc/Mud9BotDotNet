@@ -29,142 +29,139 @@ public class UpdateHandler(
     private string? _botUsername;
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
     
-    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+    public async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
     {
-        //  🚀 流量統計：任何更新進入 Bot 都計入總數 (Summary only)
+        // 🚀 1. 流量統計：總數紀錄 (任何進來的更新都先記一筆)
         await botStatsService.RecordUpdateAsync(update, cancellationToken);
-        
+
+        // 🚀 2. 指令預解析與「有效性」驗證統計
+        // 這樣做是為了確保：
+        // A. /fortune@Mud9Bot 與 /fortune 會合併統計
+        // B. 即使指令被後面的 ConversationManager 攔截 return，數據也能先入庫
+        // C. 無效指令（如 /asdfg）不會出現在排行榜上
+        string? resolvedCommand = null;
+        if (update.Message?.Text is { } text && text.StartsWith('/'))
+        {
+            var parts = text.Split(' ', 2);
+            var rawCmd = parts[0].Substring(1);
+            int atIndex = rawCmd.IndexOf('@');
+            
+            // 統一轉為小寫並去掉 Bot Name 尾綴
+            string cleanCommand = (atIndex > 0 ? rawCmd.Substring(0, atIndex) : rawCmd).ToLower();
+            
+            bool isForMe = true;
+            if (atIndex > 0)
+            {
+                var targetBot = rawCmd.Substring(atIndex + 1);
+                if (string.IsNullOrEmpty(_botUsername)) _botUsername = (await bot.GetMe(cancellationToken)).Username;
+                isForMe = string.Equals(targetBot, _botUsername, StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (isForMe)
+            {
+                // 驗證指令是否為有效註冊的（包含普通指令與對話觸發詞）
+                bool isValid = commandRegistry.IsRegistered(cleanCommand) || conversationManager.HasTrigger(cleanCommand);
+                
+                if (isValid)
+                {
+                    resolvedCommand = cleanCommand;
+                    await botStatsService.RecordEventAsync("command", resolvedCommand, update, cancellationToken);
+                }
+            }
+        }
+
+        // 🚀 3. 按鈕點擊統計 (在 Manager 處理前先紀錄，確保 100% 採集)
+        if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery is { } cb)
+        {
+            var prefix = cb.Data?.Split('+').FirstOrDefault() ?? "unknown";
+            await botStatsService.RecordEventAsync("interaction", $"button_{prefix}", update, cancellationToken);
+        }
+
         // ---------------------------------------------------------
-        // 0. Inline Query Handling
+        // 4. 業務邏輯執行 (完全維持您要求的原始順序)
         // ---------------------------------------------------------
+
+        // 4.0. Inline Query Handling
         if (update.Type == UpdateType.InlineQuery && update.InlineQuery is { } inlineQuery)
         {
-            await inlineQueryHandler.HandleAsync(botClient, inlineQuery, cancellationToken);
+            await botStatsService.RecordEventAsync("interaction", "inline_query", update, cancellationToken);
+            await inlineQueryHandler.HandleAsync(bot, inlineQuery, cancellationToken);
             return;
         }
         
-        // ---------------------------------------------------------
-        // 0.1. Payment Handling (Highest Priority)
-        // ---------------------------------------------------------
-        // 處理支付相關的 API 請求，避免被後續邏輯誤擋
+        // 4.0.1. Payment Handling
         if (update.Type == UpdateType.PreCheckoutQuery && update.PreCheckoutQuery is { } preCheckoutQuery)
         {
-            await paymentService.HandlePreCheckoutQueryAsync(botClient, preCheckoutQuery, cancellationToken);
+            await paymentService.HandlePreCheckoutQueryAsync(bot, preCheckoutQuery, cancellationToken);
             return;
         }
-        
         if (update.Message?.SuccessfulPayment is { } successfulPayment)
         {
-            await paymentService.HandleSuccessfulPaymentAsync(botClient, update.Message, successfulPayment, cancellationToken);
+            await paymentService.HandleSuccessfulPaymentAsync(bot, update.Message, successfulPayment, cancellationToken);
             return;
         }
         
-        // ---------------------------------------------------------
-        // 1. Conversation Manager (Active Sessions & Entry Points)
-        // ---------------------------------------------------------
-        // 優先處理使用者是否正在進行中的對話 (例如 Settings)，或者是否觸發了對話的進入點
+        // 4.1. Conversation Manager (最高優先權業務邏輯)
         if (await conversationManager.HandleUpdateAsync(update, cancellationToken))
         {
+            // 如果是對話中的純文字輸入（非指令），補上一筆互動統計
+            if (update.Message?.Text != null && !update.Message.Text.StartsWith("/"))
+            {
+                 await botStatsService.RecordEventAsync("interaction", "conversation_input", update, cancellationToken);
+            }
             return; 
         }
         
-        // ---------------------------------------------------------
-        // 2. Standard Callback Queries (Fallback)
-        // ---------------------------------------------------------
-        // 如果按鈕事件不屬於任何對話流程，則交給這裡處理
+        // 4.2. Standard Callback Queries (Fallback)
         if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery is { } callbackQuery)
         {
             using var cbScope = scopeFactory.CreateScope();
-            await callbackRegistry.ExecuteAsync(botClient, callbackQuery, cbScope.ServiceProvider, cancellationToken);
+            await callbackRegistry.ExecuteAsync(bot, callbackQuery, cbScope.ServiceProvider, cancellationToken);
             return;
         }
         
-        // ---------------------------------------------------------
-        // 3. Message Extraction & Preliminary Checks
-        // ---------------------------------------------------------
-        // 確保這是一個包含文字的普通訊息
+        // 4.3. Message Extraction & Preliminary Checks
         if (update.Message is not { } message) return;
 
-        var chatId = message.Chat.Id;
-
-        // ---------------------------------------------------------
-        // 4. Data Synchronization (User & Group)
-        // ---------------------------------------------------------
-        // 在執行任何進階操作前，確保資料庫有最新的用戶與群組資料
+        // 4.4. Data Synchronization (User & Group)
         using var scope = scopeFactory.CreateScope();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        if (message.From != null) await userService.SyncUserAsync(message.From, cancellationToken);
+        if (message.Chat.Type != ChatType.Private) await userService.SyncGroupAsync(message.Chat, cancellationToken);
         
-        if (message.From != null)
-        {
-            await userService.SyncUserAsync(message.From, cancellationToken);
-        }
-        if (message.Chat.Type != ChatType.Private)
-        {
-            await userService.SyncGroupAsync(message.Chat, cancellationToken);
-        }
-        
-        // --- 🚀 NEW CHAT MEMBERS EVENT (Intercept before Text check) ---
+        // 處理進/退群事件
         if (message.NewChatMembers?.Any() == true)
         {
             var welcomeService = scope.ServiceProvider.GetRequiredService<IWelcomeService>();
-            await welcomeService.HandleNewChatMembersAsync(botClient, message, cancellationToken);
+            await welcomeService.HandleNewChatMembersAsync(bot, message, cancellationToken);
             return;
         }
-        
         if (message.LeftChatMember != null)
         {
             var welcomeService = scope.ServiceProvider.GetRequiredService<IWelcomeService>();
-            await welcomeService.HandleLeftChatMemberAsync(botClient, message, cancellationToken);
-            return; // 處理完退群事件就結束
+            await welcomeService.HandleLeftChatMemberAsync(bot, message, cancellationToken);
+            return;
         }
         
         if (message.Text is not { } messageText) return;
         
-        // ---------------------------------------------------------
-        // 5. Text Triggers (Regex / Passive Listeners)
-        // ---------------------------------------------------------
-        // 被動監聽所有文字訊息 (例如: 早晨、晚安)。
-        // 必須放在 `StartsWith('/')` 之前執行，否則普通文字會被拋棄。
-        await messageRegistry.ExecuteAsync(botClient, message, scope.ServiceProvider, cancellationToken);
+        // 4.5. Text Triggers (Regex / Passive Listeners)
+        // MessageRegistry 內部已實作 RecordEvent 邏輯
+        await messageRegistry.ExecuteAsync(bot, message, scope.ServiceProvider, cancellationToken);
 
-        // ---------------------------------------------------------
-        // 6. Command Execution
-        // ---------------------------------------------------------
-        // 如果訊息不是以 '/' 開頭，到此為止 (只記錄 LastSeen，不當作指令處理)
-        if (!messageText.StartsWith('/')) return; 
-        
-        // --- PARSING LOGIC START ---
-        var parts = messageText.Split(' ', 2); 
-        var commandPart = parts[0].Substring(1); 
-        var args = parts.Length > 1 ? parts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>(); 
-
-        // 處理 @BotName 的情況 (例如 /help@Mud9Bot)
-        var atIndex = commandPart.IndexOf('@');
-        if (atIndex > 0)
+        // 4.6. Command Execution
+        // 統計已在 Step 2 完成，此處僅負責執行邏輯
+        if (resolvedCommand != null) 
         {
-            var targetBot = commandPart.Substring(atIndex + 1); 
+            var finalParts = messageText.Split(' ', 2); 
+            var args = finalParts.Length > 1 ? finalParts[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>(); 
 
-            if (string.IsNullOrEmpty(_botUsername))
-            {
-                var me = await botClient.GetMe(cancellationToken);
-                _botUsername = me.Username;
-            }
-
-            if (!string.Equals(targetBot, _botUsername, StringComparison.OrdinalIgnoreCase))
-            {
-                return; // 如果指令是給群組內其他 Bot 的，就忽略
-            }
-
-            commandPart = commandPart.Substring(0, atIndex); 
+            logger.LogInformation("Command executed: {Command}", resolvedCommand);
+            await commandRegistry.ExecuteAsync(resolvedCommand, args, bot, message, scope.ServiceProvider, cancellationToken);
         }
-        // --- PARSING LOGIC END ---
-
-        logger.LogInformation("Command detected: {CommandPart}", commandPart);
-
-        await commandRegistry.ExecuteAsync(commandPart, args, botClient, message, scope.ServiceProvider, cancellationToken);
     }
 
-    public async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
+    public async Task HandleErrorAsync(ITelegramBotClient bot, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
     {
         logger.LogError(exception, "Telegram API Error");
         await Task.CompletedTask;
