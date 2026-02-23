@@ -1,0 +1,65 @@
+name: Deploy Mud9Bot & Web
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      
+      # 1. 編譯 Bot 專案
+      - name: Build Bot
+        run: dotnet publish Mud9Bot/Mud9Bot.csproj -c Release -o ./publish_bot
+      
+      # 2. 編譯 Web 專案
+      - name: Build Web
+        run: dotnet publish Mud9Bot.Web/Mud9Bot.Web.csproj -c Release -o ./publish_web
+      
+      # 3. 部署 Bot (已修正 strip_components 與全變數化)
+      - name: Deploy Bot to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "publish_bot/"
+          target: "${{ secrets.BOT_DEPLOY_PATH }}/releases/${{ github.sha }}"
+          strip_components: 1
+      
+      # 4. 部署 Web
+      - name: Deploy Web to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "publish_web/"
+          target: "${{ secrets.WEB_DEPLOY_PATH }}/releases/${{ github.sha }}"
+          strip_components: 1
+      
+      # 5. 切換 Symlink 並重啟服務
+      - name: Finalize and Restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # --- Bot 處理 ---
+            ln -sfn ${{ secrets.BOT_DEPLOY_PATH }}/releases/${{ github.sha }} ${{ secrets.BOT_DEPLOY_PATH }}/current
+            # 加入 xargs -r 避免初始檔案不夠時報錯
+            cd ${{ secrets.BOT_DEPLOY_PATH }}/releases && ls -t | tail -n +6 | xargs -r rm -rf
+            sudo systemctl restart ${{ secrets.BOT_SERVICE_NAME }}
+            
+            # --- Web 處理 ---
+            ln -sfn ${{ secrets.WEB_DEPLOY_PATH }}/releases/${{ github.sha }} ${{ secrets.WEB_DEPLOY_PATH }}/current
+            cd ${{ secrets.WEB_DEPLOY_PATH }}/releases && ls -t | tail -n +6 | xargs -r rm -rf
+            sudo systemctl restart ${{ secrets.WEB_SERVICE_NAME }}
