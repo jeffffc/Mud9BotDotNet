@@ -143,7 +143,11 @@ public class AdminModule(
     [Command("botstats", Description = "Show bot registration statistics", DevOnly = true)]
     public async Task BotStatsCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version?.ToString() ?? "Unknown";
+        
+        // 🚀 取得 DLL 的最後寫入時間 (即編譯/發布時間)
+        var buildTime = System.IO.File.GetLastWriteTime(assembly.Location).ToHkTime();
         
         var commandsList = string.Join(", ", commandRegistry.RegisteredTriggers.Select(t => $"<code>/{t}</code>"));
         var callbacksList = string.Join(", ", callbackRegistry.RegisteredPrefixes.Select(p => $"<code>{p}</code>"));
@@ -153,6 +157,7 @@ public class AdminModule(
         sb.AppendLine("<b>📊 Bot Registration Stats</b>");
         sb.AppendLine();
         sb.AppendLine($"├ Version: <code>{version}</code>");
+        sb.AppendLine($"├ Built At: <code>{buildTime:yyyy-MM-dd HH:mm:ss}</code>"); // 🚀 新增這一行
         sb.AppendLine($"├ Commands: <b>{metadata.CommandCount}</b> (Triggers: {commandRegistry.RegisteredTriggers.Count()})");
         sb.AppendLine($"├ Callbacks: <b>{metadata.CallbackCount}</b>");
         sb.AppendLine($"├ Msg Triggers: <b>{metadata.MessageTriggerCount}</b>");
