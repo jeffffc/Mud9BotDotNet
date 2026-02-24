@@ -7,9 +7,6 @@ on:
     types: [trigger_build_bot, trigger_build_web, trigger_deploy_bot, trigger_deploy_web]
 
 jobs:
-  # ---------------------------------------------------------
-  # 1. 偵測變更並發送通知
-  # ---------------------------------------------------------
   notify-push:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -18,8 +15,6 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@v4
-      
-      # 🚀 偵測檔案路徑變更
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -31,7 +26,7 @@ jobs:
               - 'Mud9Bot.Web/**'
               - 'Mud9Bot.Data/**'
 
-      # 🤖 如果有 Bot 變更，發送 Bot 通知
+      # 🚀 遵循標準：Callback Data 改為 GH_BUILD+BOT+SHA
       - name: Send Bot Notification
         if: steps.filter.outputs.bot == 'true'
         run: |
@@ -39,9 +34,9 @@ jobs:
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=🤖 <b>[Bot] New Changes Detected</b>%0AAuthor: <b>${{ github.actor }}</b>%0ASHA: <code>${{ github.sha }}</code>%0AMsg: <code>${{ github.event.head_commit.message }}</code>" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Bot\",\"callback_data\":\"GH_BUILD_BOT+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+${{ github.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Bot\",\"callback_data\":\"GH_BUILD+BOT+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+BOT+${{ github.sha }}\"}]]}"
 
-      # 🌐 如果有 Web 變更，發送 Web 通知
+      # 🚀 遵循標準：Callback Data 改為 GH_BUILD+WEB+SHA
       - name: Send Web Notification
         if: steps.filter.outputs.web == 'true'
         run: |
@@ -49,11 +44,8 @@ jobs:
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=🌐 <b>[Web] New Changes Detected</b>%0AAuthor: <b>${{ github.actor }}</b>%0ASHA: <code>${{ github.sha }}</code>%0AMsg: <code>${{ github.event.head_commit.message }}</code>" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Web\",\"callback_data\":\"GH_BUILD_WEB+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+${{ github.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Web\",\"callback_data\":\"GH_BUILD+WEB+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+WEB+${{ github.sha }}\"}]]}"
 
-  # ---------------------------------------------------------
-  # 2. Bot 編譯階段 (由 GH_BUILD_BOT 按鈕觸發)
-  # ---------------------------------------------------------
   build-bot:
     if: github.event.action == 'trigger_build_bot'
     runs-on: ubuntu-latest
@@ -72,17 +64,16 @@ jobs:
         with:
           name: bot-pkg-${{ github.event.client_payload.sha }}
           path: publish_bot/
+      
+      # 🚀 遵循標準：Callback Data 改為 GH_DEPLOY+BOT+SHA
       - name: Notify Bot Build Success
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=✅ <b>Bot Build Success!</b>%0ASHA: <code>${{ github.event.client_payload.sha }}</code>%0A%0A已完成編譯，準備好部署 Bot 嗎？" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Bot\",\"callback_data\":\"GH_DEPLOY_BOT+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+${{ github.event.client_payload.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Bot\",\"callback_data\":\"GH_DEPLOY+BOT+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+BOT+${{ github.event.client_payload.sha }}\"}]]}"
 
-  # ---------------------------------------------------------
-  # 3. Web 編譯階段 (由 GH_BUILD_WEB 按鈕觸發)
-  # ---------------------------------------------------------
   build-web:
     if: github.event.action == 'trigger_build_web'
     runs-on: ubuntu-latest
@@ -101,17 +92,16 @@ jobs:
         with:
           name: web-pkg-${{ github.event.client_payload.sha }}
           path: publish_web/
+      
+      # 🚀 遵循標準：Callback Data 改為 GH_DEPLOY+WEB+SHA
       - name: Notify Web Build Success
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=✅ <b>Web Build Success!</b>%0ASHA: <code>${{ github.event.client_payload.sha }}</code>%0A%0A已完成編譯，準備好部署 Web 嗎？" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Web\",\"callback_data\":\"GH_DEPLOY_WEB+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+${{ github.event.client_payload.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Web\",\"callback_data\":\"GH_DEPLOY+WEB+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+WEB+${{ github.event.client_payload.sha }}\"}]]}"
 
-  # ---------------------------------------------------------
-  # 4. Bot 部署階段
-  # ---------------------------------------------------------
   deploy-bot:
     if: github.event.action == 'trigger_deploy_bot'
     runs-on: ubuntu-latest
@@ -139,18 +129,25 @@ jobs:
           script: |
             B_PATH="${{ secrets.BOT_DEPLOY_PATH }}"
             SHA="${{ github.event.client_payload.sha }}"
+            
+            # 🚀 1. 從 shared 資料夾複製所有被 gitignore 的設定檔到新版本
+            if [ -d "$B_PATH/shared" ]; then
+              cp -r $B_PATH/shared/* $B_PATH/releases/$SHA/
+            fi
+            
+            # 2. 切換軟連結
             ln -sfn $B_PATH/releases/$SHA $B_PATH/current
+            
+            # 3. 清理舊版本並重啟
             cd $B_PATH/releases && ls -t | tail -n +6 | xargs -r rm -rf
             sudo systemctl restart ${{ secrets.BOT_SERVICE_NAME }}
+
       - name: Final Notification Bot
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "text=🎉 [Bot] Deployment Complete! Version: ${{ github.event.client_payload.sha }}"
 
-  # ---------------------------------------------------------
-  # 5. Web 部署階段
-  # ---------------------------------------------------------
   deploy-web:
     if: github.event.action == 'trigger_deploy_web'
     runs-on: ubuntu-latest
@@ -178,9 +175,19 @@ jobs:
           script: |
             W_PATH="${{ secrets.WEB_DEPLOY_PATH }}"
             SHA="${{ github.event.client_payload.sha }}"
+            
+            # 🚀 1. 從 shared 資料夾複製所有被 gitignore 的設定檔到新版本
+            if [ -d "$W_PATH/shared" ]; then
+              cp -r $W_PATH/shared/* $W_PATH/releases/$SHA/
+            fi
+            
+            # 2. 切換軟連結
             ln -sfn $W_PATH/releases/$SHA $W_PATH/current
+            
+            # 3. 清理舊版本並重啟
             cd $W_PATH/releases && ls -t | tail -n +6 | xargs -r rm -rf
             sudo systemctl restart ${{ secrets.WEB_SERVICE_NAME }}
+
       - name: Final Notification Web
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
