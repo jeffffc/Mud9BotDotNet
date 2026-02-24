@@ -1,7 +1,10 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Mud9Bot;
 using Mud9Bot.Data;
+using Mud9Bot.Data.Interfaces;
+using Mud9Bot.Data.Services;
 using Mud9Bot.Services;
 using Mud9Bot.Modules; // Import your modules namespace
 using Mud9Bot.Extensions;
@@ -25,9 +28,15 @@ var botToken = builder.Configuration["BotConfiguration:BotToken"];
 if (string.IsNullOrEmpty(botToken))
     throw new ArgumentNullException("BotToken is missing");
 
+builder.Services.AddSingleton<ISettingsService, SettingsService>();
+
 // 3. Register Database (PostgreSQL)
 builder.Services.AddDbContext<BotDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    options.UseNpgsql(connectionString);
+    // 🚀 ADD THIS LINE HERE TOO TO FIX THE CRASH
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 
 // 4. Register Telegram Client
 builder.Services.AddSingleton<ITelegramBotClient>(sp => new TelegramBotClient(botToken));

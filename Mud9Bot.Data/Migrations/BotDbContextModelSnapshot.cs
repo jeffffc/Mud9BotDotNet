@@ -58,7 +58,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("EventType", "Metadata", "ChatType")
                         .IsUnique();
 
-                    b.ToTable("bot_event_logs");
+                    b.ToTable("bot_event_logs", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.BotGroup", b =>
@@ -136,7 +136,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("TelegramId")
                         .IsUnique();
 
-                    b.ToTable("groups");
+                    b.ToTable("groups", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.BotUser", b =>
@@ -188,7 +188,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("TelegramId")
                         .IsUnique();
 
-                    b.ToTable("users");
+                    b.ToTable("users", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CommandLog", b =>
@@ -218,7 +218,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("command_logs");
+                    b.ToTable("command_logs", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CurrencyRate", b =>
@@ -241,7 +241,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Code");
 
-                    b.ToTable("currency_rates");
+                    b.ToTable("currency_rates", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CustomGreeting", b =>
@@ -269,7 +269,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("custom_greetings");
+                    b.ToTable("custom_greetings", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.DailyLimit", b =>
@@ -299,7 +299,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("LimitId");
 
-                    b.ToTable("dailylimit");
+                    b.ToTable("dailylimit", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Donation", b =>
@@ -349,7 +349,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("donation");
+                    b.ToTable("donation", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.FortuneLimit", b =>
@@ -379,7 +379,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("FortuneLimitId");
 
-                    b.ToTable("fortune_limit");
+                    b.ToTable("fortune_limit", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.GayGif", b =>
@@ -398,7 +398,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("GayGifId");
 
-                    b.ToTable("gaygif");
+                    b.ToTable("gaygif", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Job", b =>
@@ -448,7 +448,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("JobId");
 
-                    b.ToTable("job");
+                    b.ToTable("job", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.LomoIgnoreWord", b =>
@@ -466,7 +466,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("lomo_ignore_words");
+                    b.ToTable("lomo_ignore_words", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Movie", b =>
@@ -536,7 +536,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("movies");
+                    b.ToTable("movies", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.SystemSetting", b =>
@@ -560,7 +560,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("SettingKey");
 
-                    b.ToTable("system_settings");
+                    b.ToTable("system_settings", (string)null);
 
                     b.HasData(
                         new
@@ -657,7 +657,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("WinePlasticId");
 
-                    b.ToTable("wineplastic");
+                    b.ToTable("wineplastic", (string)null);
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Zodiac", b =>
@@ -713,7 +713,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("zodiacs");
+                    b.ToTable("zodiacs", (string)null);
                 });
 #pragma warning restore 612, 618
         }

@@ -58,6 +58,12 @@ public class BotDbContext : DbContext
             .HasIndex(g => g.TelegramId)
             .IsUnique();
         
+        // 🚀 FIX: Use a FIXED date for seed data. 
+        // Using DateTime.UtcNow in OnModelCreating causes EF Core 9+ to detect 
+        // a "model change" every single time the app starts, causing a crash.
+        var seedDate = new DateTime(2026, 2, 24, 0, 0, 0, DateTimeKind.Utc);
+        
+        
         // Seed initial data for the Admin Console
         // Seed initial data for the Admin Console and Global Settings
         modelBuilder.Entity<SystemSetting>().HasData(
@@ -66,14 +72,14 @@ public class BotDbContext : DbContext
                 SettingKey = "is_maintenance", 
                 SettingValue = "false", 
                 Description = "Toggle global maintenance mode",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             },
             new SystemSetting 
             { 
                 SettingKey = "maintenance_message", 
                 SettingValue = "🛠 系統正在維護中，請稍後再試。 / System is under maintenance. Please try again later.", 
                 Description = "Message shown to users during maintenance",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             },
             new SystemSetting 
             { 
@@ -87,29 +93,30 @@ public class BotDbContext : DbContext
                 SettingKey = "web_banner_message", 
                 SettingValue = "", 
                 Description = "Site-wide announcement message for the web dashboard",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             },
             new SystemSetting 
             { 
                 SettingKey = "enable_gas", 
                 SettingValue = "true", 
                 Description = "Feature flag: Enable gas price service",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             },
             new SystemSetting 
             { 
                 SettingKey = "enable_zodiac", 
                 SettingValue = "true", 
                 Description = "Feature flag: Enable daily zodiac horoscopes",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             },
             new SystemSetting 
             { 
                 SettingKey = "enable_wineplastic", 
                 SettingValue = "true", 
                 Description = "Feature flag: Enable core wine/plastic interactions",
-                LastUpdated = DateTime.UtcNow 
+                LastUpdated = seedDate
             }
         );
+        
     }
 }
