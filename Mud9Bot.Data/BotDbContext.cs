@@ -57,5 +57,59 @@ public class BotDbContext : DbContext
         modelBuilder.Entity<BotGroup>()
             .HasIndex(g => g.TelegramId)
             .IsUnique();
+        
+        // Seed initial data for the Admin Console
+        // Seed initial data for the Admin Console and Global Settings
+        modelBuilder.Entity<SystemSetting>().HasData(
+            new SystemSetting 
+            { 
+                SettingKey = "is_maintenance", 
+                SettingValue = "false", 
+                Description = "Toggle global maintenance mode",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "maintenance_message", 
+                SettingValue = "🛠 系統正在維護中，請稍後再試。 / System is under maintenance. Please try again later.", 
+                Description = "Message shown to users during maintenance",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "broadcast_delay_ms", 
+                SettingValue = "35", 
+                Description = "Delay between messages during global broadcast (ms)",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "web_banner_message", 
+                SettingValue = "", 
+                Description = "Site-wide announcement message for the web dashboard",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "enable_gas", 
+                SettingValue = "true", 
+                Description = "Feature flag: Enable gas price service",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "enable_zodiac", 
+                SettingValue = "true", 
+                Description = "Feature flag: Enable daily zodiac horoscopes",
+                LastUpdated = DateTime.UtcNow 
+            },
+            new SystemSetting 
+            { 
+                SettingKey = "enable_wineplastic", 
+                SettingValue = "true", 
+                Description = "Feature flag: Enable core wine/plastic interactions",
+                LastUpdated = DateTime.UtcNow 
+            }
+        );
     }
 }

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-HK" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mud9Bot | Admin Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        body { background-color: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+        input:checked ~ .dot { transform: translateX(100%); background-color: #3b82f6; }
+        .loader { border-top-color: #3b82f6; animation: spinner 0.6s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<!-- 🔐 Login Overlay (Shown if not authenticated) -->
+<div id="loginOverlay" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-6">
+    <div class="glass p-10 rounded-[2.5rem] text-center max-w-sm w-full shadow-2xl">
+        <img src="mud9bot_logo.jpg" class="w-20 h-20 rounded-2xl mx-auto mb-6 shadow-lg" alt="Logo">
+        <h1 class="text-2xl font-black mb-2">Admin Access</h1>
+        <p class="text-slate-500 text-sm mb-8">Please sign in with a registered Developer account to continue.</p>
+
+        <div id="tg-login-container" class="flex justify-center">
+            <!-- 🚀 Change 'YOUR_BOT_USERNAME' to your actual bot username -->
+            <script async src="https://telegram.org/js/telegram-widget.js?22"
+                    data-telegram-login="Mud9Bot"
+                    data-size="large"
+                    data-onauth="onTelegramAuth(user)"
+                    data-request-access="write"></script>
+        </div>
+
+        <p id="loginError" class="text-red-400 text-xs mt-6 hidden">🚫 權限不足或驗證失敗</p>
+    </div>
+</div>
+
+<!-- 📱 Main Dashboard (Hidden until auth) -->
+<div id="mainDashboard" class="hidden">
+
+    <!-- Top Nav -->
+    <nav class="glass sticky top-0 z-40 border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="font-black text-lg tracking-tighter text-blue-400">Mud9 Admin</span>
+            </div>
+            <div id="userInfo" class="flex items-center space-x-4">
+                <span id="userNameDisplay" class="text-sm font-bold">Admin</span>
+                <button onclick="logout()" class="p-2 text-slate-500 hover:text-white transition-colors">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+        <!-- Sidebar -->
+        <aside class="space-y-2">
+            <button class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-blue-600/10 text-blue-400 font-bold">
+                <i class="fas fa-cog w-5"></i> <span>System Settings</span>
+            </button>
+            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
+                <i class="fas fa-bullhorn w-5"></i> <span>Broadcast (Soon)</span>
+            </button>
+            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
+                <i class="fas fa-users w-5"></i> <span>Inspector (Soon)</span>
+            </button>
+            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
+                <i class="fas fa-terminal w-5"></i> <span>Live Logs (Soon)</span>
+            </button>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="lg:col-span-3 space-y-6">
+
+            <!-- 🛠 Maintenance Mode Card -->
+            <div class="glass p-8 rounded-3xl border-l-4 border-l-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-black flex items-center">
+                            <i class="fas fa-tools mr-3 text-blue-500"></i> Maintenance Mode
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1">When active, the bot only responds to Developers.</p>
+                    </div>
+                    <label for="maintToggle" class="flex items-center cursor-pointer">
+                        <div class="relative">
+                            <input type="checkbox" id="maintToggle" class="sr-only" onchange="confirmMaintenance(this)">
+                            <div class="block bg-slate-800 w-14 h-8 rounded-full border border-white/10"></div>
+                            <div class="dot absolute left-1 top-1 bg-slate-400 w-6 h-6 rounded-full transition shadow-md"></div>
+                        </div>
+                    </label>
+                </div>
+                <div id="maintStatus" class="mt-4 text-xs font-mono text-slate-600">Status: Checking...</div>
+            </div>
+
+            <!-- 📋 Settings Table -->
+            <div class="glass rounded-3xl overflow-hidden">
+                <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                    <h3 class="font-bold">System Configuration</h3>
+                    <button onclick="loadSettings()" class="text-xs text-blue-400 hover:underline">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                        <tr>
+                            <th class="px-6 py-4">Key</th>
+                            <th class="px-6 py-4">Value</th>
+                            <th class="px-6 py-4">Last Updated</th>
+                        </tr>
+                        </thead>
+                        <tbody id="settingsTableBody" class="divide-y divide-white/5">
+                        <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ⚠️ Confirmation Modal -->
+<div id="confirmModal" class="fixed inset-0 z-[110] bg-slate-950/80 hidden flex items-center justify-center p-6">
+    <div class="glass p-8 rounded-[2rem] max-w-sm w-full shadow-2xl border border-blue-500/20">
+        <div class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-2xl text-blue-500 mx-auto mb-6">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3 class="text-xl font-bold text-center mb-2">Confirm Action?</h3>
+        <p id="confirmText" class="text-slate-400 text-sm text-center mb-8">Are you sure you want to change the system state?</p>
+        <div class="flex space-x-3">
+            <button onclick="closeModal()" class="flex-1 px-4 py-3 bg-slate-800 rounded-xl font-bold hover:bg-slate-700 transition-all">Cancel</button>
+            <button id="modalConfirmBtn" class="flex-1 px-4 py-3 bg-blue-600 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-900/20 transition-all">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Authentication State
+    let currentMaintState = false;
+
+    async function onTelegramAuth(user) {
+        console.log("Auth success", user);
+
+        const formData = new FormData();
+        Object.keys(user).forEach(key => formData.append(key, user[key]));
+
+        try {
+            const response = await fetch('/api/admin/auth', { method: 'POST', body: formData });
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('loginOverlay').classList.add('hidden');
+                document.getElementById('mainDashboard').classList.remove('hidden');
+                document.getElementById('userNameDisplay').textContent = data.user;
+                sessionStorage.setItem('admin_token', 'validated'); // Mock token for session
+                loadSettings();
+            } else {
+                showLoginError();
+            }
+        } catch (err) {
+            showLoginError();
+        }
+    }
+
+    function showLoginError() {
+        const err = document.getElementById('loginError');
+        err.classList.remove('hidden');
+        setTimeout(() => err.classList.add('hidden'), 5000);
+    }
+
+    function logout() {
+        sessionStorage.removeItem('admin_token');
+        location.reload();
+    }
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/admin/settings');
+            const settings = await res.json();
+
+            const tableBody = document.getElementById('settingsTableBody');
+            tableBody.innerHTML = '';
+
+            settings.forEach(s => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-white/5 transition-colors";
+
+                const isMaint = s.settingKey === 'is_maintenance';
+                if (isMaint) {
+                    currentMaintState = s.settingValue === 'true';
+                    document.getElementById('maintToggle').checked = currentMaintState;
+                    updateMaintLabel(currentMaintState);
+                }
+
+                row.innerHTML = `
+                        <td class="px-6 py-4 font-mono text-blue-400">${s.settingKey}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-xs truncate max-w-[200px] inline-block">
+                                ${s.settingValue}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-slate-500 text-xs">${new Date(s.lastUpdated).toLocaleString()}</td>
+                    `;
+                tableBody.appendChild(row);
+            });
+        } catch (err) {
+            console.error("Failed to load settings", err);
+        }
+    }
+
+    function updateMaintLabel(isActive) {
+        const el = document.getElementById('maintStatus');
+        el.textContent = isActive ? "Status: ACTIVE (Blocking Users)" : "Status: INACTIVE (Bot Running)";
+        el.className = isActive ? "mt-4 text-xs font-mono text-red-400 font-bold" : "mt-4 text-xs font-mono text-green-400";
+    }
+
+    function confirmMaintenance(checkbox) {
+        const newState = checkbox.checked;
+        // Temporarily revert checkbox visual until confirmed
+        checkbox.checked = !newState;
+
+        const modal = document.getElementById('confirmModal');
+        const text = document.getElementById('confirmText');
+        const btn = document.getElementById('modalConfirmBtn');
+
+        text.textContent = newState
+            ? "This will DISABLE the bot for all users except Developers. Proceed?"
+            : "This will ENABLE the bot for all users. Proceed?";
+
+        modal.classList.remove('hidden');
+
+        btn.onclick = async () => {
+            const success = await toggleMaintenance(newState);
+            if (success) {
+                checkbox.checked = newState;
+                closeModal();
+                loadSettings();
+            }
+        };
+    }
+
+    async function toggleMaintenance(enable) {
+        try {
+            const res = await fetch(`/api/admin/maintenance?enable=${enable}`, { method: 'POST' });
+            return res.ok;
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('confirmModal').classList.add('hidden');
+    }
+
+    // Auto-login check (Client side only)
+    if (sessionStorage.getItem('admin_token')) {
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('mainDashboard').classList.remove('hidden');
+        loadSettings();
+    }
+</script>
+</body>
+</html>

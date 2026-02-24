@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
+using Mud9Bot.Data.Interfaces;
+using Mud9Bot.Data.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,9 +14,20 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<BotDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+// 2. Register Settings Service (Shared with Bot project)
+builder.Services.AddSingleton<ISettingsService, SettingsService>();
+
 builder.Services.AddCors(options => options.AddPolicy("AllowAll", p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 var app = builder.Build();
+
+
+// 🚀 3. Initialize Settings Cache on Startup
+using (var scope = app.Services.CreateScope())
+{
+    var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+    await settings.InitializeAsync();
+}
 
 // 🚀 加入 XForwardedHost，確保 .NET 能讀取到 NPM 轉發的真實網域
 app.UseForwardedHeaders(new ForwardedHeadersOptions {
@@ -53,6 +68,11 @@ app.MapGet("/", async (context) => {
     context.Response.ContentType = "text/html";
     string host = context.Request.Host.Host.ToLower();
 
+    if (host.StartsWith("admin."))
+    {
+        await context.Response.SendFileAsync("wwwroot/admin.html");
+    }
+    
     // 如果網域包含 site 或 stats，就給他看數據儀表板
     if (host.StartsWith("stats."))
     {
@@ -72,6 +92,82 @@ app.MapGet("/dashboard", (context) => {
     return Task.CompletedTask;
 });
 
+app.MapGet("/admin", (context) => {
+    context.Response.Redirect("https://admin.mud9bot.info", permanent: true);
+    return Task.CompletedTask;
+});
+
+// ---------------------------------------------------------
+// 🚀 Admin Auth: Telegram Login Widget Verification
+// ---------------------------------------------------------
+app.MapPost("/api/admin/auth", async (HttpContext context, IConfiguration config) =>
+{
+    var form = await context.Request.ReadFormAsync();
+    var botToken = config["BotConfiguration:BotToken"] ?? "";
+    
+    // Support both array and comma-separated string formats for DevIds
+    var devIds = config.GetSection("BotConfiguration:DevIds").Get<HashSet<long>>() ?? [];
+    if (!devIds.Any() && config["BotConfiguration:DevIds"] is string devStr)
+    {
+        devIds = new HashSet<long>(devStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(long.Parse));
+    }
+
+    // 1. Extract Telegram Data
+    var authData = form.ToDictionary(x => x.Key, x => x.Value.ToString());
+    if (!authData.ContainsKey("hash")) return Results.BadRequest("Missing hash");
+
+    // 2. Validate HMAC Signature (Telegram Standard)
+    var hash = authData["hash"];
+    authData.Remove("hash");
+    var dataCheckString = string.Join("\n", authData.OrderBy(x => x.Key).Select(x => $"{x.Key}={x.Value}"));
+
+    using var sha256 = SHA256.Create();
+    var secretKey = sha256.ComputeHash(Encoding.UTF8.GetBytes(botToken));
+    using var hmac = new HMACSHA256(secretKey);
+    var checkHash = BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(dataCheckString))).Replace("-", "").ToLower();
+
+    if (checkHash != hash) return Results.Unauthorized();
+
+    // 3. Verify if user is in Dev List
+    var userId = long.Parse(authData["id"]);
+    if (!devIds.Contains(userId)) return Results.Forbid();
+
+    // 4. Return success (In production, consider setting a secure Cookie or JWT here)
+    return Results.Ok(new { success = true, user = authData["first_name"] });
+});
+
+// ---------------------------------------------------------
+// 🚀 Admin API: Settings Management
+// ---------------------------------------------------------
+app.MapGet("/api/admin/settings", async (BotDbContext db) =>
+{
+    // Fetch all global toggles and thresholds
+    var settings = await db.Set<SystemSetting>().ToListAsync();
+    return Results.Ok(settings);
+});
+
+app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService settings, BotDbContext db) =>
+{
+    var val = enable ? "true" : "false";
+    var entity = await db.Set<SystemSetting>().FindAsync("is_maintenance");
+    
+    if (entity != null)
+    {
+        entity.SettingValue = val;
+        entity.LastUpdated = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        
+        // Sync the RAM cache of the Web process immediately
+        settings.RefreshSetting("is_maintenance", val);
+        
+        return Results.Ok(new { status = val });
+    }
+    return Results.NotFound();
+});
+
+// ---------------------------------------------------------
+// 📊 Public Stats API
+// ---------------------------------------------------------
 app.MapGet("/api/stats", async (BotDbContext db) =>
 {
     try 
@@ -128,7 +224,9 @@ app.MapFallback(async (context) => {
     context.Response.ContentType = "text/html";
     string host = context.Request.Host.Host.ToLower();
 
-    if (host.StartsWith("site.") || host.StartsWith("stats."))
+    if (host.StartsWith("admin."))
+        await context.Response.SendFileAsync("wwwroot/admin.html");
+    else if (host.StartsWith("site.") || host.StartsWith("stats."))
         await context.Response.SendFileAsync("wwwroot/dashboard.html");
     else
         await context.Response.SendFileAsync("wwwroot/index.html");

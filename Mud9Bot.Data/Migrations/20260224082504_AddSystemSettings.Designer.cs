@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mud9Bot.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mud9Bot.Data.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    partial class BotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260224082504_AddSystemSettings")]
+    partial class AddSystemSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -567,50 +570,15 @@ namespace Mud9Bot.Data.Migrations
                         {
                             SettingKey = "is_maintenance",
                             Description = "Toggle global maintenance mode",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5860),
+                            LastUpdated = new DateTime(2026, 2, 24, 8, 25, 4, 610, DateTimeKind.Utc).AddTicks(4960),
                             SettingValue = "false"
                         },
                         new
                         {
                             SettingKey = "maintenance_message",
                             Description = "Message shown to users during maintenance",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5990),
+                            LastUpdated = new DateTime(2026, 2, 24, 8, 25, 4, 610, DateTimeKind.Utc).AddTicks(5090),
                             SettingValue = "🛠 系統正在維護中，請稍後再試。 / System is under maintenance. Please try again later."
-                        },
-                        new
-                        {
-                            SettingKey = "broadcast_delay_ms",
-                            Description = "Delay between messages during global broadcast (ms)",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5990),
-                            SettingValue = "35"
-                        },
-                        new
-                        {
-                            SettingKey = "web_banner_message",
-                            Description = "Site-wide announcement message for the web dashboard",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
-                            SettingValue = ""
-                        },
-                        new
-                        {
-                            SettingKey = "enable_gas",
-                            Description = "Feature flag: Enable gas price service",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
-                            SettingValue = "true"
-                        },
-                        new
-                        {
-                            SettingKey = "enable_zodiac",
-                            Description = "Feature flag: Enable daily zodiac horoscopes",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
-                            SettingValue = "true"
-                        },
-                        new
-                        {
-                            SettingKey = "enable_wineplastic",
-                            Description = "Feature flag: Enable core wine/plastic interactions",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
-                            SettingValue = "true"
                         });
                 });
 

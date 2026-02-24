@@ -8,6 +8,7 @@ using Telegram.Bot.Types.Enums;
 using Mud9Bot.Registries;
 using Mud9Bot.Interfaces; 
 using Mud9Bot.Modules.Conversations;
+using Mud9Bot.Data.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -24,13 +25,40 @@ public class UpdateHandler(
     IPaymentService paymentService,
     IConfiguration configuration,
     IInlineQueryHandler inlineQueryHandler,
-    IBotStatsService botStatsService) : IUpdateHandler
+    IBotStatsService botStatsService,
+    ISettingsService settingsService) : IUpdateHandler
 {
     private string? _botUsername;
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
+    private readonly HashSet<long> _devIds = configuration.GetSection("BotConfiguration:DevIds").Get<HashSet<long>>() ?? [];
     
     public async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
     {
+        // 🚀 0. 維護模式攔截邏輯
+        if (settingsService.IsMaintenanceMode())
+        {
+            var user = update.Message?.From ?? update.CallbackQuery?.From;
+            var chatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
+
+            // 如果不是開發者，則進行攔截
+            if (user == null || !_devIds.Contains(user.Id))
+            {
+                // 檢查是否該對此 Chat 發送通知 (10 分鐘防刷)
+                if (chatId != 0 && settingsService.ShouldNotifyMaintenance(chatId))
+                {
+                    var maintMsg = settingsService.GetMaintenanceMessage();
+                    try 
+                    { 
+                        await bot.SendMessage(chatId, maintMsg, cancellationToken: cancellationToken); 
+                    } 
+                    catch { /* 避免群組權限問題導致報錯 */ }
+                }
+                
+                logger.LogInformation("Update blocked by Maintenance Mode from user {UserId}", user?.Id);
+                return; // 終止流程，不記錄統計，不執行任何指令
+            }
+        }
+        
         // 🚀 1. 流量統計：總數紀錄 (任何進來的更新都先記一筆)
         await botStatsService.RecordUpdateAsync(update, cancellationToken);
 
