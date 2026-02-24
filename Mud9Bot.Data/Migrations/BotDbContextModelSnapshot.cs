@@ -58,7 +58,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("EventType", "Metadata", "ChatType")
                         .IsUnique();
 
-                    b.ToTable("bot_event_logs", (string)null);
+                    b.ToTable("bot_event_logs");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.BotGroup", b =>
@@ -136,7 +136,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("TelegramId")
                         .IsUnique();
 
-                    b.ToTable("groups", (string)null);
+                    b.ToTable("groups");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.BotUser", b =>
@@ -188,7 +188,7 @@ namespace Mud9Bot.Data.Migrations
                     b.HasIndex("TelegramId")
                         .IsUnique();
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CommandLog", b =>
@@ -218,7 +218,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("command_logs", (string)null);
+                    b.ToTable("command_logs");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CurrencyRate", b =>
@@ -241,7 +241,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Code");
 
-                    b.ToTable("currency_rates", (string)null);
+                    b.ToTable("currency_rates");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CustomGreeting", b =>
@@ -269,7 +269,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("custom_greetings", (string)null);
+                    b.ToTable("custom_greetings");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.DailyLimit", b =>
@@ -299,7 +299,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("LimitId");
 
-                    b.ToTable("dailylimit", (string)null);
+                    b.ToTable("dailylimit");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Donation", b =>
@@ -349,7 +349,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("donation", (string)null);
+                    b.ToTable("donation");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.FortuneLimit", b =>
@@ -379,7 +379,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("FortuneLimitId");
 
-                    b.ToTable("fortune_limit", (string)null);
+                    b.ToTable("fortune_limit");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.GayGif", b =>
@@ -398,7 +398,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("GayGifId");
 
-                    b.ToTable("gaygif", (string)null);
+                    b.ToTable("gaygif");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Job", b =>
@@ -448,7 +448,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("JobId");
 
-                    b.ToTable("job", (string)null);
+                    b.ToTable("job");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.LomoIgnoreWord", b =>
@@ -466,7 +466,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("lomo_ignore_words", (string)null);
+                    b.ToTable("lomo_ignore_words");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Movie", b =>
@@ -536,7 +536,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("movies", (string)null);
+                    b.ToTable("movies");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.SystemSetting", b =>
@@ -560,56 +560,56 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("SettingKey");
 
-                    b.ToTable("system_settings", (string)null);
+                    b.ToTable("system_settings");
 
                     b.HasData(
                         new
                         {
                             SettingKey = "is_maintenance",
                             Description = "Toggle global maintenance mode",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5860),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = "false"
                         },
                         new
                         {
                             SettingKey = "maintenance_message",
                             Description = "Message shown to users during maintenance",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5990),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = "🛠 系統正在維護中，請稍後再試。 / System is under maintenance. Please try again later."
                         },
                         new
                         {
                             SettingKey = "broadcast_delay_ms",
                             Description = "Delay between messages during global broadcast (ms)",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(5990),
+                            LastUpdated = new DateTime(2026, 2, 24, 9, 51, 31, 565, DateTimeKind.Utc).AddTicks(8530),
                             SettingValue = "35"
                         },
                         new
                         {
                             SettingKey = "web_banner_message",
                             Description = "Site-wide announcement message for the web dashboard",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = ""
                         },
                         new
                         {
                             SettingKey = "enable_gas",
                             Description = "Feature flag: Enable gas price service",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = "true"
                         },
                         new
                         {
                             SettingKey = "enable_zodiac",
                             Description = "Feature flag: Enable daily zodiac horoscopes",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = "true"
                         },
                         new
                         {
                             SettingKey = "enable_wineplastic",
                             Description = "Feature flag: Enable core wine/plastic interactions",
-                            LastUpdated = new DateTime(2026, 2, 24, 8, 42, 52, 968, DateTimeKind.Utc).AddTicks(6000),
+                            LastUpdated = new DateTime(2026, 2, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             SettingValue = "true"
                         });
                 });
@@ -657,7 +657,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("WinePlasticId");
 
-                    b.ToTable("wineplastic", (string)null);
+                    b.ToTable("wineplastic");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Zodiac", b =>
@@ -713,7 +713,7 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("zodiacs", (string)null);
+                    b.ToTable("zodiacs");
                 });
 #pragma warning restore 612, 618
         }
