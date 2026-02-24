@@ -16,6 +16,7 @@ builder.Services.AddDbContext<BotDbContext>(options =>
 
 // 2. Register Settings Service (Shared with Bot project)
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
+builder.Services.AddSingleton<IBlacklistService, BlacklistService>();
 
 builder.Services.AddCors(options => options.AddPolicy("AllowAll", p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
@@ -85,17 +86,24 @@ app.MapGet("/", async (context) => {
     }
 });
 
-// 保留這條路由，以防有人直接打 /dashboard
-app.MapGet("/dashboard", (context) => {
-    // Force redirect to the subdomain
-    context.Response.Redirect("https://stats.mud9bot.info", permanent: true);
-    return Task.CompletedTask;
-});
 
-app.MapGet("/admin", (context) => {
-    context.Response.Redirect("https://admin.mud9bot.info", permanent: true);
-    return Task.CompletedTask;
-});
+if (builder.Environment.IsProduction())
+{
+// 保留這條路由，以防有人直接打 /dashboard
+    app.MapGet("/dashboard", (context) =>
+    {
+        // Force redirect to the subdomain
+        context.Response.Redirect("https://stats.mud9bot.info", permanent: true);
+        return Task.CompletedTask;
+    });
+
+    app.MapGet("/admin", (context) =>
+    {
+        context.Response.Redirect("https://admin.mud9bot.info", permanent: true);
+        return Task.CompletedTask;
+    });
+}
+
 
 // ---------------------------------------------------------
 // 🚀 Admin Auth: Telegram Login Widget Verification
@@ -166,6 +174,137 @@ app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService setti
 });
 
 // ---------------------------------------------------------
+// 🚀 Inspector API: User Search
+// ---------------------------------------------------------
+app.MapGet("/api/admin/users/search", async (string query, BotDbContext db) =>
+{
+    // Limit to 50 results for performance
+    var users = await db.Set<BotUser>()
+        .Where(u => u.TelegramId.ToString().Contains(query) || 
+                    (u.FirstName + " " + (u.LastName ?? "")).Contains(query) ||
+                    (u.Username ?? "").Contains(query))
+        .OrderByDescending(u => u.TimeAdded)
+        .Take(50)
+        .ToListAsync();
+
+    return Results.Ok(users);
+});
+
+// ---------------------------------------------------------
+// 🚀 Inspector API: Group Search
+// ---------------------------------------------------------
+app.MapGet("/api/admin/groups/search", async (string query, BotDbContext db) =>
+{
+    var groups = await db.Set<BotGroup>()
+        .Where(g => g.TelegramId.ToString().Contains(query) || 
+                    g.Title.Contains(query) ||
+                    (g.Username ?? "").Contains(query))
+        .OrderByDescending(g => g.TimeAdded)
+        .Take(50)
+        .ToListAsync();
+
+    return Results.Ok(groups);
+});
+
+// ---------------------------------------------------------
+// 🚀 Broadcast API: Status
+// ---------------------------------------------------------
+app.MapGet("/api/admin/broadcast/status", () => Results.Ok(new {
+    state = BroadcastManager.State,
+    total = BroadcastManager.Total,
+    processed = BroadcastManager.Processed,
+    success = BroadcastManager.Success,
+    failed = BroadcastManager.Failed
+}));
+
+// ---------------------------------------------------------
+// 🚀 Broadcast API: Cancel
+// ---------------------------------------------------------
+app.MapPost("/api/admin/broadcast/cancel", () => {
+    BroadcastManager.Cts?.Cancel();
+    BroadcastManager.State = "Cancelled";
+    return Results.Ok();
+});
+
+// ---------------------------------------------------------
+// 🚀 Broadcast API: Start
+// ---------------------------------------------------------
+app.MapPost("/api/admin/broadcast/start", async (BroadcastRequest req, BotDbContext db, IConfiguration config, ISettingsService settings) =>
+{
+    if (BroadcastManager.State == "Running") return Results.Conflict("A broadcast is already running.");
+
+    // 1. Prepare Targets
+    List<long> targetIds = new();
+    if (req.Target == "users") targetIds = await db.Set<BotUser>().Select(u => u.TelegramId).ToListAsync();
+    else if (req.Target == "groups") targetIds = await db.Set<BotGroup>().Select(g => g.TelegramId).ToListAsync();
+    else if (req.Target == "devs") 
+    {
+        var devStr = config["BotConfiguration:DevIds"] ?? "";
+        targetIds = devStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(long.Parse).ToList();
+    }
+
+    // 2. Initialize Task
+    BroadcastManager.State = "Running";
+    BroadcastManager.Total = targetIds.Count;
+    BroadcastManager.Processed = 0;
+    BroadcastManager.Success = 0;
+    BroadcastManager.Failed = 0;
+    BroadcastManager.Cts = new CancellationTokenSource();
+
+    var token = BroadcastManager.Cts.Token;
+    var botToken = config["BotConfiguration:BotToken"] ?? "";
+    var delayMs = int.Parse(settings.GetSetting("broadcast_delay_ms", "35"));
+
+    // 3. Start Background Processing (Fire and Forget)
+    _ = Task.Run(async () =>
+    {
+        using var client = new HttpClient();
+        var url = $"https://api.telegram.org/bot{botToken}/sendMessage";
+
+        foreach (var id in targetIds)
+        {
+            if (token.IsCancellationRequested) break;
+
+            try
+            {
+                var payload = new { chat_id = id, text = req.Content, parse_mode = "HTML" };
+                var response = await client.PostAsJsonAsync(url, payload, token);
+                
+                if (response.IsSuccessStatusCode) BroadcastManager.Success++;
+                else BroadcastManager.Failed++;
+            }
+            catch { BroadcastManager.Failed++; }
+
+            BroadcastManager.Processed++;
+            await Task.Delay(delayMs); 
+        }
+
+        if (BroadcastManager.State != "Cancelled") BroadcastManager.State = "Completed";
+    });
+
+    return Results.Accepted();
+});
+
+// ---------------------------------------------------------
+// 🚀 Blacklist API
+// ---------------------------------------------------------
+app.MapGet("/api/admin/blacklist", async (BotDbContext db) => 
+    Results.Ok(await db.Set<BlacklistedId>().OrderByDescending(b => b.TimeAdded).ToListAsync()));
+
+app.MapPost("/api/admin/blacklist/add", async (BlacklistAddRequest req, IBlacklistService blacklist) =>
+{
+    // adminId should ideally come from current session
+    await blacklist.AddAsync(req.TelegramId, req.Reason ?? "No reason", 0);
+    return Results.Ok();
+});
+
+app.MapPost("/api/admin/blacklist/remove", async (long id, IBlacklistService blacklist) =>
+{
+    await blacklist.RemoveAsync(id);
+    return Results.Ok();
+});
+
+// ---------------------------------------------------------
 // 📊 Public Stats API
 // ---------------------------------------------------------
 app.MapGet("/api/stats", async (BotDbContext db) =>
@@ -233,3 +372,21 @@ app.MapFallback(async (context) => {
 });
 
 app.Run();
+
+
+// =========================================================================
+// 🏗️ ADDITIONAL CLASSES & RECORDS (Must be at the bottom of the file)
+// =========================================================================
+
+public static class BroadcastManager
+{
+    public static string State = "Idle";
+    public static int Total = 0;
+    public static int Processed = 0;
+    public static int Success = 0;
+    public static int Failed = 0;
+    public static CancellationTokenSource? Cts;
+}
+
+public record BroadcastRequest(string Content, string Target);
+public record BlacklistAddRequest(long TelegramId, string? Reason);

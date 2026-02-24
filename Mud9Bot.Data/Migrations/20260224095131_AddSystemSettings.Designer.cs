@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mud9Bot.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mud9Bot.Data.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    partial class BotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260224095131_AddSystemSettings")]
+    partial class AddSystemSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,32 +24,6 @@ namespace Mud9Bot.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("Mud9Bot.Data.Entities.BlacklistedId", b =>
-                {
-                    b.Property<long>("TelegramId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("telegram_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("TelegramId"));
-
-                    b.Property<long>("BannedBy")
-                        .HasColumnType("bigint")
-                        .HasColumnName("banned_by");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text")
-                        .HasColumnName("reason");
-
-                    b.Property<DateTime>("TimeAdded")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("time_added");
-
-                    b.HasKey("TelegramId");
-
-                    b.ToTable("blacklist");
-                });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.BotEventLog", b =>
                 {
@@ -607,7 +584,7 @@ namespace Mud9Bot.Data.Migrations
                         {
                             SettingKey = "broadcast_delay_ms",
                             Description = "Delay between messages during global broadcast (ms)",
-                            LastUpdated = new DateTime(2026, 2, 24, 12, 59, 30, 563, DateTimeKind.Utc).AddTicks(9620),
+                            LastUpdated = new DateTime(2026, 2, 24, 9, 51, 31, 565, DateTimeKind.Utc).AddTicks(8530),
                             SettingValue = "35"
                         },
                         new

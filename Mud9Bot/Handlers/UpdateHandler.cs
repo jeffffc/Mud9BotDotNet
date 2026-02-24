@@ -26,7 +26,8 @@ public class UpdateHandler(
     IConfiguration configuration,
     IInlineQueryHandler inlineQueryHandler,
     IBotStatsService botStatsService,
-    ISettingsService settingsService) : IUpdateHandler
+    ISettingsService settingsService,
+    IBlacklistService blacklistService) : IUpdateHandler
 {
     private string? _botUsername;
     private readonly long _logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
@@ -34,11 +35,23 @@ public class UpdateHandler(
     
     public async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, CancellationToken cancellationToken)
     {
+        // 1. Get User/Chat ID safely
+        var userId = update.Message?.From?.Id ?? update.CallbackQuery?.From?.Id ?? 0;
+        var chatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
+
+        // 🚀 2. GLOBAL BLACKLIST CHECK
+        // This is the very first line of defense. If the user or group is banned, we stop here.
+        if (blacklistService.IsBlacklisted(userId) || (chatId != 0 && blacklistService.IsBlacklisted(chatId)))
+        {
+            logger.LogWarning("Banned entity attempt: User {UserId} in Chat {ChatId}", userId, chatId);
+            return; // Silent ignore - no reply, no stats, no processing.
+        }
+        
         // 🚀 0. 維護模式攔截邏輯
         if (settingsService.IsMaintenanceMode())
         {
             var user = update.Message?.From ?? update.CallbackQuery?.From;
-            var chatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
+            // var chatId = update.Message?.Chat.Id ?? update.CallbackQuery?.Message?.Chat.Id ?? 0;
 
             // 如果不是開發者，則進行攔截
             if (user == null || !_devIds.Contains(user.Id))

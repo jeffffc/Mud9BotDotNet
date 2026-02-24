@@ -28,7 +28,9 @@ var botToken = builder.Configuration["BotConfiguration:BotToken"];
 if (string.IsNullOrEmpty(botToken))
     throw new ArgumentNullException("BotToken is missing");
 
+// For website
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
+builder.Services.AddSingleton<IBlacklistService, BlacklistService>();
 
 // 3. Register Database (PostgreSQL)
 builder.Services.AddDbContext<BotDbContext>(options =>

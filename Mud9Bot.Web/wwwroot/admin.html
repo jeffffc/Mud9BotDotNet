@@ -9,23 +9,26 @@
     <style>
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
         body { background-color: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+        .tab-active { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
         input:checked ~ .dot { transform: translateX(100%); background-color: #3b82f6; }
         .loader { border-top-color: #3b82f6; animation: spinner 0.6s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden-view { display: none; }
+        .progress-container { width: 100%; background-color: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden; height: 8px; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s ease; }
     </style>
 </head>
 <body class="min-h-screen">
 
-<!-- 🔐 Login Overlay (Shown if not authenticated) -->
+<!-- 🔐 Login Overlay -->
 <div id="loginOverlay" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-6">
     <div class="glass p-10 rounded-[2.5rem] text-center max-w-sm w-full shadow-2xl">
         <img src="mud9bot_logo.jpg" class="w-20 h-20 rounded-2xl mx-auto mb-6 shadow-lg" alt="Logo">
         <h1 class="text-2xl font-black mb-2">Admin Access</h1>
         <p class="text-slate-500 text-sm mb-8">Please sign in with a registered Developer account to continue.</p>
 
+        <!-- 🚀 Official Telegram Widget -->
         <div id="tg-login-container" class="flex justify-center">
-            <!-- 🚀 Change 'YOUR_BOT_USERNAME' to your actual bot username -->
             <script async src="https://telegram.org/js/telegram-widget.js?22"
                     data-telegram-login="Mud9Bot"
                     data-size="large"
@@ -33,20 +36,25 @@
                     data-request-access="write"></script>
         </div>
 
+        <!-- 🛠 Developer Bypass (Visible only on localhost or preview) -->
+        <div id="devBypass" class="mt-8 pt-8 border-t border-white/5 hidden">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-4">Local Debug Mode</p>
+            <input type="number" id="debugId" placeholder="Enter Your Telegram ID" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-xs mb-2 focus:outline-none">
+            <button onclick="debugLogin()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-all">Bypass Auth</button>
+        </div>
+
         <p id="loginError" class="text-red-400 text-xs mt-6 hidden">🚫 權限不足或驗證失敗</p>
     </div>
 </div>
 
-<!-- 📱 Main Dashboard (Hidden until auth) -->
+<!-- 📱 Main Dashboard -->
 <div id="mainDashboard" class="hidden">
-
-    <!-- Top Nav -->
     <nav class="glass sticky top-0 z-40 border-b border-white/5">
         <div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
             <div class="flex items-center space-x-3">
                 <span class="font-black text-lg tracking-tighter text-blue-400">Mud9 Admin</span>
             </div>
-            <div id="userInfo" class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4">
                 <span id="userNameDisplay" class="text-sm font-bold">Admin</span>
                 <button onclick="logout()" class="p-2 text-slate-500 hover:text-white transition-colors">
                     <i class="fas fa-sign-out-alt"></i>
@@ -56,159 +64,277 @@
     </nav>
 
     <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-
         <!-- Sidebar -->
         <aside class="space-y-2">
-            <button class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-blue-600/10 text-blue-400 font-bold">
+            <button id="nav-settings" onclick="switchView('settings')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all font-bold tab-active">
                 <i class="fas fa-cog w-5"></i> <span>System Settings</span>
             </button>
-            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
-                <i class="fas fa-bullhorn w-5"></i> <span>Broadcast (Soon)</span>
+            <button id="nav-inspector" onclick="switchView('inspector')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
+                <i class="fas fa-users w-5"></i> <span>Inspector</span>
             </button>
-            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
-                <i class="fas fa-users w-5"></i> <span>Inspector (Soon)</span>
+            <button id="nav-blacklist" onclick="switchView('blacklist')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
+                <i class="fas fa-ban w-5"></i> <span>Blacklist</span>
             </button>
-            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 opacity-50 cursor-not-allowed">
+            <button id="nav-broadcast" onclick="switchView('broadcast')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
+                <i class="fas fa-bullhorn w-5"></i> <span>Broadcast</span>
+            </button>
+            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-600 opacity-50 cursor-not-allowed">
                 <i class="fas fa-terminal w-5"></i> <span>Live Logs (Soon)</span>
             </button>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="lg:col-span-3 space-y-6">
-
-            <!-- 🛠 Maintenance Mode Card -->
-            <div class="glass p-8 rounded-3xl border-l-4 border-l-blue-500">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-black flex items-center">
-                            <i class="fas fa-tools mr-3 text-blue-500"></i> Maintenance Mode
-                        </h2>
-                        <p class="text-slate-500 text-sm mt-1">When active, the bot only responds to Developers.</p>
-                    </div>
-                    <label for="maintToggle" class="flex items-center cursor-pointer">
-                        <div class="relative">
-                            <input type="checkbox" id="maintToggle" class="sr-only" onchange="confirmMaintenance(this)">
-                            <div class="block bg-slate-800 w-14 h-8 rounded-full border border-white/10"></div>
-                            <div class="dot absolute left-1 top-1 bg-slate-400 w-6 h-6 rounded-full transition shadow-md"></div>
+        <main class="lg:col-span-3">
+            <!-- 1. Settings View -->
+            <div id="view-settings" class="space-y-6">
+                <div class="glass p-8 rounded-3xl border-l-4 border-l-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-black flex items-center"><i class="fas fa-tools mr-3 text-blue-500"></i> Maintenance Mode</h2>
+                            <p class="text-slate-500 text-sm mt-1">When active, the bot only responds to Developers.</p>
                         </div>
-                    </label>
+                        <label class="flex items-center cursor-pointer">
+                            <div class="relative">
+                                <input type="checkbox" id="maintToggle" class="sr-only" onchange="confirmMaintenance(this)">
+                                <div class="block bg-slate-800 w-14 h-8 rounded-full border border-white/10"></div>
+                                <div class="dot absolute left-1 top-1 bg-slate-400 w-6 h-6 rounded-full transition shadow-md"></div>
+                            </div>
+                        </label>
+                    </div>
+                    <div id="maintStatus" class="mt-4 text-xs font-mono text-slate-600">Status: Checking...</div>
                 </div>
-                <div id="maintStatus" class="mt-4 text-xs font-mono text-slate-600">Status: Checking...</div>
+
+                <div class="glass rounded-3xl overflow-hidden">
+                    <div class="p-6 border-b border-white/5 flex justify-between items-center">
+                        <h3 class="font-bold">System Configuration</h3>
+                        <button onclick="loadSettings()" class="text-xs text-blue-400 hover:underline">
+                            <i class="fas fa-sync-alt mr-1"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                            <tr>
+                                <th class="px-6 py-4">Key</th>
+                                <th class="px-6 py-4">Value</th>
+                                <th class="px-6 py-4">Last Updated</th>
+                            </tr>
+                            </thead>
+                            <tbody id="settingsTableBody" class="divide-y divide-white/5"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
-            <!-- 📋 Settings Table -->
-            <div class="glass rounded-3xl overflow-hidden">
-                <div class="p-6 border-b border-white/5 flex justify-between items-center">
-                    <h3 class="font-bold">System Configuration</h3>
-                    <button onclick="loadSettings()" class="text-xs text-blue-400 hover:underline">
-                        <i class="fas fa-sync-alt mr-1"></i> Refresh
-                    </button>
+            <!-- 2. Inspector View -->
+            <div id="view-inspector" class="space-y-6 hidden-view">
+                <div class="glass p-8 rounded-3xl">
+                    <h2 class="text-xl font-black mb-6 flex items-center"><i class="fas fa-search mr-3 text-blue-400"></i> Entity Inspector</h2>
+                    <div class="flex flex-col md:flex-row gap-4 mb-8">
+                        <div class="flex-1 relative">
+                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="text" id="inspectorSearch" placeholder="Search by ID, Name, or Username..." class="w-full bg-slate-900 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        </div>
+                        <div class="flex glass p-1 rounded-xl">
+                            <button onclick="setInspectorTab('users')" id="tab-users" class="px-6 py-2 rounded-lg text-sm font-bold transition-all tab-active">Users</button>
+                            <button onclick="setInspectorTab('groups')" id="tab-groups" class="px-6 py-2 rounded-lg text-sm font-bold transition-all text-slate-500">Groups</button>
+                        </div>
+                        <button onclick="runSearch()" class="px-8 py-3 bg-blue-600 rounded-2xl font-black hover:bg-blue-700 transition-all">Search</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead id="inspectorTableHeader" class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest"></thead>
+                            <tbody id="inspectorTableBody" class="divide-y divide-white/5">
+                            <tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">Enter a query to start inspecting.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                        <tr>
-                            <th class="px-6 py-4">Key</th>
-                            <th class="px-6 py-4">Value</th>
-                            <th class="px-6 py-4">Last Updated</th>
-                        </tr>
-                        </thead>
-                        <tbody id="settingsTableBody" class="divide-y divide-white/5">
-                        <!-- Dynamic Content -->
-                        </tbody>
-                    </table>
+            </div>
+
+            <!-- 3. Blacklist View -->
+            <div id="view-blacklist" class="space-y-6 hidden-view">
+                <div class="glass p-8 rounded-3xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-black flex items-center"><i class="fas fa-user-slash mr-3 text-red-400"></i> Global Blacklist</h2>
+                        <button onclick="showAddBlacklistModal()" class="px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition-all">
+                            <i class="fas fa-plus mr-2"></i> Add Manual Ban
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                            <tr>
+                                <th class="px-6 py-4">Target ID</th>
+                                <th class="px-6 py-4">Reason</th>
+                                <th class="px-6 py-4">Banned On</th>
+                                <th class="px-6 py-4">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody id="blacklistTableBody" class="divide-y divide-white/5"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Broadcast View -->
+            <div id="view-broadcast" class="space-y-6 hidden-view">
+                <div class="glass p-8 rounded-3xl">
+                    <h2 class="text-xl font-black mb-6 flex items-center"><i class="fas fa-bullhorn mr-3 text-purple-400"></i> Global Broadcast</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="md:col-span-2 space-y-4">
+                            <div>
+                                <label class="block text-xs font-black uppercase text-slate-500 mb-2 tracking-widest">Message Content (HTML Supported)</label>
+                                <textarea id="broadcastContent" rows="8" placeholder="<b>Announcement</b>&#10;Type your message here..." class="w-full bg-slate-900 border border-white/10 rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono text-sm"></textarea>
+                            </div>
+                            <div class="flex gap-3">
+                                <button id="btnStartBroadcast" onclick="startBroadcast()" class="flex-1 py-4 bg-purple-600 rounded-2xl font-black hover:bg-purple-700 transition-all shadow-xl shadow-purple-900/20">🚀 Start Broadcast</button>
+                                <button id="btnCancelBroadcast" onclick="cancelBroadcast()" class="px-6 py-4 bg-red-600/20 text-red-400 rounded-2xl font-black hover:bg-red-600 hover:text-white transition-all hidden">Cancel</button>
+                            </div>
+                        </div>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-xs font-black uppercase text-slate-500 mb-2 tracking-widest">Target Audience</label>
+                                <select id="broadcastTarget" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm focus:outline-none">
+                                    <option value="users">All Registered Users</option>
+                                    <option value="groups">All Active Groups</option>
+                                    <option value="devs">Developers Only (Test)</option>
+                                </select>
+                            </div>
+                            <div class="glass p-5 rounded-2xl border-l-4 border-l-slate-700">
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-xs font-bold text-slate-400">Task Status</span>
+                                    <span id="bcStateLabel" class="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-bold uppercase">Idle</span>
+                                </div>
+                                <div class="space-y-4">
+                                    <div>
+                                        <div class="flex justify-between text-[10px] font-mono mb-1 text-slate-500">
+                                            <span>Progress</span>
+                                            <span id="bcProgressText">0 / 0</span>
+                                        </div>
+                                        <div class="progress-container"><div id="bcProgressBar" class="progress-bar" style="width: 0%"></div></div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-center">
+                                        <div class="bg-white/5 p-2 rounded-xl">
+                                            <div class="text-[10px] text-slate-500 font-bold">Success</div>
+                                            <div id="bcSuccessCount" class="text-green-400 font-black">0</div>
+                                        </div>
+                                        <div class="bg-white/5 p-2 rounded-xl">
+                                            <div class="text-[10px] text-slate-500 font-bold">Failed</div>
+                                            <div id="bcFailCount" class="text-red-400 font-black">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
 </div>
 
-<!-- ⚠️ Confirmation Modal -->
+<!-- ⚠️ Shared Confirmation/Input Modal -->
 <div id="confirmModal" class="fixed inset-0 z-[110] bg-slate-950/80 hidden flex items-center justify-center p-6">
     <div class="glass p-8 rounded-[2rem] max-w-sm w-full shadow-2xl border border-blue-500/20">
-        <div class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-2xl text-blue-500 mx-auto mb-6">
+        <div id="modalIcon" class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-2xl text-blue-500 mx-auto mb-6">
             <i class="fas fa-exclamation-triangle"></i>
         </div>
-        <h3 class="text-xl font-bold text-center mb-2">Confirm Action?</h3>
-        <p id="confirmText" class="text-slate-400 text-sm text-center mb-8">Are you sure you want to change the system state?</p>
+        <h3 id="modalTitle" class="text-xl font-bold text-center mb-2">Confirm Action?</h3>
+        <p id="confirmText" class="text-slate-400 text-sm text-center mb-6"></p>
+
+        <div id="modalInputArea" class="hidden mb-6">
+            <input type="number" id="banIdInput" placeholder="Telegram ID" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm mb-2 focus:outline-none">
+            <input type="text" id="banReasonInput" placeholder="Reason for ban" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm focus:outline-none">
+        </div>
+
         <div class="flex space-x-3">
             <button onclick="closeModal()" class="flex-1 px-4 py-3 bg-slate-800 rounded-xl font-bold hover:bg-slate-700 transition-all">Cancel</button>
-            <button id="modalConfirmBtn" class="flex-1 px-4 py-3 bg-blue-600 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-900/20 transition-all">Confirm</button>
+            <button id="modalConfirmBtn" class="flex-1 px-4 py-3 bg-blue-600 rounded-xl font-bold hover:bg-blue-700 transition-all">Confirm</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Authentication State
-    let currentMaintState = false;
+    let inspectorTab = 'users';
+    let bcPollingInterval = null;
 
-    async function onTelegramAuth(user) {
-        console.log("Auth success", user);
+    // --- View Navigation ---
+    function switchView(viewId) {
+        document.querySelectorAll('main > div').forEach(el => el.classList.add('hidden-view'));
+        document.getElementById(`view-${viewId}`).classList.remove('hidden-view');
 
-        const formData = new FormData();
-        Object.keys(user).forEach(key => formData.append(key, user[key]));
+        document.querySelectorAll('aside button').forEach(el => {
+            el.classList.remove('tab-active');
+            el.classList.add('text-slate-400');
+        });
+        const activeBtn = document.getElementById(`nav-${viewId}`);
+        activeBtn.classList.add('tab-active');
+        activeBtn.classList.remove('text-slate-400');
 
-        try {
-            const response = await fetch('/api/admin/auth', { method: 'POST', body: formData });
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('loginOverlay').classList.add('hidden');
-                document.getElementById('mainDashboard').classList.remove('hidden');
-                document.getElementById('userNameDisplay').textContent = data.user;
-                sessionStorage.setItem('admin_token', 'validated'); // Mock token for session
-                loadSettings();
-            } else {
-                showLoginError();
-            }
-        } catch (err) {
-            showLoginError();
-        }
+        if (viewId === 'broadcast') startPollingBroadcast(); else stopPollingBroadcast();
+        if (viewId === 'blacklist') loadBlacklist();
     }
 
-    function showLoginError() {
-        const err = document.getElementById('loginError');
-        err.classList.remove('hidden');
-        setTimeout(() => err.classList.add('hidden'), 5000);
+    // --- Telegram Auth ---
+    async function onTelegramAuth(user) {
+        const formData = new FormData();
+        Object.keys(user).forEach(key => formData.append(key, user[key]));
+        try {
+            const res = await fetch('/api/admin/auth', { method: 'POST', body: formData });
+            if (res.ok) {
+                loginSuccess(user.first_name);
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    function loginSuccess(name) {
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('mainDashboard').classList.remove('hidden');
+        document.getElementById('userNameDisplay').textContent = name;
+        sessionStorage.setItem('admin_token', 'validated');
+        sessionStorage.setItem('admin_name', name);
+        loadSettings();
+    }
+
+    // 🛠 Debug Mode: Mock Login for development/preview
+    function debugLogin() {
+        const id = document.getElementById('debugId').value;
+        if (!id) return;
+        // In a real dev environment, you'd send this to /api/admin/auth
+        // For Canvas preview purposes, we simulate success
+        loginSuccess("Debug Admin");
     }
 
     function logout() {
         sessionStorage.removeItem('admin_token');
+        sessionStorage.removeItem('admin_name');
         location.reload();
     }
 
+    // --- Settings Management ---
     async function loadSettings() {
         try {
             const res = await fetch('/api/admin/settings');
             const settings = await res.json();
-
-            const tableBody = document.getElementById('settingsTableBody');
-            tableBody.innerHTML = '';
+            const tbody = document.getElementById('settingsTableBody');
+            tbody.innerHTML = '';
 
             settings.forEach(s => {
                 const row = document.createElement('tr');
-                row.className = "hover:bg-white/5 transition-colors";
-
-                const isMaint = s.settingKey === 'is_maintenance';
-                if (isMaint) {
-                    currentMaintState = s.settingValue === 'true';
-                    document.getElementById('maintToggle').checked = currentMaintState;
-                    updateMaintLabel(currentMaintState);
+                if (s.settingKey === 'is_maintenance') {
+                    document.getElementById('maintToggle').checked = s.settingValue === 'true';
+                    updateMaintLabel(s.settingValue === 'true');
                 }
-
                 row.innerHTML = `
                         <td class="px-6 py-4 font-mono text-blue-400">${s.settingKey}</td>
-                        <td class="px-6 py-4">
-                            <span class="px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-xs truncate max-w-[200px] inline-block">
-                                ${s.settingValue}
-                            </span>
-                        </td>
+                        <td class="px-6 py-4"><span class="px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-xs">${s.settingValue}</span></td>
                         <td class="px-6 py-4 text-slate-500 text-xs">${new Date(s.lastUpdated).toLocaleString()}</td>
                     `;
-                tableBody.appendChild(row);
+                tbody.appendChild(row);
             });
-        } catch (err) {
-            console.error("Failed to load settings", err);
-        }
+        } catch (err) { console.error(err); }
     }
 
     function updateMaintLabel(isActive) {
@@ -219,49 +345,189 @@
 
     function confirmMaintenance(checkbox) {
         const newState = checkbox.checked;
-        // Temporarily revert checkbox visual until confirmed
         checkbox.checked = !newState;
-
-        const modal = document.getElementById('confirmModal');
-        const text = document.getElementById('confirmText');
-        const btn = document.getElementById('modalConfirmBtn');
-
-        text.textContent = newState
-            ? "This will DISABLE the bot for all users except Developers. Proceed?"
-            : "This will ENABLE the bot for all users. Proceed?";
-
-        modal.classList.remove('hidden');
-
-        btn.onclick = async () => {
-            const success = await toggleMaintenance(newState);
-            if (success) {
+        showModal("Confirm Mode Switch", newState ? "Block all non-dev users?" : "Allow all users to access the bot?", async () => {
+            const res = await fetch(`/api/admin/maintenance?enable=${newState}`, { method: 'POST' });
+            if (res.ok) {
                 checkbox.checked = newState;
                 closeModal();
                 loadSettings();
             }
-        };
+        });
     }
 
-    async function toggleMaintenance(enable) {
+    // --- Blacklist Management ---
+    async function loadBlacklist() {
         try {
-            const res = await fetch(`/api/admin/maintenance?enable=${enable}`, { method: 'POST' });
-            return res.ok;
-        } catch (err) {
-            console.error(err);
-            return false;
-        }
+            const res = await fetch('/api/admin/blacklist');
+            const data = await res.json();
+            const tbody = document.getElementById('blacklistTableBody');
+            tbody.innerHTML = '';
+            data.forEach(b => {
+                tbody.innerHTML += `
+                        <tr class="hover:bg-white/5 transition-all">
+                            <td class="px-6 py-4 font-mono text-red-400">${b.telegramId}</td>
+                            <td class="px-6 py-4 text-slate-300 text-xs">${b.reason || '-'}</td>
+                            <td class="px-6 py-4 text-slate-500 text-xs">${new Date(b.timeAdded).toLocaleDateString()}</td>
+                            <td class="px-6 py-4"><button onclick="removeBan(${b.telegramId})" class="text-blue-400 hover:underline text-xs">Revoke</button></td>
+                        </tr>`;
+            });
+            if (!data.length) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-20 text-center text-slate-500">Blacklist is currently empty.</td></tr>';
+        } catch (err) { console.error(err); }
+    }
+
+    function showAddBlacklistModal() {
+        document.getElementById('modalInputArea').classList.remove('hidden');
+        showModal("Add Global Ban", "Manually restrict a User or Group ID from using Mud9Bot.", async () => {
+            const id = document.getElementById('banIdInput').value;
+            const reason = document.getElementById('banReasonInput').value;
+            if (!id) return;
+            const res = await fetch('/api/admin/blacklist/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId: parseInt(id), reason })
+            });
+            if (res.ok) { closeModal(); loadBlacklist(); }
+        }, "fa-user-slash", "bg-red-500/10", "text-red-400");
+    }
+
+    function removeBan(id) {
+        showModal("Revoke Ban", `Allow ID ${id} to use the bot again?`, async () => {
+            const res = await fetch(`/api/admin/blacklist/remove?id=${id}`, { method: 'POST' });
+            if (res.ok) { closeModal(); loadBlacklist(); }
+        });
+    }
+
+    // --- Entity Inspector ---
+    function setInspectorTab(tab) {
+        inspectorTab = tab;
+        document.getElementById('tab-users').classList.toggle('tab-active', tab === 'users');
+        document.getElementById('tab-groups').classList.toggle('tab-active', tab === 'groups');
+    }
+
+    async function runSearch() {
+        const query = document.getElementById('inspectorSearch').value;
+        if (!query) return;
+        const tbody = document.getElementById('inspectorTableBody');
+        const thead = document.getElementById('inspectorTableHeader');
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center"><div class="loader w-8 h-8 border-4 rounded-full mx-auto"></div></td></tr>';
+        try {
+            const res = await fetch(`/api/admin/${inspectorTab}/search?query=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            tbody.innerHTML = '';
+            if (inspectorTab === 'users') {
+                thead.innerHTML = `<tr><th class="px-6 py-4">User Info</th><th class="px-6 py-4">Total Wine</th><th class="px-6 py-4">Total Plastic</th><th class="px-6 py-4">First Seen</th></tr>`;
+                data.forEach(u => {
+                    tbody.innerHTML += `
+                            <tr class="hover:bg-white/5 transition-all">
+                                <td class="px-6 py-4">
+                                    <div class="font-bold">${u.firstName} ${u.lastName || ''}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">ID: ${u.telegramId} | @${u.username || 'n/a'}</div>
+                                </td>
+                                <td class="px-6 py-4 text-amber-500 font-bold">${u.wine}</td>
+                                <td class="px-6 py-4 text-slate-400 font-bold">${u.plastic}</td>
+                                <td class="px-6 py-4 text-[10px] text-slate-500">${new Date(u.timeAdded).toLocaleDateString()}</td>
+                            </tr>`;
+                });
+            } else {
+                thead.innerHTML = `<tr><th class="px-6 py-4">Group Title</th><th class="px-6 py-4">Quotas (W/P)</th><th class="px-6 py-4">Settings</th><th class="px-6 py-4">Added</th></tr>`;
+                data.forEach(g => {
+                    tbody.innerHTML += `
+                            <tr class="hover:bg-white/5 transition-all">
+                                <td class="px-6 py-4">
+                                    <div class="font-bold text-blue-400">${g.title}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">ID: ${g.telegramId}</div>
+                                </td>
+                                <td class="px-6 py-4 text-xs font-mono">${g.wQuota} / ${g.pQuota}</td>
+                                <td class="px-6 py-4 space-x-1">${g.offFortune ? '🚫🔮' : '✅🔮'} ${g.offZodiac ? '🚫♈' : '✅♈'}</td>
+                                <td class="px-6 py-4 text-[10px] text-slate-500">${new Date(g.timeAdded).toLocaleDateString()}</td>
+                            </tr>`;
+                });
+            }
+            if (!data.length) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">No matches found.</td></tr>';
+        } catch (err) { tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-red-400">Search failed.</td></tr>'; }
+    }
+
+    // --- Broadcast System ---
+    async function startBroadcast() {
+        const content = document.getElementById('broadcastContent').value;
+        const target = document.getElementById('broadcastTarget').value;
+        if (!content) return;
+        showModal("Confirm Broadcast", `Are you sure you want to broadcast to ${target}?`, async () => {
+            closeModal();
+            try {
+                const res = await fetch('/api/admin/broadcast/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, target }) });
+                if (res.ok) startPollingBroadcast();
+            } catch (err) { console.error(err); }
+        }, "fa-paper-plane", "bg-purple-500/10", "text-purple-400");
+    }
+
+    async function cancelBroadcast() { await fetch('/api/admin/broadcast/cancel', { method: 'POST' }); }
+
+    function startPollingBroadcast() {
+        if (bcPollingInterval) return;
+        updateBroadcastUI();
+        bcPollingInterval = setInterval(updateBroadcastUI, 2000);
+    }
+
+    function stopPollingBroadcast() {
+        if (bcPollingInterval) { clearInterval(bcPollingInterval); bcPollingInterval = null; }
+    }
+
+    async function updateBroadcastUI() {
+        try {
+            const res = await fetch('/api/admin/broadcast/status');
+            const status = await res.json();
+            const isRunning = status.state === 'Running';
+            document.getElementById('bcStateLabel').textContent = status.state;
+            document.getElementById('bcStateLabel').className = isRunning ? "px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase" : "px-2 py-0.5 rounded-md bg-slate-800 text-slate-500 text-[10px] font-bold uppercase";
+            document.getElementById('btnStartBroadcast').disabled = isRunning;
+            document.getElementById('btnStartBroadcast').className = isRunning ? "flex-1 py-4 bg-slate-800 text-slate-600 rounded-2xl font-black cursor-not-allowed" : "flex-1 py-4 bg-purple-600 rounded-2xl font-black hover:bg-purple-700 transition-all shadow-xl shadow-purple-900/20";
+            document.getElementById('btnCancelBroadcast').classList.toggle('hidden', !isRunning);
+            document.getElementById('bcProgressText').textContent = `${status.processed} / ${status.total}`;
+            document.getElementById('bcSuccessCount').textContent = status.success;
+            document.getElementById('bcFailCount').textContent = status.failed;
+            const percent = status.total > 0 ? (status.processed / status.total) * 100 : 0;
+            document.getElementById('bcProgressBar').style.width = `${percent}%`;
+        } catch (err) { console.error(err); }
+    }
+
+    // --- Shared Modal Helper ---
+    function showModal(title, text, onConfirm, icon = "fa-exclamation-triangle", bgClass = "bg-blue-500/10", textClass = "text-blue-500") {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('confirmText').textContent = text;
+        const iconContainer = document.getElementById('modalIcon');
+        iconContainer.className = `w-16 h-16 ${bgClass} rounded-2xl flex items-center justify-center text-2xl ${textClass} mx-auto mb-6`;
+        iconContainer.innerHTML = `<i class="fas ${icon}"></i>`;
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+        confirmBtn.className = `flex-1 px-4 py-3 rounded-xl font-bold transition-all ${textClass === 'text-red-400' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+        modal.classList.remove('hidden');
+        confirmBtn.onclick = onConfirm;
     }
 
     function closeModal() {
         document.getElementById('confirmModal').classList.add('hidden');
+        document.getElementById('modalInputArea').classList.add('hidden');
+        document.getElementById('banIdInput').value = '';
+        document.getElementById('banReasonInput').value = '';
     }
 
-    // Auto-login check (Client side only)
-    if (sessionStorage.getItem('admin_token')) {
-        document.getElementById('loginOverlay').classList.add('hidden');
-        document.getElementById('mainDashboard').classList.remove('hidden');
-        loadSettings();
-    }
+    // --- Environment Check & Initialization ---
+    window.onload = function() {
+        // Show bypass if on localhost or sandbox preview
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('canvas') || window.location.hostname.includes('worker');
+        if (isLocal) {
+            document.getElementById('devBypass').classList.remove('hidden');
+        }
+
+        if (sessionStorage.getItem('admin_token')) {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('mainDashboard').classList.remove('hidden');
+            document.getElementById('userNameDisplay').textContent = sessionStorage.getItem('admin_name');
+            loadSettings();
+        }
+    };
 </script>
 </body>
 </html>
