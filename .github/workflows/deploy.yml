@@ -106,11 +106,17 @@ jobs:
     if: github.event.action == 'trigger_deploy_bot'
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
+      # 🚀 修正：直接在部署階段重新 Checkout 與編譯，避開跨執行緒的 Artifact 限制
+      - uses: actions/checkout@v4
         with:
-          name: bot-pkg-${{ github.event.client_payload.sha }}
-          path: publish_bot/
+          ref: ${{ github.event.client_payload.sha }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build Bot
+        run: dotnet publish Mud9Bot/Mud9Bot.csproj -c Release -o ./publish_bot
+
       - name: Deploy Bot to Server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -148,11 +154,17 @@ jobs:
     if: github.event.action == 'trigger_deploy_web'
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
+      # 🚀 修正：直接在部署階段重新 Checkout 與編譯
+      - uses: actions/checkout@v4
         with:
-          name: web-pkg-${{ github.event.client_payload.sha }}
-          path: publish_web/
+          ref: ${{ github.event.client_payload.sha }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build Web
+        run: dotnet publish Mud9Bot.Web/Mud9Bot.Web.csproj -c Release -o ./publish_web
+
       - name: Deploy Web to Server
         uses: appleboy/scp-action@v0.1.7
         with:
