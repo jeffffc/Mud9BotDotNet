@@ -1,5 +1,8 @@
 # 🤖 Mud9Bot
 
+[![Add to Telegram](https://img.shields.io/badge/Telegram-Add%20to%20Group-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/Mud9Bot)  
+![Build Status](https://img.shields.io/github/actions/workflow/status/jeffffc/Mud9BotDotNet/deploy.yml?branch=main&label=CI/CD&style=flat-square) ![Framework](https://img.shields.io/badge/.NET-10.0-512bd4?style=flat-square&logo=dotnet) ![Database](https://img.shields.io/badge/Database-PostgreSQL-336791?style=flat-square&logo=postgresql) ![Last Commit](https://img.shields.io/github/last-commit/jeffffc/Mud9BotDotNet?style=flat-square)
+
 Mud9Bot is an advanced, highly modular Telegram Bot built with C# .NET 10. It features a scalable architecture, dynamic dependency injection, PostgreSQL integration, Quartz.NET scheduling, and a fully automated CI/CD pipeline. It is designed to be easily deployable and extensible for any community.
 
 - - -
@@ -184,11 +187,11 @@ Mud9Bot 是一隻採用 C# .NET 10 開發的高性能、高度模組化 Telegram
 
 ## 目錄
 
-* [🏗️ 系統架構與目錄結構](#structure) 
+* [🏗️ 系統架構與目錄結構](#structure)
 * [🚀 環境架設 (本地開發)](#setup)
 * [🐛 運行與除錯](#debugging)
-* [🧩 功能擴充 (添加模組)](#modularity) 
-* [🎛️ 啟用/停用功能](#activation) 
+* [🧩 功能擴充 (添加模組)](#modularity)
+* [🎛️ 啟用/停用功能](#activation)
 * [🚢 部署流程 (CI/CD)](#deployment)
 
 
