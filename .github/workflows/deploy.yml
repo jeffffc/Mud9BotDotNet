@@ -26,7 +26,7 @@ jobs:
               - 'Mud9Bot.Web/**'
               - 'Mud9Bot.Data/**'
 
-      # 🚀 遵循標準：Callback Data 改為 GH_BUILD+BOT+SHA
+      # 🚀 修正：使用 %2B 代替 +，防止被 curl 轉換成空格
       - name: Send Bot Notification
         if: steps.filter.outputs.bot == 'true'
         run: |
@@ -34,9 +34,9 @@ jobs:
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=🤖 <b>[Bot] New Changes Detected</b>%0AAuthor: <b>${{ github.actor }}</b>%0ASHA: <code>${{ github.sha }}</code>%0AMsg: <code>${{ github.event.head_commit.message }}</code>" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Bot\",\"callback_data\":\"GH_BUILD+BOT+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+BOT+${{ github.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Bot\",\"callback_data\":\"GH_BUILD%2BBOT%2B${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL%2BBOT%2B${{ github.sha }}\"}]]}"
 
-      # 🚀 遵循標準：Callback Data 改為 GH_BUILD+WEB+SHA
+      # 🚀 修正：使用 %2B 代替 +
       - name: Send Web Notification
         if: steps.filter.outputs.web == 'true'
         run: |
@@ -44,7 +44,7 @@ jobs:
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=🌐 <b>[Web] New Changes Detected</b>%0AAuthor: <b>${{ github.actor }}</b>%0ASHA: <code>${{ github.sha }}</code>%0AMsg: <code>${{ github.event.head_commit.message }}</code>" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Web\",\"callback_data\":\"GH_BUILD+WEB+${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+WEB+${{ github.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🔨 Build Web\",\"callback_data\":\"GH_BUILD%2BWEB%2B${{ github.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL%2BWEB%2B${{ github.sha }}\"}]]}"
 
   build-bot:
     if: github.event.action == 'trigger_build_bot'
@@ -65,14 +65,14 @@ jobs:
           name: bot-pkg-${{ github.event.client_payload.sha }}
           path: publish_bot/
       
-      # 🚀 遵循標準：Callback Data 改為 GH_DEPLOY+BOT+SHA
+      # 🚀 修正：使用 %2B 代替 +
       - name: Notify Bot Build Success
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=✅ <b>Bot Build Success!</b>%0ASHA: <code>${{ github.event.client_payload.sha }}</code>%0A%0A已完成編譯，準備好部署 Bot 嗎？" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Bot\",\"callback_data\":\"GH_DEPLOY+BOT+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+BOT+${{ github.event.client_payload.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Bot\",\"callback_data\":\"GH_DEPLOY%2BBOT%2B${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL%2BBOT%2B${{ github.event.client_payload.sha }}\"}]]}"
 
   build-web:
     if: github.event.action == 'trigger_build_web'
@@ -93,14 +93,14 @@ jobs:
           name: web-pkg-${{ github.event.client_payload.sha }}
           path: publish_web/
       
-      # 🚀 遵循標準：Callback Data 改為 GH_DEPLOY+WEB+SHA
+      # 🚀 修正：使用 %2B 代替 +
       - name: Notify Web Build Success
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
           -d "chat_id=${{ secrets.TELEGRAM_LOG_GROUP_ID }}" \
           -d "parse_mode=HTML" \
           -d "text=✅ <b>Web Build Success!</b>%0ASHA: <code>${{ github.event.client_payload.sha }}</code>%0A%0A已完成編譯，準備好部署 Web 嗎？" \
-          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Web\",\"callback_data\":\"GH_DEPLOY+WEB+${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL+WEB+${{ github.event.client_payload.sha }}\"}]]}"
+          -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"🚀 Deploy Web\",\"callback_data\":\"GH_DEPLOY%2BWEB%2B${{ github.event.client_payload.sha }}\"},{\"text\":\"❌ Cancel\",\"callback_data\":\"GH_CANCEL%2BWEB%2B${{ github.event.client_payload.sha }}\"}]]}"
 
   deploy-bot:
     if: github.event.action == 'trigger_deploy_bot'
@@ -130,15 +130,11 @@ jobs:
             B_PATH="${{ secrets.BOT_DEPLOY_PATH }}"
             SHA="${{ github.event.client_payload.sha }}"
             
-            # 🚀 1. 從 shared 資料夾複製所有被 gitignore 的設定檔到新版本
             if [ -d "$B_PATH/shared" ]; then
               cp -r $B_PATH/shared/* $B_PATH/releases/$SHA/
             fi
             
-            # 2. 切換軟連結
             ln -sfn $B_PATH/releases/$SHA $B_PATH/current
-            
-            # 3. 清理舊版本並重啟
             cd $B_PATH/releases && ls -t | tail -n +6 | xargs -r rm -rf
             sudo systemctl restart ${{ secrets.BOT_SERVICE_NAME }}
 
@@ -176,15 +172,11 @@ jobs:
             W_PATH="${{ secrets.WEB_DEPLOY_PATH }}"
             SHA="${{ github.event.client_payload.sha }}"
             
-            # 🚀 1. 從 shared 資料夾複製所有被 gitignore 的設定檔到新版本
             if [ -d "$W_PATH/shared" ]; then
               cp -r $W_PATH/shared/* $W_PATH/releases/$SHA/
             fi
             
-            # 2. 切換軟連結
             ln -sfn $W_PATH/releases/$SHA $W_PATH/current
-            
-            # 3. 清理舊版本並重啟
             cd $W_PATH/releases && ls -t | tail -n +6 | xargs -r rm -rf
             sudo systemctl restart ${{ secrets.WEB_SERVICE_NAME }}
 
