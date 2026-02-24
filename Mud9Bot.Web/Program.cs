@@ -73,7 +73,7 @@ app.MapGet("/", async (context) => {
     {
         await context.Response.SendFileAsync("wwwroot/admin.html");
     }
-    
+    else
     // 如果網域包含 site 或 stats，就給他看數據儀表板
     if (host.StartsWith("stats."))
     {
