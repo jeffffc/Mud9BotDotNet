@@ -240,18 +240,25 @@ app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService setti
 // 🔍 INSPECTOR (Power Actions)
 // ---------------------------------------------------------
 app.MapGet("/api/admin/users/search", async (string query, BotDbContext db) =>
-    Results.Ok(await db.Set<BotUser>().Where(u => 
-        u.TelegramId.ToString().Contains(query) || (u.FirstName + " " + (u.LastName ?? "")).Contains(query) || (u.Username ?? "").Contains(query))
-        .OrderByDescending( u => u.TimeAdded) 
+{
+    var q = query.ToLower();
+    Results.Ok(await db.Set<BotUser>().Where(u =>
+            u.TelegramId.ToString().Contains(q) || (u.FirstName + " " + (u.LastName ?? "")).Contains(q) ||
+            (u.Username ?? "").Contains(q))
+        .OrderByDescending(u => u.TimeAdded)
         .Take(50).ToListAsync()
-    )).RequireAuthorization();
+    );
+}).RequireAuthorization();
 
 app.MapGet("/api/admin/groups/search", async (string query, BotDbContext db) =>
+{
+    var q = query.ToLower();
     Results.Ok(await db.Set<BotGroup>().Where(g =>
-        g.TelegramId.ToString().Contains(query) || g.Title.Contains(query) || (g.Username ?? "").Contains(query))
+            g.TelegramId.ToString().Contains(q) || g.Title.Contains(q) || (g.Username ?? "").Contains(q))
         .OrderByDescending(g => g.TimeAdded)
         .Take(50).ToListAsync()
-    )).RequireAuthorization();
+    );
+}).RequireAuthorization();
 
 // 🚀 NEW: Reset user wine/plastic quota
 app.MapPost("/api/admin/users/reset-quota", async (long userId, BotDbContext db) => {
