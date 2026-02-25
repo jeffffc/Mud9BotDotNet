@@ -16,6 +16,7 @@
         .hidden-view { display: none; }
         .progress-container { width: 100%; background-color: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden; height: 8px; }
         .progress-bar { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s ease; }
+        th { cursor: pointer; user-select: none; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -26,23 +27,14 @@
         <img src="mud9bot_logo.jpg" class="w-20 h-20 rounded-2xl mx-auto mb-6 shadow-lg" alt="Logo">
         <h1 class="text-2xl font-black mb-2">Admin Access</h1>
         <p class="text-slate-500 text-sm mb-8">Please sign in with a registered Developer account to continue.</p>
-
-        <!-- 🚀 Official Telegram Widget -->
         <div id="tg-login-container" class="flex justify-center">
-            <script async src="https://telegram.org/js/telegram-widget.js?22"
-                    data-telegram-login="Mud9Bot"
-                    data-size="large"
-                    data-onauth="onTelegramAuth(user)"
-                    data-request-access="write"></script>
+            <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Mud9Bot" data-size="large" data-onauth="onTelegramAuth(user)" data-request-access="write"></script>
         </div>
-
-        <!-- 🛠 Developer Bypass (Visible only on localhost or preview) -->
         <div id="devBypass" class="mt-8 pt-8 border-t border-white/5 hidden">
             <p class="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-4">Local Debug Mode</p>
             <input type="number" id="debugId" placeholder="Enter Your Telegram ID" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-xs mb-2 focus:outline-none">
             <button onclick="debugLogin()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-all">Bypass Auth</button>
         </div>
-
         <p id="loginError" class="text-red-400 text-xs mt-6 hidden">🚫 權限不足或驗證失敗</p>
     </div>
 </div>
@@ -56,9 +48,7 @@
             </div>
             <div class="flex items-center space-x-4">
                 <span id="userNameDisplay" class="text-sm font-bold">Admin</span>
-                <button onclick="logout()" class="p-2 text-slate-500 hover:text-white transition-colors">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
+                <button onclick="logout()" class="p-2 text-slate-500 hover:text-white transition-colors"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </div>
     </nav>
@@ -66,21 +56,13 @@
     <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
         <!-- Sidebar -->
         <aside class="space-y-2">
-            <button id="nav-settings" onclick="switchView('settings')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all font-bold tab-active">
-                <i class="fas fa-cog w-5"></i> <span>System Settings</span>
-            </button>
-            <button id="nav-inspector" onclick="switchView('inspector')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
-                <i class="fas fa-users w-5"></i> <span>Inspector</span>
-            </button>
-            <button id="nav-blacklist" onclick="switchView('blacklist')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
-                <i class="fas fa-ban w-5"></i> <span>Blacklist</span>
-            </button>
-            <button id="nav-broadcast" onclick="switchView('broadcast')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold">
-                <i class="fas fa-bullhorn w-5"></i> <span>Broadcast</span>
-            </button>
-            <button disabled class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-600 opacity-50 cursor-not-allowed">
-                <i class="fas fa-terminal w-5"></i> <span>Live Logs (Soon)</span>
-            </button>
+            <button id="nav-settings" onclick="switchView('settings')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all font-bold tab-active"><i class="fas fa-cog w-5"></i> <span>System Settings</span></button>
+            <button id="nav-inspector" onclick="switchView('inspector')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-users w-5"></i> <span>Inspector</span></button>
+            <button id="nav-blacklist" onclick="switchView('blacklist')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-ban w-5"></i> <span>Blacklist</span></button>
+            <button id="nav-donations" onclick="switchView('donations')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-hand-holding-usd w-5"></i> <span>Donations</span></button>
+            <button id="nav-feedback" onclick="switchView('feedback')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-inbox w-5"></i> <span>Feedback Inbox</span></button>
+            <button id="nav-logs" onclick="switchView('logs')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-terminal w-5"></i> <span>Live Activity Logs</span></button>
+            <button id="nav-broadcast" onclick="switchView('broadcast')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all text-slate-400 hover:bg-white/5 font-bold"><i class="fas fa-bullhorn w-5"></i> <span>Broadcast</span></button>
         </aside>
 
         <main class="lg:col-span-3">
@@ -102,22 +84,15 @@
                     </div>
                     <div id="maintStatus" class="mt-4 text-xs font-mono text-slate-600">Status: Checking...</div>
                 </div>
-
                 <div class="glass rounded-3xl overflow-hidden">
                     <div class="p-6 border-b border-white/5 flex justify-between items-center">
                         <h3 class="font-bold">System Configuration</h3>
-                        <button onclick="loadSettings()" class="text-xs text-blue-400 hover:underline">
-                            <i class="fas fa-sync-alt mr-1"></i> Refresh
-                        </button>
+                        <button onclick="loadSettings()" class="text-xs text-blue-400 hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                            <tr>
-                                <th class="px-6 py-4">Key</th>
-                                <th class="px-6 py-4">Value</th>
-                                <th class="px-6 py-4">Last Updated</th>
-                            </tr>
+                            <tr><th class="px-6 py-4">Key</th><th class="px-6 py-4">Value</th><th class="px-6 py-4">Last Updated</th></tr>
                             </thead>
                             <tbody id="settingsTableBody" class="divide-y divide-white/5"></tbody>
                         </table>
@@ -143,9 +118,7 @@
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead id="inspectorTableHeader" class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest"></thead>
-                            <tbody id="inspectorTableBody" class="divide-y divide-white/5">
-                            <tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">Enter a query to start inspecting.</td></tr>
-                            </tbody>
+                            <tbody id="inspectorTableBody" class="divide-y divide-white/5"><tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">Enter a query to start inspecting.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -156,19 +129,12 @@
                 <div class="glass p-8 rounded-3xl">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-xl font-black flex items-center"><i class="fas fa-user-slash mr-3 text-red-400"></i> Global Blacklist</h2>
-                        <button onclick="showAddBlacklistModal()" class="px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition-all">
-                            <i class="fas fa-plus mr-2"></i> Add Manual Ban
-                        </button>
+                        <button onclick="showAddBlacklistModal()" class="px-4 py-2 bg-red-600/10 text-red-400 border border-red-600/20 rounded-xl text-xs font-bold hover:bg-red-600 hover:text-white transition-all"><i class="fas fa-plus mr-2"></i> Add Manual Ban</button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest">
-                            <tr>
-                                <th class="px-6 py-4">Target ID</th>
-                                <th class="px-6 py-4">Reason</th>
-                                <th class="px-6 py-4">Banned On</th>
-                                <th class="px-6 py-4">Actions</th>
-                            </tr>
+                            <tr><th class="px-6 py-4">Target ID</th><th class="px-6 py-4">Reason</th><th class="px-6 py-4">Banned On</th><th class="px-6 py-4">Actions</th></tr>
                             </thead>
                             <tbody id="blacklistTableBody" class="divide-y divide-white/5"></tbody>
                         </table>
@@ -176,7 +142,106 @@
                 </div>
             </div>
 
-            <!-- 4. Broadcast View -->
+            <!-- 4. Donations View -->
+            <div id="view-donations" class="space-y-6 hidden-view">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="glass p-6 rounded-3xl border-b-4 border-b-amber-500">
+                        <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Total Stars</p>
+                        <h3 id="statTotalStars" class="text-2xl font-black text-amber-500">0</h3>
+                        <p id="statApproxHkd" class="text-xs text-slate-400 mt-1 font-mono">~ HK$0.00</p>
+                    </div>
+                    <div class="glass p-6 rounded-3xl border-b-4 border-b-emerald-500">
+                        <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Legacy Fiat</p>
+                        <h3 id="statTotalFiat" class="text-2xl font-black text-emerald-500">HK$0</h3>
+                    </div>
+                    <div class="glass p-6 rounded-3xl border-b-4 border-b-purple-500">
+                        <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">All-Time Combined</p>
+                        <h3 id="statCombined" class="text-2xl font-black text-purple-400">HK$0.00</h3>
+                    </div>
+                    <div class="glass p-6 rounded-3xl border-b-4 border-b-blue-500">
+                        <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Recent (30 Days)</p>
+                        <h3 id="statRecentCount" class="text-2xl font-black text-blue-400">0</h3>
+                    </div>
+                </div>
+                <div class="glass rounded-3xl overflow-hidden">
+                    <div class="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h3 class="font-bold">Transaction History</h3>
+                        <div class="flex items-center gap-4 w-full md:w-auto">
+                            <div class="relative flex-1 md:w-64">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                                <input type="text" id="donationSearch" oninput="filterAndSortDonations()" placeholder="Search user or TxID..." class="w-full bg-slate-900 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all">
+                            </div>
+                            <button onclick="loadDonations()" class="text-xs text-blue-400 hover:underline shrink-0"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest select-none">
+                            <tr>
+                                <th class="px-6 py-4 hover:text-white transition-colors" onclick="setDonationSort('name')">User <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="px-6 py-4 hover:text-white transition-colors" onclick="setDonationSort('stars')">Stars <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="px-6 py-4 hover:text-white transition-colors" onclick="setDonationSort('amount')">Fiat (HKD) <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="px-6 py-4 hover:text-white transition-colors" onclick="setDonationSort('txid')">Transaction ID <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="px-6 py-4 hover:text-white transition-colors" onclick="setDonationSort('time')">Date <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                            </tr>
+                            </thead>
+                            <tbody id="donationsTableBody" class="divide-y divide-white/5"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Feedback Inbox View -->
+            <div id="view-feedback" class="space-y-6 hidden-view">
+                <div class="glass p-8 rounded-3xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-black flex items-center"><i class="fas fa-inbox mr-3 text-sky-400"></i> Feedback Inbox</h2>
+                        <button onclick="loadFeedback()" class="text-xs text-blue-400 hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                    </div>
+
+                    <div class="flex space-x-2 mb-6 border-b border-white/5 pb-4">
+                        <button id="fbTabUnresolved" onclick="setFbTab('unresolved')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-sky-500/20 text-sky-400">Unresolved</button>
+                        <button id="fbTabAll" onclick="setFbTab('all')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all text-slate-500 hover:bg-white/5">All Feedback</button>
+                    </div>
+
+                    <div id="feedbackContainer" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <<main class="lg:col-span-3">
+            <!-- 6. Live Logs View -->
+            <div id="view-logs" class="space-y-6 hidden-view">
+                <div class="glass p-8 rounded-3xl">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="text-xl font-black flex items-center"><i class="fas fa-terminal mr-3 text-green-400"></i> Live Activity Logs</h2>
+                            <div class="flex mt-3 bg-slate-900 p-1 rounded-xl w-fit border border-white/5">
+                                <button id="btn-src-db" onclick="setLogSource('db')" class="log-source-btn active px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest">Database</button>
+                                <button id="btn-src-sys" onclick="setLogSource('sys')" class="log-source-btn px-4 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">System (Journal)</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center cursor-pointer space-x-2">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Auto-Refresh</span>
+                                <div class="relative">
+                                    <input type="checkbox" id="logAutoRefresh" class="sr-only" onchange="toggleLogPolling(this)" checked>
+                                    <div class="block bg-slate-800 w-10 h-6 rounded-full border border-white/10"></div>
+                                    <div class="dot absolute left-1 top-1 bg-slate-400 w-4 h-4 rounded-full transition shadow-md"></div>
+                                </div>
+                            </label>
+                            <button onclick="loadLiveLogs()" class="text-xs text-blue-400 hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                        </div>
+                    </div>
+                    <div id="logFeed" class="bg-slate-950 rounded-2xl p-6 border border-white/5 h-[600px] overflow-y-auto space-y-1 shadow-inner scroll-smooth">
+                        <div class="text-slate-600 text-[10px] font-mono italic">Initializing log stream...</div>
+                    </div>
+                </div>
+            </div>
+            </main>
+            
+            <!-- 7. Broadcast View -->
             <div id="view-broadcast" class="space-y-6 hidden-view">
                 <div class="glass p-8 rounded-3xl">
                     <h2 class="text-xl font-black mb-6 flex items-center"><i class="fas fa-bullhorn mr-3 text-purple-400"></i> Global Broadcast</h2>
@@ -201,27 +266,15 @@
                                 </select>
                             </div>
                             <div class="glass p-5 rounded-2xl border-l-4 border-l-slate-700">
-                                <div class="flex justify-between items-center mb-4">
-                                    <span class="text-xs font-bold text-slate-400">Task Status</span>
-                                    <span id="bcStateLabel" class="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-bold uppercase">Idle</span>
-                                </div>
+                                <div class="flex justify-between items-center mb-4"><span class="text-xs font-bold text-slate-400">Task Status</span><span id="bcStateLabel" class="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-bold uppercase">Idle</span></div>
                                 <div class="space-y-4">
                                     <div>
-                                        <div class="flex justify-between text-[10px] font-mono mb-1 text-slate-500">
-                                            <span>Progress</span>
-                                            <span id="bcProgressText">0 / 0</span>
-                                        </div>
+                                        <div class="flex justify-between text-[10px] font-mono mb-1 text-slate-500"><span>Progress</span><span id="bcProgressText">0 / 0</span></div>
                                         <div class="progress-container"><div id="bcProgressBar" class="progress-bar" style="width: 0%"></div></div>
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-center">
-                                        <div class="bg-white/5 p-2 rounded-xl">
-                                            <div class="text-[10px] text-slate-500 font-bold">Success</div>
-                                            <div id="bcSuccessCount" class="text-green-400 font-black">0</div>
-                                        </div>
-                                        <div class="bg-white/5 p-2 rounded-xl">
-                                            <div class="text-[10px] text-slate-500 font-bold">Failed</div>
-                                            <div id="bcFailCount" class="text-red-400 font-black">0</div>
-                                        </div>
+                                        <div class="bg-white/5 p-2 rounded-xl"><div class="text-[10px] text-slate-500 font-bold">Success</div><div id="bcSuccessCount" class="text-green-400 font-black">0</div></div>
+                                        <div class="bg-white/5 p-2 rounded-xl"><div class="text-[10px] text-slate-500 font-bold">Failed</div><div id="bcFailCount" class="text-red-400 font-black">0</div></div>
                                     </div>
                                 </div>
                             </div>
@@ -233,18 +286,22 @@
     </div>
 </div>
 
-<!-- ⚠️ Shared Confirmation/Input Modal -->
+<!-- ⚠️ Shared Confirmation Modal -->
 <div id="confirmModal" class="fixed inset-0 z-[110] bg-slate-950/80 hidden flex items-center justify-center p-6">
     <div class="glass p-8 rounded-[2rem] max-w-sm w-full shadow-2xl border border-blue-500/20">
-        <div id="modalIcon" class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-2xl text-blue-500 mx-auto mb-6">
-            <i class="fas fa-exclamation-triangle"></i>
-        </div>
+        <div id="modalIcon" class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-2xl text-blue-500 mx-auto mb-6"><i class="fas fa-exclamation-triangle"></i></div>
         <h3 id="modalTitle" class="text-xl font-bold text-center mb-2">Confirm Action?</h3>
         <p id="confirmText" class="text-slate-400 text-sm text-center mb-6"></p>
 
         <div id="modalInputArea" class="hidden mb-6">
             <input type="number" id="banIdInput" placeholder="Telegram ID" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm mb-2 focus:outline-none">
             <input type="text" id="banReasonInput" placeholder="Reason for ban" class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm focus:outline-none">
+        </div>
+
+        <!-- New Feedback Reply Area -->
+        <div id="modalReplyArea" class="hidden mb-6">
+            <input type="hidden" id="replyFeedbackId">
+            <textarea id="replyMessageInput" rows="4" placeholder="Type your reply to the user here..." class="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"></textarea>
         </div>
 
         <div class="flex space-x-3">
@@ -258,34 +315,58 @@
     let inspectorTab = 'users';
     let bcPollingInterval = null;
 
-    // --- View Navigation ---
+    // Donation Tracking Variables
+    let allDonations = [];
+    let donationSortCol = 'time';
+    let donationSortAsc = false;
+
+    // Feedback Tracking
+    let feedbackList = [];
+    let fbCurrentTab = 'unresolved';
+
+    let logPollingInterval = null;
+    let currentLogSource = 'db';
+
     function switchView(viewId) {
         document.querySelectorAll('main > div').forEach(el => el.classList.add('hidden-view'));
-        document.getElementById(`view-${viewId}`).classList.remove('hidden-view');
+        const target = document.getElementById(`view-${viewId}`);
+        if (target) target.classList.remove('hidden-view');
 
-        document.querySelectorAll('aside button').forEach(el => {
-            el.classList.remove('tab-active');
-            el.classList.add('text-slate-400');
-        });
+        document.querySelectorAll('aside button').forEach(el => { el.classList.remove('tab-active'); el.classList.add('text-slate-400'); });
         const activeBtn = document.getElementById(`nav-${viewId}`);
-        activeBtn.classList.add('tab-active');
-        activeBtn.classList.remove('text-slate-400');
+        if (activeBtn) { activeBtn.classList.add('tab-active'); activeBtn.classList.remove('text-slate-400'); }
 
+        // 🚀 Logic to handle interval start/stop based on view
+        if (viewId === 'logs') {
+            loadLiveLogs();
+            if (document.getElementById('logAutoRefresh').checked) startLogPolling();
+        } else {
+            stopLogPolling();
+        }
         if (viewId === 'broadcast') startPollingBroadcast(); else stopPollingBroadcast();
         if (viewId === 'blacklist') loadBlacklist();
+        if (viewId === 'donations') loadDonations();
+        if (viewId === 'feedback') loadFeedback();
     }
 
-    // --- Telegram Auth ---
+    function setLogSource(src) {
+        currentLogSource = src;
+        document.getElementById('btn-src-db').classList.toggle('active', src === 'db');
+        document.getElementById('btn-src-sys').classList.toggle('active', src === 'sys');
+        document.getElementById('btn-src-db').classList.toggle('text-slate-500', src !== 'db');
+        document.getElementById('btn-src-sys').classList.toggle('text-slate-500', src !== 'sys');
+
+        document.getElementById('logFeed').innerHTML = '<div class="text-slate-600 text-[10px] font-mono italic">Switching log source...</div>';
+        loadLiveLogs();
+    }
+
     async function onTelegramAuth(user) {
         const formData = new FormData();
         Object.keys(user).forEach(key => formData.append(key, user[key]));
         try {
             const res = await fetch('/api/admin/auth', { method: 'POST', body: formData });
-            if (res.ok) {
-                loginSuccess(user.first_name);
-            } else {
-                document.getElementById('loginError').classList.remove('hidden');
-            }
+            if (res.ok) loginSuccess(user.first_name);
+            else document.getElementById('loginError').classList.remove('hidden');
         } catch (err) { console.error(err); }
     }
 
@@ -298,41 +379,21 @@
         loadSettings();
     }
 
-    // 🛠 Debug Mode: Mock Login for development/preview
-    function debugLogin() {
-        const id = document.getElementById('debugId').value;
-        if (!id) return;
-        // In a real dev environment, you'd send this to /api/admin/auth
-        // For Canvas preview purposes, we simulate success
-        loginSuccess("Debug Admin");
-    }
+    function debugLogin() { loginSuccess("Debug Admin"); }
+    function logout() { sessionStorage.removeItem('admin_token'); location.reload(); }
 
-    function logout() {
-        sessionStorage.removeItem('admin_token');
-        sessionStorage.removeItem('admin_name');
-        location.reload();
-    }
-
-    // --- Settings Management ---
+    // --- Core Modules (Settings, Blacklist, Inspector) ---
     async function loadSettings() {
         try {
             const res = await fetch('/api/admin/settings');
             const settings = await res.json();
-            const tbody = document.getElementById('settingsTableBody');
-            tbody.innerHTML = '';
-
+            const tbody = document.getElementById('settingsTableBody'); tbody.innerHTML = '';
             settings.forEach(s => {
-                const row = document.createElement('tr');
                 if (s.settingKey === 'is_maintenance') {
                     document.getElementById('maintToggle').checked = s.settingValue === 'true';
                     updateMaintLabel(s.settingValue === 'true');
                 }
-                row.innerHTML = `
-                        <td class="px-6 py-4 font-mono text-blue-400">${s.settingKey}</td>
-                        <td class="px-6 py-4"><span class="px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-xs">${s.settingValue}</span></td>
-                        <td class="px-6 py-4 text-slate-500 text-xs">${new Date(s.lastUpdated).toLocaleString()}</td>
-                    `;
-                tbody.appendChild(row);
+                tbody.innerHTML += `<tr><td class="px-6 py-4 font-mono text-blue-400">${s.settingKey}</td><td class="px-6 py-4"><span class="px-3 py-1 rounded-lg bg-slate-800 border border-white/5 text-xs">${s.settingValue}</span></td><td class="px-6 py-4 text-slate-500 text-xs">${new Date(s.lastUpdated).toLocaleString()}</td></tr>`;
             });
         } catch (err) { console.error(err); }
     }
@@ -344,35 +405,21 @@
     }
 
     function confirmMaintenance(checkbox) {
-        const newState = checkbox.checked;
-        checkbox.checked = !newState;
+        const newState = checkbox.checked; checkbox.checked = !newState;
         showModal("Confirm Mode Switch", newState ? "Block all non-dev users?" : "Allow all users to access the bot?", async () => {
             const res = await fetch(`/api/admin/maintenance?enable=${newState}`, { method: 'POST' });
-            if (res.ok) {
-                checkbox.checked = newState;
-                closeModal();
-                loadSettings();
-            }
+            if (res.ok) { checkbox.checked = newState; closeModal(); loadSettings(); }
         });
     }
 
-    // --- Blacklist Management ---
     async function loadBlacklist() {
         try {
             const res = await fetch('/api/admin/blacklist');
             const data = await res.json();
-            const tbody = document.getElementById('blacklistTableBody');
-            tbody.innerHTML = '';
+            const tbody = document.getElementById('blacklistTableBody'); tbody.innerHTML = '';
             data.forEach(b => {
-                tbody.innerHTML += `
-                        <tr class="hover:bg-white/5 transition-all">
-                            <td class="px-6 py-4 font-mono text-red-400">${b.telegramId}</td>
-                            <td class="px-6 py-4 text-slate-300 text-xs">${b.reason || '-'}</td>
-                            <td class="px-6 py-4 text-slate-500 text-xs">${new Date(b.timeAdded).toLocaleDateString()}</td>
-                            <td class="px-6 py-4"><button onclick="removeBan(${b.telegramId})" class="text-blue-400 hover:underline text-xs">Revoke</button></td>
-                        </tr>`;
+                tbody.innerHTML += `<tr><td class="px-6 py-4 font-mono text-red-400">${b.telegramId}</td><td class="px-6 py-4 text-slate-300 text-xs">${b.reason || '-'}</td><td class="px-6 py-4 text-slate-500 text-xs">${new Date(b.timeAdded).toLocaleDateString()}</td><td class="px-6 py-4"><button onclick="removeBan(${b.telegramId})" class="text-blue-400 hover:underline text-xs">Revoke</button></td></tr>`;
             });
-            if (!data.length) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-20 text-center text-slate-500">Blacklist is currently empty.</td></tr>';
         } catch (err) { console.error(err); }
     }
 
@@ -383,9 +430,7 @@
             const reason = document.getElementById('banReasonInput').value;
             if (!id) return;
             const res = await fetch('/api/admin/blacklist/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegramId: parseInt(id), reason })
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ telegramId: parseInt(id), reason })
             });
             if (res.ok) { closeModal(); loadBlacklist(); }
         }, "fa-user-slash", "bg-red-500/10", "text-red-400");
@@ -398,86 +443,283 @@
         });
     }
 
-    // --- Entity Inspector ---
-    function setInspectorTab(tab) {
-        inspectorTab = tab;
-        document.getElementById('tab-users').classList.toggle('tab-active', tab === 'users');
-        document.getElementById('tab-groups').classList.toggle('tab-active', tab === 'groups');
-    }
-
+    function setInspectorTab(tab) { inspectorTab = tab; document.getElementById('tab-users').classList.toggle('tab-active', tab === 'users'); document.getElementById('tab-groups').classList.toggle('tab-active', tab === 'groups'); }
     async function runSearch() {
-        const query = document.getElementById('inspectorSearch').value;
-        if (!query) return;
-        const tbody = document.getElementById('inspectorTableBody');
-        const thead = document.getElementById('inspectorTableHeader');
+        const query = document.getElementById('inspectorSearch').value; if (!query) return;
+        const tbody = document.getElementById('inspectorTableBody'); const thead = document.getElementById('inspectorTableHeader');
         tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center"><div class="loader w-8 h-8 border-4 rounded-full mx-auto"></div></td></tr>';
         try {
             const res = await fetch(`/api/admin/${inspectorTab}/search?query=${encodeURIComponent(query)}`);
-            const data = await res.json();
-            tbody.innerHTML = '';
+            const data = await res.json(); tbody.innerHTML = '';
             if (inspectorTab === 'users') {
                 thead.innerHTML = `<tr><th class="px-6 py-4">User Info</th><th class="px-6 py-4">Total Wine</th><th class="px-6 py-4">Total Plastic</th><th class="px-6 py-4">First Seen</th></tr>`;
-                data.forEach(u => {
-                    tbody.innerHTML += `
-                            <tr class="hover:bg-white/5 transition-all">
-                                <td class="px-6 py-4">
-                                    <div class="font-bold">${u.firstName} ${u.lastName || ''}</div>
-                                    <div class="text-[10px] text-slate-500 font-mono">ID: ${u.telegramId} | @${u.username || 'n/a'}</div>
-                                </td>
-                                <td class="px-6 py-4 text-amber-500 font-bold">${u.wine}</td>
-                                <td class="px-6 py-4 text-slate-400 font-bold">${u.plastic}</td>
-                                <td class="px-6 py-4 text-[10px] text-slate-500">${new Date(u.timeAdded).toLocaleDateString()}</td>
-                            </tr>`;
-                });
+                data.forEach(u => { tbody.innerHTML += `<tr><td class="px-6 py-4"><div class="font-bold">${u.firstName} ${u.lastName || ''}</div><div class="text-[10px] text-slate-500 font-mono">ID: ${u.telegramId} | @${u.username || 'n/a'}</div></td><td class="px-6 py-4 text-amber-500 font-bold">${u.wine}</td><td class="px-6 py-4 text-slate-400 font-bold">${u.plastic}</td><td class="px-6 py-4 text-[10px] text-slate-500">${new Date(u.timeAdded).toLocaleDateString()}</td></tr>`; });
             } else {
                 thead.innerHTML = `<tr><th class="px-6 py-4">Group Title</th><th class="px-6 py-4">Quotas (W/P)</th><th class="px-6 py-4">Settings</th><th class="px-6 py-4">Added</th></tr>`;
-                data.forEach(g => {
-                    tbody.innerHTML += `
-                            <tr class="hover:bg-white/5 transition-all">
-                                <td class="px-6 py-4">
-                                    <div class="font-bold text-blue-400">${g.title}</div>
-                                    <div class="text-[10px] text-slate-500 font-mono">ID: ${g.telegramId}</div>
-                                </td>
-                                <td class="px-6 py-4 text-xs font-mono">${g.wQuota} / ${g.pQuota}</td>
-                                <td class="px-6 py-4 space-x-1">${g.offFortune ? '🚫🔮' : '✅🔮'} ${g.offZodiac ? '🚫♈' : '✅♈'}</td>
-                                <td class="px-6 py-4 text-[10px] text-slate-500">${new Date(g.timeAdded).toLocaleDateString()}</td>
-                            </tr>`;
-                });
+                data.forEach(g => { tbody.innerHTML += `<tr><td class="px-6 py-4"><div class="font-bold text-blue-400">${g.title}</div><div class="text-[10px] text-slate-500 font-mono">ID: ${g.telegramId}</div></td><td class="px-6 py-4 text-xs font-mono">${g.wQuota} / ${g.pQuota}</td><td class="px-6 py-4 space-x-1">${g.offFortune ? '🚫🔮' : '✅🔮'} ${g.offZodiac ? '🚫♈' : '✅♈'}</td><td class="px-6 py-4 text-[10px] text-slate-500">${new Date(g.timeAdded).toLocaleDateString()}</td></tr>`; });
             }
-            if (!data.length) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">No matches found.</td></tr>';
         } catch (err) { tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-red-400">Search failed.</td></tr>'; }
     }
 
+    // --- Donations Module ---
+    async function loadDonations() {
+        try {
+            const sRes = await fetch('/api/admin/donations/summary');
+            const sData = await sRes.json();
+            document.getElementById('statTotalStars').textContent = `${sData.totalStars.toLocaleString()} ⭐`;
+            document.getElementById('statApproxHkd').textContent = `~ HK$${sData.totalStarsApproxHkd.toFixed(2)}`;
+            document.getElementById('statTotalFiat').textContent = `HK$${sData.totalLegacyHkd.toLocaleString()}`;
+            document.getElementById('statCombined').textContent = `HK$${sData.totalCombinedHkd.toFixed(2)}`;
+            document.getElementById('statRecentCount').textContent = sData.recentCount;
+
+            const lRes = await fetch('/api/admin/donations/list');
+            allDonations = await lRes.json();
+            filterAndSortDonations();
+        } catch (err) { console.error(err); }
+    }
+
+    function setDonationSort(col) {
+        if (donationSortCol === col) donationSortAsc = !donationSortAsc;
+        else { donationSortCol = col; donationSortAsc = col === 'name' || col === 'txid'; }
+        filterAndSortDonations();
+    }
+
+    function filterAndSortDonations() {
+        const query = document.getElementById('donationSearch').value.toLowerCase();
+        const tbody = document.getElementById('donationsTableBody');
+
+        let filtered = allDonations.filter(d => {
+            const txId = d.telegramPaymentChargeId || d.providerPaymentChargeId || d.donationId || '';
+            const name = (d.name || 'Anonymous').toLowerCase();
+            const username = (d.username || '').toLowerCase();
+            return name.includes(query) || username.includes(query) || txId.toLowerCase().includes(query) || d.telegramId.toString().includes(query);
+        });
+
+        filtered.sort((a, b) => {
+            let valA, valB;
+            if (donationSortCol === 'name') { valA = a.name || ''; valB = b.name || ''; }
+            else if (donationSortCol === 'stars') { valA = a.stars || 0; valB = b.stars || 0; }
+            else if (donationSortCol === 'amount') { valA = a.amount || 0; valB = b.amount || 0; }
+            else if (donationSortCol === 'time') { valA = new Date(a.time).getTime(); valB = new Date(b.time).getTime(); }
+            else if (donationSortCol === 'txid') { valA = a.telegramPaymentChargeId || a.providerPaymentChargeId || a.donationId || ''; valB = b.telegramPaymentChargeId || b.providerPaymentChargeId || b.donationId || ''; }
+            if (valA < valB) return donationSortAsc ? -1 : 1;
+            if (valA > valB) return donationSortAsc ? 1 : -1;
+            return 0;
+        });
+
+        tbody.innerHTML = '';
+        if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-slate-500">No transactions found.</td></tr>'; return; }
+
+        filtered.forEach(d => {
+            const approxHkd = (d.stars * 0.16).toFixed(2);
+            const starsDisplay = d.stars > 0 ? `<span class="text-amber-500 font-bold">${d.stars.toLocaleString()} ⭐</span><br><span class="text-[10px] text-slate-500 font-mono">~HK$${approxHkd}</span>` : '<span class="text-slate-600">-</span>';
+            const fiatDisplay = d.amount > 0 ? `<span class="text-emerald-400 font-bold">HK$${d.amount.toLocaleString()}</span>` : '<span class="text-slate-600">-</span>';
+            const txId = d.telegramPaymentChargeId || d.providerPaymentChargeId || d.donationId || '-';
+            tbody.innerHTML += `<tr class="hover:bg-white/5 transition-all"><td class="px-6 py-4"><div class="font-bold">${d.name || 'Anonymous'}</div><div class="text-[10px] text-slate-500 font-mono">ID: ${d.telegramId} ${d.username ? '| @' + d.username : ''}</div></td><td class="px-6 py-4 leading-tight">${starsDisplay}</td><td class="px-6 py-4">${fiatDisplay}</td><td class="px-6 py-4 font-mono text-[10px] text-slate-400 break-all max-w-[150px]">${txId}</td><td class="px-6 py-4 text-slate-500 text-xs">${new Date(d.time).toLocaleString()}</td></tr>`;
+        });
+    }
+
+    // --- Feedback Inbox Module ---
+    async function loadFeedback() {
+        try {
+            const res = await fetch('/api/admin/feedback/list');
+            feedbackList = await res.json();
+            renderFeedback();
+        } catch (err) { console.error(err); }
+    }
+
+    function setFbTab(tab) {
+        fbCurrentTab = tab;
+        document.getElementById('fbTabUnresolved').className = tab === 'unresolved' ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-sky-500/20 text-sky-400' : 'px-4 py-2 rounded-xl text-sm font-bold transition-all text-slate-500 hover:bg-white/5';
+        document.getElementById('fbTabAll').className = tab === 'all' ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-sky-500/20 text-sky-400' : 'px-4 py-2 rounded-xl text-sm font-bold transition-all text-slate-500 hover:bg-white/5';
+        renderFeedback();
+    }
+
+    function renderFeedback() {
+        const container = document.getElementById('feedbackContainer');
+        container.innerHTML = '';
+
+        let filtered = feedbackList.filter(f => fbCurrentTab === 'all' || !f.isResolved);
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="col-span-1 md:col-span-2 text-center text-slate-500 py-12">No feedback found for this view.</div>';
+            return;
+        }
+
+        filtered.forEach(f => {
+            const resolvedClass = f.isResolved ? 'border-l-green-500 opacity-60' : 'border-l-sky-500';
+            const adminReplyHtml = f.adminReply ? `<div class="bg-white/5 p-3 rounded-xl text-xs text-slate-400 mb-4 border-l-2 border-l-slate-500 mt-3"><b>Admin Replied:</b><br>${f.adminReply}</div>` : '';
+
+            let actionsHtml = '';
+            if (!f.isResolved) {
+                actionsHtml = `
+                        <button onclick="resolveFeedback(${f.id})" class="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-bold hover:bg-green-500 hover:text-white transition-colors"><i class="fas fa-check mr-1"></i> Mark Resolved</button>
+                        <button onclick="showReplyModal(${f.id})" class="px-3 py-1.5 bg-sky-500/10 text-sky-400 rounded-lg text-xs font-bold hover:bg-sky-500 hover:text-white transition-colors"><i class="fas fa-reply mr-1"></i> Send Reply</button>
+                    `;
+            } else {
+                actionsHtml = `<span class="text-xs text-green-500 font-bold"><i class="fas fa-check-circle mr-1"></i> Resolved</span>`;
+            }
+
+            container.innerHTML += `
+                    <div class="glass p-5 rounded-2xl flex flex-col border-l-4 ${resolvedClass}">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <span class="font-bold text-sm text-white">${f.name || 'User'}</span>
+                                <span class="text-[10px] font-mono text-slate-500 ml-2">ID: ${f.telegramId} ${f.username ? '| @'+f.username : ''}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 whitespace-nowrap ml-2">${new Date(f.submittedAt).toLocaleDateString()}</span>
+                        </div>
+                        <p class="text-sm text-slate-300 whitespace-pre-wrap">${f.content}</p>
+                        ${adminReplyHtml}
+                        <div class="flex justify-end space-x-2 border-t border-white/5 pt-3 mt-4">
+                            ${actionsHtml}
+                        </div>
+                    </div>`;
+        });
+    }
+
+    async function resolveFeedback(id) {
+        try {
+            const res = await fetch(`/api/admin/feedback/resolve?id=${id}`, { method: 'POST' });
+            if (res.ok) loadFeedback();
+        } catch (err) { console.error(err); }
+    }
+
+    function showReplyModal(id) {
+        document.getElementById('modalReplyArea').classList.remove('hidden');
+        document.getElementById('replyFeedbackId').value = id;
+        showModal("Reply to User", "This will send a direct Telegram message to the user.", async () => {
+            const replyMessage = document.getElementById('replyMessageInput').value;
+            if (!replyMessage) return;
+
+            const btn = document.getElementById('modalConfirmBtn');
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            const res = await fetch('/api/admin/feedback/reply', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, replyMessage })
+            });
+
+            if (res.ok) { closeModal(); loadFeedback(); }
+            else { alert("Failed to send reply. Bot might be blocked by user."); }
+        }, "fa-reply", "bg-sky-500/10", "text-sky-400");
+    }
+
+    async function loadLiveLogs() {
+        const feed = document.getElementById('logFeed');
+        const endpoint = currentLogSource === 'db' ? '/api/admin/logs/activity' : '/api/admin/logs/system';
+
+        try {
+            const res = await fetch(endpoint);
+            const data = await res.json();
+
+            if (!data || data.length === 0) {
+                if (feed.innerHTML === '') feed.innerHTML = '<div class="text-slate-600 text-[10px] font-mono italic">No logs available.</div>';
+                return;
+            }
+
+            // 🚀 Database Logs Rendering
+            if (currentLogSource === 'db') {
+                feed.innerHTML = '';
+                // 🚀 The API returns newest first. We reverse it so the bottom is the newest in the UI.
+                const displayData = [...data].reverse();
+
+                displayData.forEach(l => {
+                    const timeStr = new Date(l.timestamp).toLocaleTimeString([], { hour12: false });
+                    const line = document.createElement('div');
+                    line.className = "log-line text-slate-400 border-b border-white/5 pb-1 hover:bg-white/5";
+                    line.innerHTML = `<span class="text-slate-600">[${timeStr}]</span> <span class="text-blue-500 font-bold">U:${l.userId}</span> <span class="text-slate-500">@</span> <span class="text-purple-400">${l.chatId === 0 ? 'PRV' : 'C:'+l.chatId}</span> <span class="text-green-400 ml-2 font-black">/${l.command}</span> <span class="text-slate-500 italic ml-1 truncate">${l.args || ''}</span>`;
+                    feed.appendChild(line);
+                });
+            }
+            // 🚀 System Logs Rendering (Raw text strings)
+            else {
+                feed.innerHTML = '';
+                // journalctl -n 50 already returns chronological order (newest at end), so no reverse needed.
+                data.forEach(text => {
+                    const line = document.createElement('div');
+                    line.className = "log-line text-slate-500 whitespace-pre-wrap break-all border-b border-white/5 pb-1";
+                    // Colorize common patterns
+                    let coloredText = text
+                        .replace(/info:/g, '<span class="text-blue-400">info:</span>')
+                        .replace(/warn:/g, '<span class="text-amber-400">warn:</span>')
+                        .replace(/fail:/g, '<span class="text-red-400">fail:</span>')
+                        .replace(/error:/g, '<span class="text-red-500 font-bold">error:</span>');
+
+                    line.innerHTML = coloredText;
+                    feed.appendChild(line);
+                });
+            }
+
+            // 🚀 Auto-scroll to the bottom (the most recent log entry)
+            feed.scrollTop = feed.scrollHeight;
+        } catch (err) { console.error(err); }
+    }
+
+    function toggleLogPolling(checkbox) {
+        console.log("[Logs] Auto-refresh toggled:", checkbox.checked);
+        if (checkbox.checked) {
+            startLogPolling();
+        } else {
+            stopLogPolling();
+        }
+    }
+
+    function startLogPolling() {
+        // Ensure only one interval is running
+        stopLogPolling();
+        logPollingInterval = setInterval(loadLiveLogs, 5000);
+        console.log("[Logs] Polling started (5s)");
+    }
+
+    function stopLogPolling() {
+        if (logPollingInterval) {
+            clearInterval(logPollingInterval);
+            logPollingInterval = null;
+            console.log("[Logs] Polling stopped");
+        }
+    }
+    
     // --- Broadcast System ---
     async function startBroadcast() {
         const content = document.getElementById('broadcastContent').value;
         const target = document.getElementById('broadcastTarget').value;
         if (!content) return;
+
         showModal("Confirm Broadcast", `Are you sure you want to broadcast to ${target}?`, async () => {
-            closeModal();
+            const btn = document.getElementById('modalConfirmBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Starting...';
+
             try {
-                const res = await fetch('/api/admin/broadcast/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, target }) });
-                if (res.ok) startPollingBroadcast();
-            } catch (err) { console.error(err); }
+                const res = await fetch('/api/admin/broadcast/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, target })
+                });
+
+                if (res.ok) {
+                    closeModal();
+                    startPollingBroadcast();
+                } else {
+                    const err = await res.text();
+                    document.getElementById('confirmText').className = "text-red-400 text-xs text-center mb-6 font-bold";
+                    document.getElementById('confirmText').textContent = "❌ Failed to start: " + (err || res.statusText);
+                    btn.disabled = false;
+                    btn.textContent = "Try Again";
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Network error: Could not reach the API.");
+                btn.disabled = false;
+            }
         }, "fa-paper-plane", "bg-purple-500/10", "text-purple-400");
     }
-
     async function cancelBroadcast() { await fetch('/api/admin/broadcast/cancel', { method: 'POST' }); }
-
-    function startPollingBroadcast() {
-        if (bcPollingInterval) return;
-        updateBroadcastUI();
-        bcPollingInterval = setInterval(updateBroadcastUI, 2000);
-    }
-
-    function stopPollingBroadcast() {
-        if (bcPollingInterval) { clearInterval(bcPollingInterval); bcPollingInterval = null; }
-    }
-
+    function startPollingBroadcast() { if (bcPollingInterval) return; updateBroadcastUI(); bcPollingInterval = setInterval(updateBroadcastUI, 2000); }
+    function stopPollingBroadcast() { if (bcPollingInterval) { clearInterval(bcPollingInterval); bcPollingInterval = null; } }
     async function updateBroadcastUI() {
         try {
-            const res = await fetch('/api/admin/broadcast/status');
-            const status = await res.json();
+            const res = await fetch('/api/admin/broadcast/status'); const status = await res.json();
             const isRunning = status.state === 'Running';
             document.getElementById('bcStateLabel').textContent = status.state;
             document.getElementById('bcStateLabel').className = isRunning ? "px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase" : "px-2 py-0.5 rounded-md bg-slate-800 text-slate-500 text-[10px] font-bold uppercase";
@@ -485,45 +727,45 @@
             document.getElementById('btnStartBroadcast').className = isRunning ? "flex-1 py-4 bg-slate-800 text-slate-600 rounded-2xl font-black cursor-not-allowed" : "flex-1 py-4 bg-purple-600 rounded-2xl font-black hover:bg-purple-700 transition-all shadow-xl shadow-purple-900/20";
             document.getElementById('btnCancelBroadcast').classList.toggle('hidden', !isRunning);
             document.getElementById('bcProgressText').textContent = `${status.processed} / ${status.total}`;
-            document.getElementById('bcSuccessCount').textContent = status.success;
-            document.getElementById('bcFailCount').textContent = status.failed;
+            document.getElementById('bcSuccessCount').textContent = status.success; document.getElementById('bcFailCount').textContent = status.failed;
             const percent = status.total > 0 ? (status.processed / status.total) * 100 : 0;
             document.getElementById('bcProgressBar').style.width = `${percent}%`;
         } catch (err) { console.error(err); }
     }
 
-    // --- Shared Modal Helper ---
+    // Shared Modal Setup
     function showModal(title, text, onConfirm, icon = "fa-exclamation-triangle", bgClass = "bg-blue-500/10", textClass = "text-blue-500") {
         const modal = document.getElementById('confirmModal');
         document.getElementById('modalTitle').textContent = title;
         document.getElementById('confirmText').textContent = text;
-        const iconContainer = document.getElementById('modalIcon');
-        iconContainer.className = `w-16 h-16 ${bgClass} rounded-2xl flex items-center justify-center text-2xl ${textClass} mx-auto mb-6`;
-        iconContainer.innerHTML = `<i class="fas ${icon}"></i>`;
-        const confirmBtn = document.getElementById('modalConfirmBtn');
-        confirmBtn.className = `flex-1 px-4 py-3 rounded-xl font-bold transition-all ${textClass === 'text-red-400' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+        document.getElementById('modalIcon').className = `w-16 h-16 ${bgClass} rounded-2xl flex items-center justify-center text-2xl ${textClass} mx-auto mb-6`;
+        document.getElementById('modalIcon').innerHTML = `<i class="fas ${icon}"></i>`;
+
+        const btn = document.getElementById('modalConfirmBtn');
+        btn.disabled = false; btn.textContent = 'Confirm';
+        btn.className = `flex-1 px-4 py-3 rounded-xl font-bold transition-all ${textClass === 'text-red-400' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+
         modal.classList.remove('hidden');
-        confirmBtn.onclick = onConfirm;
+        btn.onclick = onConfirm;
     }
 
     function closeModal() {
         document.getElementById('confirmModal').classList.add('hidden');
         document.getElementById('modalInputArea').classList.add('hidden');
-        document.getElementById('banIdInput').value = '';
-        document.getElementById('banReasonInput').value = '';
+        document.getElementById('modalReplyArea').classList.add('hidden');
+        document.getElementById('replyMessageInput').value = '';
     }
 
-    // --- Environment Check & Initialization ---
     window.onload = function() {
-        // Show bypass if on localhost or sandbox preview
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('canvas') || window.location.hostname.includes('worker');
-        if (isLocal) {
-            document.getElementById('devBypass').classList.remove('hidden');
+        if (!isLocal && window.location.pathname.includes('admin.html') && !window.location.hostname.startsWith('admin.')) {
+            const baseHost = window.location.hostname.replace(/^(stats\.|site\.|admin\.)/, '');
+            window.location.replace(`${window.location.protocol}//admin.${baseHost}${window.location.search}`);
+            return;
         }
-
+        if (isLocal) document.getElementById('devBypass').classList.remove('hidden');
         if (sessionStorage.getItem('admin_token')) {
-            document.getElementById('loginOverlay').classList.add('hidden');
-            document.getElementById('mainDashboard').classList.remove('hidden');
+            document.getElementById('loginOverlay').classList.add('hidden'); document.getElementById('mainDashboard').classList.remove('hidden');
             document.getElementById('userNameDisplay').textContent = sessionStorage.getItem('admin_name');
             loadSettings();
         }

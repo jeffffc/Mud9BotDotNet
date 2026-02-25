@@ -17,7 +17,8 @@ public class GeneralModule(
     IConfiguration configuration, 
     ILomoService lomoService, 
     IGroupService groupService,
-    ISimplifiedChineseService simplifiedService)
+    ISimplifiedChineseService simplifiedService, 
+    IServiceScopeFactory scopeFactory)
 {
     [Command("start", Description = "Start the bot")]
     public async Task Start(ITelegramBotClient bot, Message msg, string[] args, CancellationToken ct)
@@ -66,29 +67,62 @@ public class GeneralModule(
         }
     }
     
-    [Command("feedback", Description = "提供意見回饋")]
+    [Command("feedback", Description = "提供意見回饋 (Submit feedback)")]
     public async Task FeedbackCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
+        // 1. 檢查是否有輸入內容 (Check if content is provided)
         if (args.Length == 0)
         {
             await bot.Reply(message, "你想提供咩意見呀？請喺指令後面加上內容，例如：<code>/feedback 呢個功能好正！</code>", ct: ct);
             return;
         }
 
-        var feedbackText = string.Join(" ", args).EscapeHtml();
+        // 2. 獲取內容與使用者資訊 (Get content and user info)
+        string rawContent = string.Join(" ", args);
+        string feedbackText = rawContent.EscapeHtml();
         var user = message.From;
-        
-        var logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
+        if (user == null) return;
 
-        if (logGroupId != 0)
+        try
         {
-            // 將用戶名改為可點擊連結，導向用戶 Profile
-            string adminLog = $"📝 <b>收到新意見回饋！</b>\n" +
-                              $"👤 <b>用戶：</b> <a href=\"tg://user?id={user?.Id}\">{user?.FirstName.EscapeHtml()}</a> (<code>{user?.Id}</code>)\n" +
-                              $"💬 <b>內容：</b>\n{feedbackText}";
+            // 🚀 3. 儲存至資料庫 (Save to Database)
+            // 這樣管理後台 (admin.html) 才能讀取到這筆回饋
+            using (var scope = scopeFactory.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+                
+                var feedback = new UserFeedback
+                {
+                    TelegramId = user.Id,
+                    Name = (user.FirstName + " " + user.LastName).Trim(),
+                    Username = user.Username,
+                    Content = rawContent, // 存入原始內容以便管理員閱讀 (Save raw content for admin)
+                    SubmittedAt = DateTime.UtcNow,
+                    IsResolved = false
+                };
 
-            await bot.SendMessage(logGroupId, adminLog, parseMode: ParseMode.Html, cancellationToken: ct);
-            await bot.Reply(message, "多謝你嘅意見！我已經轉告咗畀開發者聽喇。💖", ct: ct);
+                db.Set<UserFeedback>().Add(feedback);
+                await db.SaveChangesAsync(ct);
+            }
+
+            // 4. 發送通知至開發者群組 (Send notification to Log Group)
+            var logGroupId = configuration.GetValue<long>("BotConfiguration:LogGroupId");
+            if (logGroupId != 0)
+            {
+                string adminLog = $"📝 <b>收到新意見回饋！</b>\n" +
+                                  $"👤 <b>用戶：</b> <a href=\"tg://user?id={user.Id}\">{user.FirstName.EscapeHtml()}</a> (<code>{user.Id}</code>)\n" +
+                                  $"💬 <b>內容：</b>\n{feedbackText}";
+
+                await bot.SendMessage(logGroupId, adminLog, parseMode: ParseMode.Html, cancellationToken: ct);
+            }
+
+            // 5. 回覆使用者 (Reply to the user)
+            await bot.Reply(message, "多謝你嘅意見！我已經轉告咗畀開發者聽喇，如果有需要我哋會私訊回覆你。💖", ct: ct);
+        }
+        catch (Exception ex)
+        {
+            // 如果資料庫寫入失敗，至少嘗試回覆使用者並記錄錯誤 (Fallback if DB fails)
+            await bot.Reply(message, "❌ <b>提交失敗</b>\n系統暫時有啲問題，請稍後再試。", ct: ct);
         }
     }
     
