@@ -362,19 +362,38 @@
 
     async function authFetch(url, options = {}) {
         const token = sessionStorage.getItem('admin_token');
+        // 🚀 Detect if we are in local debug session to handle 401s gracefully
+        const isDebugSession = token === 'local-debug-session';
+
+        if (!token) {
+            console.warn("No token found in session storage.");
+            if (!document.getElementById('mainDashboard').classList.contains('hidden')) {
+                logout();
+            }
+            return null;
+        }
+
         const headers = {
-            ...options.headers,
+            ...(options.headers || {}),
             'Authorization': `Bearer ${token}`
         };
 
-        const res = await fetch(url, { ...options, headers });
+        try {
+            const res = await fetch(url, { ...options, headers });
 
-        if (res.status === 401) {
-            console.warn("Unauthorized: Session might be expired.");
-            logout();
+            if (res.status === 401) {
+                console.warn("Unauthorized: Session expired or token rejected.");
+                // 🚀 In debug mode, don't force logout so we can still test the UI
+                if (!isDebugSession) {
+                    logout();
+                }
+                return null;
+            }
+            return res;
+        } catch (err) {
+            console.error("Fetch Error:", err);
             return null;
         }
-        return res;
     }
 
     async function onTelegramAuth(user) {
@@ -385,7 +404,7 @@
         if(loginErr) loginErr.classList.add('hidden');
 
         try {
-            const res = await authFetch('/api/admin/auth', { method: 'POST', body: formData });
+            const res = await fetch('/api/admin/auth', { method: 'POST', body: formData });
             const data = await res.json();
 
             if (res.ok && data.token) {
@@ -405,12 +424,26 @@
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('mainDashboard').classList.remove('hidden');
         document.getElementById('userNameDisplay').textContent = name;
-        sessionStorage.setItem('admin_token', 'validated');
-        sessionStorage.setItem('admin_name', name);
         loadSettings();
     }
 
-    function debugLogin() { loginSuccess("Debug Admin"); }
+    function debugLogin() {
+        // 🚀 Capture ID and simulate a session.
+        // This is a PURE FRONTEND BYPASS. 
+        // Backend API calls will still fail unless you use the real Telegram Login.
+        const id = document.getElementById('debugId').value;
+        if (!id) {
+            alert("Please enter a valid Telegram ID to use debug mode.");
+            return;
+        }
+
+        console.warn("DEBUG MODE ACTIVE: Server-side API calls will return 401 unless the backend is modified to accept 'local-debug-session'.");
+
+        sessionStorage.setItem('admin_token', 'local-debug-session');
+        sessionStorage.setItem('admin_name', `Debug Admin (${id})`);
+        loginSuccess(`Debug Admin (${id})`);
+    }
+    
     function logout() { sessionStorage.removeItem('admin_token'); location.reload(); }
 
     // --- Core Modules (Settings, Blacklist, Inspector) ---
