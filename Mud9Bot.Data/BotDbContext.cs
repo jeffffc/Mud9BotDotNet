@@ -50,10 +50,25 @@ public class BotDbContext : DbContext
 
         // --- Configuration ---
         // You can still apply specific configurations here if needed
+        
+        // 1. BotEventLog: Ensure UPSERT unique constraint
+        modelBuilder.Entity<BotEventLog>()
+            .HasIndex(e => new { e.EventType, e.Metadata, e.ChatType })
+            .IsUnique();
+        
+        // 🚀 Index for sorting rankings (Total Volume, Most used commands)
+        modelBuilder.Entity<BotEventLog>()
+            .HasIndex(e => e.Count);
+        
+        // 2. BotUser: Fast lookup by Telegram ID and Search
         modelBuilder.Entity<BotUser>()
             .HasIndex(u => u.TelegramId)
             .IsUnique();
+        
+        modelBuilder.Entity<BotUser>()
+            .HasIndex(u => u.Username);
             
+        // 3. BotGroup: Fast lookup by Telegram ID
         modelBuilder.Entity<BotGroup>()
             .HasIndex(g => g.TelegramId)
             .IsUnique();
@@ -63,6 +78,22 @@ public class BotDbContext : DbContext
         // a "model change" every single time the app starts, causing a crash.
         var seedDate = new DateTime(2026, 2, 24, 0, 0, 0, DateTimeKind.Utc);
         
+        
+        // 4. WinePlastic: Optimize heavy Group Stat / Rank queries
+        // Indexing GroupId and Disabled ensures the stats page loads instantly even with millions of rows
+        modelBuilder.Entity<WinePlastic>()
+            .HasIndex(wp => new { wp.GroupId, wp.Disabled });
+        
+        modelBuilder.Entity<WinePlastic>()
+            .HasIndex(wp => wp.UserId);
+
+        // 5. CommandLog: Optimize the "Live Logs" viewer
+        modelBuilder.Entity<CommandLog>()
+            .HasIndex(cl => cl.Timestamp);
+
+        // 6. Donation: Optimize financial summaries and recent donor lookups
+        modelBuilder.Entity<Donation>()
+            .HasIndex(d => d.Time);
         
         // Seed initial data for the Admin Console
         // Seed initial data for the Admin Console and Global Settings
