@@ -1,5 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -19,6 +23,27 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<BotDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// --- JWT CONFIGURATION / JWT 安全設定 ---
+var jwtKey = builder.Configuration["Jwt:SecretKey"] ?? "A_very_long_random_secret_key_at_least_32_chars";
+var key = Encoding.ASCII.GetBytes(jwtKey);
+
+builder.Services.AddAuthentication(x => {
+        x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(x => {
+        x.RequireHttpsMetadata = false;
+        x.SaveToken = true;
+        x.TokenValidationParameters = new TokenValidationParameters {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateIssuer = false,
+            ValidateAudience = false
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // Core Logic Services (Shared with Bot project) / 核心邏輯服務 (與 Bot 專案共用)
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
@@ -42,6 +67,9 @@ using (var scope = app.Services.CreateScope())
     await services.GetRequiredService<ISettingsService>().InitializeAsync();
     await services.GetRequiredService<IBlacklistService>().InitializeAsync();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // =========================================================================
 // 3. MIDDLEWARE PIPELINE / 中介軟體管線設定
@@ -153,43 +181,77 @@ app.MapPost("/api/admin/auth", async (HttpContext context, IConfiguration config
     using var hmac = new HMACSHA256(secretKey);
     var checkHash = BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(dataCheckString))).Replace("-", "").ToLower();
 
-    if (checkHash != hash) return Results.Unauthorized();
-
+    bool isValid =  checkHash != hash;
     var userId = long.Parse(authData["id"]);
-    if (!devIds.Contains(userId)) return Results.Forbid();
-
-    return Results.Ok(new { success = true, user = authData["first_name"] });
+    
+    if (isValid && devIds.Contains(userId)) {
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var tokenDescriptor = new SecurityTokenDescriptor {
+            Subject = new ClaimsIdentity(new[] { 
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Name, authData["first_name"])
+            }),
+            Expires = DateTime.UtcNow.AddDays(7),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+        };
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return Results.Ok(new { success = true, token = tokenHandler.WriteToken(token), user = authData["first_name"]});
+    }
+    return Results.Unauthorized();
+    
 });
 
 app.MapGet("/api/admin/settings", async (BotDbContext db) =>
 {
     var settings = await db.Set<SystemSetting>().ToListAsync();
     return Results.Ok(settings);
-});
+}).RequireAuthorization();
 
-app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService settings, BotDbContext db) =>
+app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService settings, BotDbContext db, HttpContext context) =>
 {
+    // 🚀 Audit Logging Logic
+    var adminId = long.Parse(context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var adminName = context.User.Identity?.Name ?? "Unknown";
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    
     var val = enable ? "true" : "false";
+    
     var entity = await db.Set<SystemSetting>().FindAsync("is_maintenance");
-    if (entity != null)
-    {
+    if (entity != null) {
         entity.SettingValue = val;
-        entity.LastUpdated = DateTime.UtcNow;
+        
+        // Log the action
+        db.Set<AdminAuditLog>().Add(new AdminAuditLog {
+            AdminId = adminId,
+            AdminName = adminName,
+            Action = "TOGGLE_MAINTENANCE",
+            Details = $"Set to: {val}",
+            IpAddress = ip
+        });
+
         await db.SaveChangesAsync();
         settings.RefreshSetting("is_maintenance", val);
         return Results.Ok(new { status = val });
     }
     return Results.NotFound();
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 🔍 INSPECTOR (Power Actions)
 // ---------------------------------------------------------
 app.MapGet("/api/admin/users/search", async (string query, BotDbContext db) =>
-    Results.Ok(await db.Set<BotUser>().Where(u => u.TelegramId.ToString().Contains(query) || (u.FirstName + " " + (u.LastName ?? "")).Contains(query) || (u.Username ?? "").Contains(query)).OrderByDescending(u => u.TimeAdded).Take(50).ToListAsync()));
+    Results.Ok(await db.Set<BotUser>().Where(u => 
+        u.TelegramId.ToString().Contains(query) || (u.FirstName + " " + (u.LastName ?? "")).Contains(query) || (u.Username ?? "").Contains(query))
+        .OrderByDescending( u => u.TimeAdded) 
+        .Take(50).ToListAsync()
+    )).RequireAuthorization();
 
 app.MapGet("/api/admin/groups/search", async (string query, BotDbContext db) =>
-    Results.Ok(await db.Set<BotGroup>().Where(g => g.TelegramId.ToString().Contains(query) || g.Title.Contains(query) || (g.Username ?? "").Contains(query)).OrderByDescending(g => g.TimeAdded).Take(50).ToListAsync()));
+    Results.Ok(await db.Set<BotGroup>().Where(g =>
+        g.TelegramId.ToString().Contains(query) || g.Title.Contains(query) || (g.Username ?? "").Contains(query))
+        .OrderByDescending(g => g.TimeAdded)
+        .Take(50).ToListAsync()
+    )).RequireAuthorization();
 
 // 🚀 NEW: Reset user wine/plastic quota
 app.MapPost("/api/admin/users/reset-quota", async (long userId, BotDbContext db) => {
@@ -197,20 +259,20 @@ app.MapPost("/api/admin/users/reset-quota", async (long userId, BotDbContext db)
     foreach(var l in limits) { l.WineLimit = 5; l.PlasticLimit = 5; }
     await db.SaveChangesAsync();
     return Results.Ok();
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 📢 BROADCAST API / 全域廣播系統
 // ---------------------------------------------------------
 app.MapGet("/api/admin/broadcast/status", () => Results.Ok(new {
     state = BroadcastManager.State, total = BroadcastManager.Total, processed = BroadcastManager.Processed, success = BroadcastManager.Success, failed = BroadcastManager.Failed
-}));
+})).RequireAuthorization();
 
 app.MapPost("/api/admin/broadcast/cancel", () => {
     BroadcastManager.Cts?.Cancel();
     BroadcastManager.State = "Cancelled";
     return Results.Ok();
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/broadcast/start", async (
     [FromBody] BroadcastRequest req, 
@@ -318,25 +380,25 @@ app.MapPost("/api/admin/broadcast/start", async (
     });
 
     return Results.Accepted();
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 🚫 BLACKLIST API / 黑名單管理
 // ---------------------------------------------------------
 app.MapGet("/api/admin/blacklist", async (BotDbContext db) => 
-    Results.Ok(await db.Set<BlacklistedId>().OrderByDescending(b => b.TimeAdded).ToListAsync()));
+    Results.Ok(await db.Set<BlacklistedId>().OrderByDescending(b => b.TimeAdded).ToListAsync())).RequireAuthorization();
 
 app.MapPost("/api/admin/blacklist/add", async (BlacklistAddRequest req, IBlacklistService blacklist) =>
 {
     await blacklist.AddAsync(req.TelegramId, req.Reason ?? "No reason", 0);
     return Results.Ok();
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/blacklist/remove", async (long id, IBlacklistService blacklist) =>
 {
     await blacklist.RemoveAsync(id);
     return Results.Ok();
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 📨 FEEDBACK INBOX API / 意見回饋信箱
@@ -345,7 +407,7 @@ app.MapGet("/api/admin/feedback/list", async (BotDbContext db) =>
 {
     var list = await db.Set<UserFeedback>().OrderByDescending(f => f.SubmittedAt).Take(100).ToListAsync();
     return Results.Ok(list);
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/feedback/resolve", async (int id, BotDbContext db) =>
 {
@@ -356,7 +418,7 @@ app.MapPost("/api/admin/feedback/resolve", async (int id, BotDbContext db) =>
         return Results.Ok(); 
     }
     return Results.NotFound();
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/feedback/reply", async (FeedbackReplyRequest req, BotDbContext db, IConfiguration config) =>
 {
@@ -379,7 +441,7 @@ app.MapPost("/api/admin/feedback/reply", async (FeedbackReplyRequest req, BotDbC
         return Results.Ok();
     }
     return Results.BadRequest("Failed to send message via Telegram API.");
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 📜 Audit & Live Logs API / 稽核與即時日誌
@@ -395,7 +457,7 @@ app.MapGet("/api/admin/logs/activity", async (BotDbContext db) =>
         .ToListAsync();
         
     return Results.Ok(logs);
-});
+}).RequireAuthorization();
 
 // Optional: Aggregated Audit Log (from your existing bot_event_logs)
 app.MapGet("/api/admin/logs/audit", async (BotDbContext db) =>
@@ -404,7 +466,7 @@ app.MapGet("/api/admin/logs/audit", async (BotDbContext db) =>
         .OrderByDescending(s => s.Count)
         .ToListAsync();
     return Results.Ok(stats);
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 🐧 System Journal Logs API (journalctl)
@@ -451,7 +513,7 @@ app.MapGet("/api/admin/logs/system", async (IConfiguration config) =>
         $"[{DateTime.Now:HH:mm:ss}] (MOCK) dotnet[1234]: info: Microsoft.Hosting.Lifetime[14] Now listening on: http://localhost:5000",
         $"[{DateTime.Now:HH:mm:ss}] (MOCK) journalctl is only available on Linux production hosts."
     });
-});
+}).RequireAuthorization();
 
 // ---------------------------------------------------------
 // 📊 PUBLIC STATS API / 公開統計數據
@@ -510,7 +572,7 @@ app.MapGet("/api/admin/donations/list", async (BotDbContext db) =>
 {
     var list = await db.Set<Donation>().OrderByDescending(d => d.Time).Take(500).ToListAsync();
     return Results.Ok(list);
-});
+}).RequireAuthorization();
 
 app.Run();
 
