@@ -360,14 +360,45 @@
         loadLiveLogs();
     }
 
+    async function authFetch(url, options = {}) {
+        const token = sessionStorage.getItem('admin_token');
+        const headers = {
+            ...options.headers,
+            'Authorization': `Bearer ${token}`
+        };
+
+        const res = await fetch(url, { ...options, headers });
+
+        if (res.status === 401) {
+            console.warn("Unauthorized: Session might be expired.");
+            logout();
+            return null;
+        }
+        return res;
+    }
+
     async function onTelegramAuth(user) {
         const formData = new FormData();
         Object.keys(user).forEach(key => formData.append(key, user[key]));
+
+        const loginErr = document.getElementById('loginError');
+        if(loginErr) loginErr.classList.add('hidden');
+
         try {
-            const res = await fetch('/api/admin/auth', { method: 'POST', body: formData });
-            if (res.ok) loginSuccess(user.first_name);
-            else document.getElementById('loginError').classList.remove('hidden');
-        } catch (err) { console.error(err); }
+            const res = await authFetch('/api/admin/auth', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (res.ok && data.token) {
+                // 🚀 FIXED: Store the real JWT token, not the string 'validated'
+                sessionStorage.setItem('admin_token', data.token);
+                sessionStorage.setItem('admin_name', data.user);
+                loginSuccess(data.user);
+            } else {
+                if(loginErr) loginErr.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error("Login Error:", err);
+        }
     }
 
     function loginSuccess(name) {
@@ -385,7 +416,7 @@
     // --- Core Modules (Settings, Blacklist, Inspector) ---
     async function loadSettings() {
         try {
-            const res = await fetch('/api/admin/settings');
+            const res = await authFetch('/api/admin/settings');
             const settings = await res.json();
             const tbody = document.getElementById('settingsTableBody'); tbody.innerHTML = '';
             settings.forEach(s => {
@@ -407,14 +438,14 @@
     function confirmMaintenance(checkbox) {
         const newState = checkbox.checked; checkbox.checked = !newState;
         showModal("Confirm Mode Switch", newState ? "Block all non-dev users?" : "Allow all users to access the bot?", async () => {
-            const res = await fetch(`/api/admin/maintenance?enable=${newState}`, { method: 'POST' });
+            const res = await authFetch(`/api/admin/maintenance?enable=${newState}`, { method: 'POST' });
             if (res.ok) { checkbox.checked = newState; closeModal(); loadSettings(); }
         });
     }
 
     async function loadBlacklist() {
         try {
-            const res = await fetch('/api/admin/blacklist');
+            const res = await authFetch('/api/admin/blacklist');
             const data = await res.json();
             const tbody = document.getElementById('blacklistTableBody'); tbody.innerHTML = '';
             data.forEach(b => {
@@ -429,7 +460,7 @@
             const id = document.getElementById('banIdInput').value;
             const reason = document.getElementById('banReasonInput').value;
             if (!id) return;
-            const res = await fetch('/api/admin/blacklist/add', {
+            const res = await authFetch('/api/admin/blacklist/add', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ telegramId: parseInt(id), reason })
             });
             if (res.ok) { closeModal(); loadBlacklist(); }
@@ -438,7 +469,7 @@
 
     function removeBan(id) {
         showModal("Revoke Ban", `Allow ID ${id} to use the bot again?`, async () => {
-            const res = await fetch(`/api/admin/blacklist/remove?id=${id}`, { method: 'POST' });
+            const res = await authFetch(`/api/admin/blacklist/remove?id=${id}`, { method: 'POST' });
             if (res.ok) { closeModal(); loadBlacklist(); }
         });
     }
@@ -458,7 +489,7 @@
         tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center"><div class="loader w-8 h-8 border-4 rounded-full mx-auto"></div></td></tr>';
 
         try {
-            const res = await fetch(`/api/admin/${currentInspectorTab}/search?query=${query}`);
+            const res = await authFetch(`/api/admin/${currentInspectorTab}/search?query=${query}`);
             const data = await res.json();
             tbody.innerHTML = '';
 
@@ -493,7 +524,7 @@
 
     async function powerBan(id, reason) {
         showModal("Confirm Ban", `Are you sure you want to ban ${id}?`, async () => {
-            const res = await fetch('/api/admin/blacklist/add', {
+            const res = await authFetch('/api/admin/blacklist/add', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegramId: id, reason })
             });
@@ -503,7 +534,7 @@
 
     async function resetQuota(userId) {
         showModal("Reset Quota", "Restore daily wine/plastic limits to default (5/5)?", async () => {
-            const res = await fetch(`/api/admin/users/reset-quota?userId=${userId}`, { method: 'POST' });
+            const res = await authFetch(`/api/admin/users/reset-quota?userId=${userId}`, { method: 'POST' });
             if (res.ok) { closeModal(); runSearch(); }
         });
     }
@@ -511,7 +542,7 @@
     // --- Donations Module ---
     async function loadDonations() {
         try {
-            const sRes = await fetch('/api/admin/donations/summary');
+            const sRes = await authFetch('/api/admin/donations/summary');
             const sData = await sRes.json();
             document.getElementById('statTotalStars').textContent = `${sData.totalStars.toLocaleString()} ⭐`;
             document.getElementById('statApproxHkd').textContent = `~ HK$${sData.totalStarsApproxHkd.toFixed(2)}`;
@@ -519,7 +550,7 @@
             document.getElementById('statCombined').textContent = `HK$${sData.totalCombinedHkd.toFixed(2)}`;
             document.getElementById('statRecentCount').textContent = sData.recentCount;
 
-            const lRes = await fetch('/api/admin/donations/list');
+            const lRes = await authFetch('/api/admin/donations/list');
             allDonations = await lRes.json();
             filterAndSortDonations();
         } catch (err) { console.error(err); }
@@ -569,7 +600,7 @@
     // --- Feedback Inbox Module ---
     async function loadFeedback() {
         try {
-            const res = await fetch('/api/admin/feedback/list');
+            const res = await authFetch('/api/admin/feedback/list');
             feedbackList = await res.json();
             renderFeedback();
         } catch (err) { console.error(err); }
@@ -627,7 +658,7 @@
 
     async function resolveFeedback(id) {
         try {
-            const res = await fetch(`/api/admin/feedback/resolve?id=${id}`, { method: 'POST' });
+            const res = await authFetch(`/api/admin/feedback/resolve?id=${id}`, { method: 'POST' });
             if (res.ok) loadFeedback();
         } catch (err) { console.error(err); }
     }
@@ -642,7 +673,7 @@
             const btn = document.getElementById('modalConfirmBtn');
             btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-            const res = await fetch('/api/admin/feedback/reply', {
+            const res = await authFetch('/api/admin/feedback/reply', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, replyMessage })
             });
 
@@ -656,7 +687,7 @@
         const endpoint = currentLogSource === 'db' ? '/api/admin/logs/activity' : '/api/admin/logs/system';
 
         try {
-            const res = await fetch(endpoint);
+            const res = await authFetch(endpoint);
             const data = await res.json();
 
             if (!data || data.length === 0) {
@@ -748,7 +779,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Starting...';
 
             try {
-                const res = await fetch('/api/admin/broadcast/start', {
+                const res = await authFetch('/api/admin/broadcast/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content, target })
@@ -771,12 +802,12 @@
             }
         }, "fa-paper-plane", "bg-purple-500/10", "text-purple-400");
     }
-    async function cancelBroadcast() { await fetch('/api/admin/broadcast/cancel', { method: 'POST' }); }
+    async function cancelBroadcast() { await authFetch('/api/admin/broadcast/cancel', { method: 'POST' }); }
     function startPollingBroadcast() { if (bcPollingInterval) return; updateBroadcastUI(); bcPollingInterval = setInterval(updateBroadcastUI, 2000); }
     function stopPollingBroadcast() { if (bcPollingInterval) { clearInterval(bcPollingInterval); bcPollingInterval = null; } }
     async function updateBroadcastUI() {
         try {
-            const res = await fetch('/api/admin/broadcast/status'); const status = await res.json();
+            const res = await authFetch('/api/admin/broadcast/status'); const status = await res.json();
             const isRunning = status.state === 'Running';
             document.getElementById('bcStateLabel').textContent = status.state;
             document.getElementById('bcStateLabel').className = isRunning ? "px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-400 text-[10px] font-bold uppercase" : "px-2 py-0.5 rounded-md bg-slate-800 text-slate-500 text-[10px] font-bold uppercase";

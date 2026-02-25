@@ -181,7 +181,7 @@ app.MapPost("/api/admin/auth", async (HttpContext context, IConfiguration config
     using var hmac = new HMACSHA256(secretKey);
     var checkHash = BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(dataCheckString))).Replace("-", "").ToLower();
 
-    bool isValid =  checkHash != hash;
+    bool isValid =  checkHash == hash;
     var userId = long.Parse(authData["id"]);
     
     if (isValid && devIds.Contains(userId)) {
