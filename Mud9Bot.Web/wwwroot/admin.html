@@ -210,35 +210,35 @@
                 </div>
             </div>
 
-            <<main class="lg:col-span-3">
+            <main class="lg:col-span-3">
             <!-- 6. Live Logs View -->
-            <div id="view-logs" class="space-y-6 hidden-view">
-                <div class="glass p-8 rounded-3xl">
-                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-                        <div>
-                            <h2 class="text-xl font-black flex items-center"><i class="fas fa-terminal mr-3 text-green-400"></i> Live Activity Logs</h2>
-                            <div class="flex mt-3 bg-slate-900 p-1 rounded-xl w-fit border border-white/5">
-                                <button id="btn-src-db" onclick="setLogSource('db')" class="log-source-btn active px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest">Database</button>
-                                <button id="btn-src-sys" onclick="setLogSource('sys')" class="log-source-btn px-4 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">System (Journal)</button>
+                <div id="view-logs" class="space-y-6 hidden-view">
+                    <div class="glass p-8 rounded-3xl">
+                        <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                            <div>
+                                <h2 class="text-xl font-black flex items-center"><i class="fas fa-terminal mr-3 text-green-400"></i> Live Activity Logs</h2>
+                                <div class="flex mt-3 bg-slate-900 p-1 rounded-xl w-fit border border-white/5">
+                                    <button id="btn-src-db" onclick="setLogSource('db')" class="log-source-btn active px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest">Database</button>
+                                    <button id="btn-src-sys" onclick="setLogSource('sys')" class="log-source-btn px-4 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">System (Journal)</button>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <label class="flex items-center cursor-pointer space-x-2">
+                                    <span class="text-[10px] font-bold text-slate-500 uppercase">Auto-Refresh</span>
+                                    <div class="relative">
+                                        <input type="checkbox" id="logAutoRefresh" class="sr-only" onchange="toggleLogPolling(this)" checked>
+                                        <div class="block bg-slate-800 w-10 h-6 rounded-full border border-white/10"></div>
+                                        <div class="dot absolute left-1 top-1 bg-slate-400 w-4 h-4 rounded-full transition shadow-md"></div>
+                                    </div>
+                                </label>
+                                <button onclick="loadLiveLogs()" class="text-xs text-blue-400 hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-4">
-                            <label class="flex items-center cursor-pointer space-x-2">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase">Auto-Refresh</span>
-                                <div class="relative">
-                                    <input type="checkbox" id="logAutoRefresh" class="sr-only" onchange="toggleLogPolling(this)" checked>
-                                    <div class="block bg-slate-800 w-10 h-6 rounded-full border border-white/10"></div>
-                                    <div class="dot absolute left-1 top-1 bg-slate-400 w-4 h-4 rounded-full transition shadow-md"></div>
-                                </div>
-                            </label>
-                            <button onclick="loadLiveLogs()" class="text-xs text-blue-400 hover:underline"><i class="fas fa-sync-alt mr-1"></i> Refresh</button>
+                        <div id="logFeed" class="bg-slate-950 rounded-2xl p-6 border border-white/5 h-[600px] overflow-y-auto space-y-1 shadow-inner scroll-smooth">
+                            <div class="text-slate-600 text-[10px] font-mono italic">Initializing log stream...</div>
                         </div>
                     </div>
-                    <div id="logFeed" class="bg-slate-950 rounded-2xl p-6 border border-white/5 h-[600px] overflow-y-auto space-y-1 shadow-inner scroll-smooth">
-                        <div class="text-slate-600 text-[10px] font-mono italic">Initializing log stream...</div>
-                    </div>
                 </div>
-            </div>
             </main>
             
             <!-- 7. Broadcast View -->
@@ -326,6 +326,7 @@
 
     let logPollingInterval = null;
     let currentLogSource = 'db';
+    let isProgrammaticScroll = false; // 🚀 Flag to differentiate auto-scroll from manual scroll
 
     function switchView(viewId) {
         document.querySelectorAll('main > div').forEach(el => el.classList.add('hidden-view'));
@@ -613,47 +614,57 @@
             const data = await res.json();
 
             if (!data || data.length === 0) {
-                if (feed.innerHTML === '') feed.innerHTML = '<div class="text-slate-600 text-[10px] font-mono italic">No logs available.</div>';
+                if (feed.innerHTML.includes('Initializing') || feed.innerHTML === '') {
+                    feed.innerHTML = '<div class="text-slate-600 text-[10px] font-mono italic">No logs available.</div>';
+                }
                 return;
             }
 
-            // 🚀 Database Logs Rendering
             if (currentLogSource === 'db') {
                 feed.innerHTML = '';
-                // 🚀 The API returns newest first. We reverse it so the bottom is the newest in the UI.
                 const displayData = [...data].reverse();
 
                 displayData.forEach(l => {
-                    const timeStr = new Date(l.timestamp).toLocaleTimeString([], { hour12: false });
+                    const date = new Date(l.timestamp);
+                    const timeStr = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     const line = document.createElement('div');
-                    line.className = "log-line text-slate-400 border-b border-white/5 pb-1 hover:bg-white/5";
-                    line.innerHTML = `<span class="text-slate-600">[${timeStr}]</span> <span class="text-blue-500 font-bold">U:${l.userId}</span> <span class="text-slate-500">@</span> <span class="text-purple-400">${l.chatId === 0 ? 'PRV' : 'C:'+l.chatId}</span> <span class="text-green-400 ml-2 font-black">/${l.command}</span> <span class="text-slate-500 italic ml-1 truncate">${l.args || ''}</span>`;
+                    line.className = "log-line text-slate-400 border-b border-white/5 pb-1 hover:bg-white/5 transition-colors";
+                    const chatDisplay = l.chatId === 0 ? '<span class="text-pink-500">PRIVATE</span>' : `<span class="text-purple-400">C:${l.chatId}</span>`;
+
+                    line.innerHTML = `
+                            <span class="text-slate-600">[${timeStr}]</span>
+                            <span class="text-blue-500 font-bold">U:${l.userId}</span>
+                            <span class="text-slate-500">@</span>
+                            ${chatDisplay}
+                            <span class="text-green-400 ml-2 font-black">/${l.command}</span>
+                            <span class="text-slate-500 italic ml-1 truncate">${l.args || ''}</span>
+                        `;
                     feed.appendChild(line);
                 });
-            }
-            // 🚀 System Logs Rendering (Raw text strings)
-            else {
+            } else {
                 feed.innerHTML = '';
-                // journalctl -n 50 already returns chronological order (newest at end), so no reverse needed.
                 data.forEach(text => {
                     const line = document.createElement('div');
                     line.className = "log-line text-slate-500 whitespace-pre-wrap break-all border-b border-white/5 pb-1";
-                    // Colorize common patterns
                     let coloredText = text
                         .replace(/info:/g, '<span class="text-blue-400">info:</span>')
                         .replace(/warn:/g, '<span class="text-amber-400">warn:</span>')
                         .replace(/fail:/g, '<span class="text-red-400">fail:</span>')
                         .replace(/error:/g, '<span class="text-red-500 font-bold">error:</span>');
-
                     line.innerHTML = coloredText;
                     feed.appendChild(line);
                 });
             }
 
-            // 🚀 Auto-scroll to the bottom (the most recent log entry)
+            // 🚀 Programmatic Auto-scroll
+            isProgrammaticScroll = true;
             feed.scrollTop = feed.scrollHeight;
-        } catch (err) { console.error(err); }
+            // Use setTimeout to clear flag after the scroll event has likely fired
+            setTimeout(() => { isProgrammaticScroll = false; }, 50);
+
+        } catch (err) { console.error("[Logs] Failed to fetch:", err); }
     }
+    
 
     function toggleLogPolling(checkbox) {
         console.log("[Logs] Auto-refresh toggled:", checkbox.checked);
