@@ -183,26 +183,20 @@ app.MapPost("/api/admin/maintenance", async (bool enable, ISettingsService setti
 });
 
 // ---------------------------------------------------------
-// 🔍 INSPECTOR API / 實體檢查工具
+// 🔍 INSPECTOR (Power Actions)
 // ---------------------------------------------------------
 app.MapGet("/api/admin/users/search", async (string query, BotDbContext db) =>
-{
-    var users = await db.Set<BotUser>()
-        .Where(u => u.TelegramId.ToString().Contains(query) || 
-                    (u.FirstName + " " + (u.LastName ?? "")).Contains(query) ||
-                    (u.Username ?? "").Contains(query))
-        .OrderByDescending(u => u.TimeAdded).Take(50).ToListAsync();
-    return Results.Ok(users);
-});
+    Results.Ok(await db.Set<BotUser>().Where(u => u.TelegramId.ToString().Contains(query) || (u.FirstName + " " + (u.LastName ?? "")).Contains(query) || (u.Username ?? "").Contains(query)).OrderByDescending(u => u.TimeAdded).Take(50).ToListAsync()));
 
 app.MapGet("/api/admin/groups/search", async (string query, BotDbContext db) =>
-{
-    var groups = await db.Set<BotGroup>()
-        .Where(g => g.TelegramId.ToString().Contains(query) || 
-                    g.Title.Contains(query) ||
-                    (g.Username ?? "").Contains(query))
-        .OrderByDescending(g => g.TimeAdded).Take(50).ToListAsync();
-    return Results.Ok(groups);
+    Results.Ok(await db.Set<BotGroup>().Where(g => g.TelegramId.ToString().Contains(query) || g.Title.Contains(query) || (g.Username ?? "").Contains(query)).OrderByDescending(g => g.TimeAdded).Take(50).ToListAsync()));
+
+// 🚀 NEW: Reset user wine/plastic quota
+app.MapPost("/api/admin/users/reset-quota", async (long userId, BotDbContext db) => {
+    var limits = await db.Set<DailyLimit>().Where(d => d.UserId == (int)userId).ToListAsync();
+    foreach(var l in limits) { l.WineLimit = 5; l.PlasticLimit = 5; }
+    await db.SaveChangesAsync();
+    return Results.Ok();
 });
 
 // ---------------------------------------------------------

@@ -100,25 +100,22 @@
                 </div>
             </div>
 
-            <!-- 2. Inspector View -->
+            <!-- 2. Power Inspector -->
             <div id="view-inspector" class="space-y-6 hidden-view">
                 <div class="glass p-8 rounded-3xl">
-                    <h2 class="text-xl font-black mb-6 flex items-center"><i class="fas fa-search mr-3 text-blue-400"></i> Entity Inspector</h2>
+                    <h2 class="text-xl font-black mb-6"><i class="fas fa-search mr-3 text-blue-400"></i> Entity Inspector</h2>
                     <div class="flex flex-col md:flex-row gap-4 mb-8">
-                        <div class="flex-1 relative">
-                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
-                            <input type="text" id="inspectorSearch" placeholder="Search by ID, Name, or Username..." class="w-full bg-slate-900 border border-white/10 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        <input type="text" id="inspectorSearch" placeholder="ID, Name, or Username..." class="flex-1 bg-slate-900 border border-white/10 rounded-2xl py-3 px-4 focus:outline-none">
+                        <div class="flex bg-slate-900 p-1 rounded-xl">
+                            <button onclick="setInspectorTab('users')" id="tab-users" class="px-6 py-2 rounded-lg text-sm font-bold active">Users</button>
+                            <button onclick="setInspectorTab('groups')" id="tab-groups" class="px-6 py-2 rounded-lg text-sm font-bold text-slate-500">Groups</button>
                         </div>
-                        <div class="flex glass p-1 rounded-xl">
-                            <button onclick="setInspectorTab('users')" id="tab-users" class="px-6 py-2 rounded-lg text-sm font-bold transition-all tab-active">Users</button>
-                            <button onclick="setInspectorTab('groups')" id="tab-groups" class="px-6 py-2 rounded-lg text-sm font-bold transition-all text-slate-500">Groups</button>
-                        </div>
-                        <button onclick="runSearch()" class="px-8 py-3 bg-blue-600 rounded-2xl font-black hover:bg-blue-700 transition-all">Search</button>
+                        <button onclick="runSearch()" class="px-8 py-3 bg-blue-600 rounded-2xl font-black">Search</button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead id="inspectorTableHeader" class="bg-white/5 text-slate-400 uppercase text-[10px] font-black tracking-widest"></thead>
-                            <tbody id="inspectorTableBody" class="divide-y divide-white/5"><tr><td colspan="4" class="px-6 py-12 text-center text-slate-500">Enter a query to start inspecting.</td></tr></tbody>
+                            <tbody id="inspectorTableBody" class="divide-y divide-white/5"></tbody>
                         </table>
                     </div>
                 </div>
@@ -328,6 +325,8 @@
     let currentLogSource = 'db';
     let isProgrammaticScroll = false; // 🚀 Flag to differentiate auto-scroll from manual scroll
 
+    let currentInspectorTab = 'users';
+
     function switchView(viewId) {
         document.querySelectorAll('main > div').forEach(el => el.classList.add('hidden-view'));
         const target = document.getElementById(`view-${viewId}`);
@@ -444,22 +443,69 @@
         });
     }
 
-    function setInspectorTab(tab) { inspectorTab = tab; document.getElementById('tab-users').classList.toggle('tab-active', tab === 'users'); document.getElementById('tab-groups').classList.toggle('tab-active', tab === 'groups'); }
+    // --- Inspector Logic (Step 12) ---
+    function setInspectorTab(tab) {
+        currentInspectorTab = tab;
+        document.getElementById('tab-users').classList.toggle('text-slate-500', tab !== 'users');
+        document.getElementById('tab-groups').classList.toggle('text-slate-500', tab !== 'groups');
+        document.getElementById('inspectorTableBody').innerHTML = '';
+    }
+
     async function runSearch() {
-        const query = document.getElementById('inspectorSearch').value; if (!query) return;
-        const tbody = document.getElementById('inspectorTableBody'); const thead = document.getElementById('inspectorTableHeader');
-        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center"><div class="loader w-8 h-8 border-4 rounded-full mx-auto"></div></td></tr>';
+        const query = document.getElementById('inspectorSearch').value;
+        const tbody = document.getElementById('inspectorTableBody');
+        const thead = document.getElementById('inspectorTableHeader');
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center"><div class="loader w-8 h-8 border-4 rounded-full mx-auto"></div></td></tr>';
+
         try {
-            const res = await fetch(`/api/admin/${inspectorTab}/search?query=${encodeURIComponent(query)}`);
-            const data = await res.json(); tbody.innerHTML = '';
-            if (inspectorTab === 'users') {
-                thead.innerHTML = `<tr><th class="px-6 py-4">User Info</th><th class="px-6 py-4">Total Wine</th><th class="px-6 py-4">Total Plastic</th><th class="px-6 py-4">First Seen</th></tr>`;
-                data.forEach(u => { tbody.innerHTML += `<tr><td class="px-6 py-4"><div class="font-bold">${u.firstName} ${u.lastName || ''}</div><div class="text-[10px] text-slate-500 font-mono">ID: ${u.telegramId} | @${u.username || 'n/a'}</div></td><td class="px-6 py-4 text-amber-500 font-bold">${u.wine}</td><td class="px-6 py-4 text-slate-400 font-bold">${u.plastic}</td><td class="px-6 py-4 text-[10px] text-slate-500">${new Date(u.timeAdded).toLocaleDateString()}</td></tr>`; });
+            const res = await fetch(`/api/admin/${currentInspectorTab}/search?query=${query}`);
+            const data = await res.json();
+            tbody.innerHTML = '';
+
+            if (currentInspectorTab === 'users') {
+                thead.innerHTML = `<tr><th class="px-6 py-4">User</th><th class="px-6 py-4">Wine/Plastic</th><th class="px-6 py-4">Actions</th></tr>`;
+                data.forEach(u => {
+                    tbody.innerHTML += `
+                            <tr class="hover:bg-white/5">
+                                <td class="px-6 py-4"><b>${u.firstName}</b><br><span class="text-[10px] text-slate-500 font-mono">${u.telegramId}</span></td>
+                                <td class="px-6 py-4">🍷 ${u.wine} | 🌚 ${u.plastic}</td>
+                                <td class="px-6 py-4 space-x-2">
+                                    <button onclick="powerBan(${u.telegramId}, 'User banned via Inspector')" class="text-red-400 text-xs hover:underline">Ban</button>
+                                    <button onclick="resetQuota(${u.telegramId})" class="text-blue-400 text-xs hover:underline">Reset Quota</button>
+                                </td>
+                            </tr>`;
+                });
             } else {
-                thead.innerHTML = `<tr><th class="px-6 py-4">Group Title</th><th class="px-6 py-4">Quotas (W/P)</th><th class="px-6 py-4">Settings</th><th class="px-6 py-4">Added</th></tr>`;
-                data.forEach(g => { tbody.innerHTML += `<tr><td class="px-6 py-4"><div class="font-bold text-blue-400">${g.title}</div><div class="text-[10px] text-slate-500 font-mono">ID: ${g.telegramId}</div></td><td class="px-6 py-4 text-xs font-mono">${g.wQuota} / ${g.pQuota}</td><td class="px-6 py-4 space-x-1">${g.offFortune ? '🚫🔮' : '✅🔮'} ${g.offZodiac ? '🚫♈' : '✅♈'}</td><td class="px-6 py-4 text-[10px] text-slate-500">${new Date(g.timeAdded).toLocaleDateString()}</td></tr>`; });
+                thead.innerHTML = `<tr><th class="px-6 py-4">Group Title</th><th class="px-6 py-4">Settings</th><th class="px-6 py-4">Actions</th></tr>`;
+                data.forEach(g => {
+                    tbody.innerHTML += `
+                            <tr class="hover:bg-white/5">
+                                <td class="px-6 py-4"><b>${g.title}</b><br><span class="text-[10px] text-slate-500 font-mono">${g.telegramId}</span></td>
+                                <td class="px-6 py-4 text-xs">${g.offFortune ? '🚫 Fortune' : '✅ Fortune'}<br>${g.offZodiac ? '🚫 Zodiac' : '✅ Zodiac'}</td>
+                                <td class="px-6 py-4">
+                                    <button onclick="powerBan(${g.telegramId}, 'Group banned via Inspector')" class="text-red-400 text-xs hover:underline">Restrict</button>
+                                </td>
+                            </tr>`;
+                });
             }
-        } catch (err) { tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-12 text-center text-red-400">Search failed.</td></tr>'; }
+        } catch (err) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-red-400">Error fetching data.</td></tr>'; }
+    }
+
+    async function powerBan(id, reason) {
+        showModal("Confirm Ban", `Are you sure you want to ban ${id}?`, async () => {
+            const res = await fetch('/api/admin/blacklist/add', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegramId: id, reason })
+            });
+            if (res.ok) { closeModal(); alert("Entity banned successfully."); }
+        });
+    }
+
+    async function resetQuota(userId) {
+        showModal("Reset Quota", "Restore daily wine/plastic limits to default (5/5)?", async () => {
+            const res = await fetch(`/api/admin/users/reset-quota?userId=${userId}`, { method: 'POST' });
+            if (res.ok) { closeModal(); runSearch(); }
+        });
     }
 
     // --- Donations Module ---
