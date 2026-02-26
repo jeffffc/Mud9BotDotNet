@@ -83,8 +83,7 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
         var response = await client.GetFromJsonAsync<BusApiResponse<List<BusRouteStopDto>>>(url);
         return (response?.Data ?? [])
-            .OrderBy(s => s.Sequence)
-            .ToList();
+            .OrderBy(s => s.Sequence).ToList();
     }
 
     public async Task<BusStopDto?> GetStopDetailsAsync(string company, string stopId)
