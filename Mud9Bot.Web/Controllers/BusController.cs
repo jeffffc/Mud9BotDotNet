@@ -58,16 +58,35 @@ public class BusController(
             return Ok(new List<BusRouteSearchResult>());
         }
 
-        var routes = await dbContext.Set<BusRouteStop>()
+        // Fetch entities first so we can apply C# swapping logic for CTB
+        var rawRoutes = await dbContext.Set<BusRouteStop>()
             .Where(rs => rs.IsActive && nearbyStops.Contains(rs.StopId))
             .Select(rs => rs.BusRoute)
             .Where(r => r.IsActive)
             .Distinct()
             .OrderBy(r => r.RouteNumber)
             .Take(50)
-            .Select(r => new BusRouteSearchResult(
-                r.RouteNumber, r.Bound, r.Company, r.DestinationTc, r.OriginTc, r.ServiceType))
             .ToListAsync();
+
+        // Map and fix data anomalies (like CTB single-record direction) before sending to UI
+        var routes = rawRoutes.Select(r => 
+        {
+            var isCtb = r.Company == "CTB" || r.Company == "NWFB";
+            var isReturn = r.Bound.Equals("I", StringComparison.OrdinalIgnoreCase) || r.Bound.Equals("inbound", StringComparison.OrdinalIgnoreCase);
+
+            var orig = r.OriginTc;
+            var dest = r.DestinationTc;
+
+            // Swap names for Citybus inbound routes
+            if (isCtb && isReturn)
+            {
+                orig = r.DestinationTc;
+                dest = r.OriginTc;
+            }
+
+            return new BusRouteSearchResult(
+                r.RouteNumber, r.Bound, r.Company, dest, orig, r.ServiceType);
+        }).ToList();
 
         logger.LogInformation("[Nearby] 🚌 Found {RouteCount} unique routes.", routes.Count);
         return Ok(routes);
@@ -80,13 +99,15 @@ public class BusController(
         
         // Use explicit ordering to ensure stops are sequential.
         // 確保車站係跟 Sequence 排，費事去程變咗回程方向。
-        var query = dbContext.Set<BusRouteStop>()
-            .Where(rs => rs.RouteId == routeId && rs.IsActive)
-            .Include(rs => rs.BusStop);
-
+        
         // Debug logic for reversed bounds
         // 如果發現特定路線（如 272A）嘅 Bound 有問題，可以喺度針對性處理。
-        var rawStops = await query
+        
+        // STRICT FIX: Apply OrderBy native to EF Core SQL to guarantee 1, 2, 3 sequence
+        var stops = await dbContext.Set<BusRouteStop>()
+            .Where(rs => rs.RouteId == routeId && rs.IsActive)
+            .Include(rs => rs.BusStop)
+            .OrderBy(rs => rs.Sequence) // Native SQL numerical sort
             .Select(rs => new {
                 rs.Sequence,
                 rs.StopId,
@@ -96,11 +117,6 @@ public class BusController(
                 rs.BusStop.Longitude
             })
             .ToListAsync();
-
-        // STRICT FIX: Manually sort by sequence in memory to ensure 1, 2, 3... order
-        // regardless of internal database indexing or bound specific anomalies.
-        // 嚴格執行 Sequence 數字排序，解決 Inbound 路線清單完全倒轉嘅問題。
-        var stops = rawStops.OrderBy(s => s.Sequence).ToList();
 
         if (stops.Any())
         {
@@ -143,6 +159,10 @@ public class BusController(
                     return eDir == targetBound;
                 }).ToList();
             }
+
+            // GUARANTEE: Sort chronologically. KMB returns 'seq' as the stop sequence, 
+            // which causes ties/randomness if used for ETAs. This ensures closest bus is first.
+            etas = etas.OrderBy(e => e.EtaTime ?? DateTime.MaxValue).ToList();
 
             return Ok(etas);
         }

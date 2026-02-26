@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Mud9Bot.Bus.Interfaces;
@@ -17,6 +18,7 @@ namespace Mud9Bot.Bus.Services;
 public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache cache) : IBusApiService
 {
     private const string KmbBaseUrl = "https://data.etabus.gov.hk/v1/transport/kmb/";
+    // User Update: LWB API URL is same as KMB.
     private const string LwbBaseUrl = "https://data.etabus.gov.hk/v1/transport/kmb/";
     private const string CitybusBaseUrl = "https://rt.data.gov.hk/v2/transport/citybus/";
 
@@ -26,7 +28,7 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         string c = company.ToUpper();
         
         // Handling specific base URLs for KMB and LWB as per official documentation
-        // 根據官方文件，九巴同龍運雖然係同一集團，但 API Path 係分開嘅。
+        // 根據官方文件，九巴同龍運雖然係同一集團，但 API Path 係分開嘅 (目前 LWB 同 KMB 一樣)。
         var baseUrl = c switch {
             "KMB" => KmbBaseUrl,
             "LWB" => LwbBaseUrl,
@@ -83,10 +85,11 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
         var response = await client.GetFromJsonAsync<BusApiResponse<List<BusRouteStopDto>>>(url);
         
-        // FIXED: Strictly order by sequence using numeric sort to avoid lexicographical ordering (1, 10, 2)
+        // FIXED: Strictly order by sequence using numeric sort to avoid lexicographical ordering (1, 10, 2).
+        // Removed redundant .ToString() for cleaner type safety.
         // 修正：因為 Sequence 喺 DTO 係 string，要轉做 int 先可以正確排序（1, 2, 3... 10）。
         return (response?.Data ?? [])
-            .OrderBy(s => int.TryParse(s.Sequence.ToString(), out var val) ? val : 0)
+            .OrderBy(s => s.Sequence)
             .ToList();
     }
 
@@ -125,6 +128,7 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         var response = await client.GetFromJsonAsync<BusApiResponse<List<BusEtaDto>>>(url);
         
         // Ensuring the sequence order here helps the UI display arrivals correctly.
+        // 前端已經移除排序邏輯，交由 API 全權負責資料正確排序。
         return (response?.Data ?? [])
             .OrderBy(e => e.Sequence)
             .ToList();

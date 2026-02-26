@@ -142,6 +142,9 @@
             </div>
 
             <div class="flex items-center space-x-2">
+                <!-- Reverse Button Container -->
+                <div id="reverseBtnContainer"></div>
+
                 <button onclick="refreshVisibleEtas()" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -358,10 +361,23 @@
             searchResults.innerHTML = '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關路線喎...</div>';
             return;
         }
+
         const html = filteredPool.slice(0, visibleCount).map(r => {
-            const boundText = (r.bound === 'I' || r.bound === 'inbound') ? '回程' : '去程';
+            const isReturn = (r.bound === 'I' || r.bound === 'inbound');
+            const boundText = isReturn ? '回程' : '去程';
+
+            let displayOrig = r.orig_tc || '總站';
+            let displayDest = r.dest_tc || '未知';
+
+            // FIX for CTB names: Citybus API only provides one Origin/Dest pair per route.
+            // For 'inbound' (the return journey), we must visually swap them on the frontend.
+            if ((r.company === 'CTB' || r.company === 'NWFB') && isReturn) {
+                displayOrig = r.dest_tc || '總站';
+                displayDest = r.orig_tc || '未知';
+            }
+
             return `
-                <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${(r.dest_tc || '未知').replace(/'/g, "\\'")}', '${r.service_type || '1'}', '${(r.orig_tc || '總站').replace(/'/g, "\\'")}')" 
+                <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${displayDest.replace(/'/g, "\\'")}', '${r.service_type || '1'}', '${displayOrig.replace(/'/g, "\\'")}')" 
                      class="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all shadow-sm relative overflow-hidden">
                     <div class="flex items-center space-x-4">
                         <div class="flex flex-col items-center justify-center min-w-[60px]">
@@ -370,16 +386,17 @@
                         </div>
                         <div class="flex flex-col">
                             <div class="flex items-center flex-wrap">
-                                <span class="text-sm font-bold text-gray-800">往 ${r.dest_tc}</span>
+                                <span class="text-sm font-bold text-gray-800">往 ${displayDest}</span>
                                 ${r.service_type && r.service_type !== '1' ? '<span class="ml-1 text-[9px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">特別班次</span>' : ''}
                             </div>
-                            <span class="text-[10px] text-gray-400 font-bold mt-0.5">由 ${r.orig_tc || '總站'} 開出</span>
+                            <span class="text-[10px] text-gray-400 font-bold mt-0.5">由 ${displayOrig} 開出</span>
                         </div>
                     </div>
                     <div class="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1.5 rounded-xl uppercase tracking-widest">${boundText}</div>
                 </div>
             `;
         }).join('');
+
         searchResults.innerHTML = html;
         searchResults.classList.remove('hidden');
     }
@@ -398,7 +415,6 @@
         const letters = Array.from(validLettersSet).sort();
         letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-blue-50 text-blue-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
 
-        // Trigger initial scroll hint check
         setTimeout(handleKbScroll, 100);
     }
 
@@ -437,7 +453,6 @@
         toggleKeyboard(false); tg.BackButton.show();
         searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
 
-        // Remove padding to ensure banner starts at the absolute top of the content area
         document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
         document.getElementById('mainContent').classList.add('p-0');
 
@@ -445,21 +460,74 @@
 
         document.getElementById('displayRouteName').innerText = route;
         document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1');
+
+        // Because 'dest' is passed from renderResults, the CTB name swap automatically applies here too!
         document.getElementById('displayRouteSub').innerText = `往 ${dest} • ${companyMap[company] || company}`;
+
+        // --- Reverse Direction Button Logic (尋找相反方向路線邏輯) ---
+        const isCurrentlyInbound = (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND');
+        const routeMatches = fullDirectory.filter(r => r.route === route && r.company === company);
+
+        let counterpart = null;
+        const oppositeCandidates = routeMatches.filter(r => {
+            const isReturn = (r.bound === 'I' || r.bound === 'inbound' || r.bound === 'INBOUND');
+            return isCurrentlyInbound !== isReturn; // Find the opposite direction
+        });
+
+        if (oppositeCandidates.length > 0) {
+            // Priority 1: Same service type (同一個特別班次)
+            // Priority 2: Regular service type '1' (常規班次)
+            // Priority 3: First available opposite (任何可用的相反方向)
+            counterpart = oppositeCandidates.find(r => r.service_type === serviceType)
+                || oppositeCandidates.find(r => (r.service_type || '1') === '1')
+                || oppositeCandidates[0];
+        }
+
+        const revContainer = document.getElementById('reverseBtnContainer');
+        if (counterpart) {
+            let cDest = counterpart.dest_tc || '未知';
+            let cOrig = counterpart.orig_tc || '總站';
+            const cIsReturn = (counterpart.bound === 'I' || counterpart.bound === 'inbound' || counterpart.bound === 'INBOUND');
+
+            // Apply CTB logic for correct naming on the counterpart
+            if ((counterpart.company === 'CTB' || counterpart.company === 'NWFB') && cIsReturn) {
+                cOrig = counterpart.dest_tc || '總站';
+                cDest = counterpart.orig_tc || '未知';
+            }
+
+            // Swap button
+            revContainer.innerHTML = `
+                <button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${cDest.replace(/'/g, "\\'")}', '${counterpart.service_type || '1'}', '${cOrig.replace(/'/g, "\\'")}')" 
+                        class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                </button>`;
+        } else {
+            // No counterpart exists (沒有相反方向)
+            if ((orig || '').trim() === (dest || '').trim()) {
+                // Circular route (循環線)
+                revContainer.innerHTML = `<span class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-xs font-black text-white/70 border border-transparent whitespace-nowrap">循環線</span>`;
+            } else {
+                // No return route (無回程)
+                revContainer.innerHTML = `<span class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-xs font-black text-white/70 border border-transparent whitespace-nowrap">無回程</span>`;
+            }
+        }
+        // -------------------------------------------------------------
 
         const container = document.getElementById('stopsContainer');
         container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div></div>';
 
-        const effectiveBound = (company === 'KMB' || company === 'LWB') ? (bound.toLowerCase() === 'inbound' ? 'I' : 'O') : bound;
+        const effectiveBound = (company === 'KMB' || company === 'LWB')
+            ? (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND' ? 'I' : 'O')
+            : bound;
+
         const routeId = `${company}_${route}_${effectiveBound}_${serviceType}`;
 
         try {
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
             if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
-
-            // Ensure numeric order for consistency
-            stops.sort((a, b) => a.sequence - b.sequence);
 
             let closestIdx = -1;
             if (lastKnownPos) {

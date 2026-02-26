@@ -78,14 +78,30 @@ public class BusDirectory(IServiceScopeFactory scopeFactory, ILogger<BusDirector
         return Task.FromResult(results);
     }
 
-    private BusRouteSearchResult MapToResult(BusRoute r) => new(
-        r.RouteNumber,
-        r.Bound,
-        r.Company,
-        r.DestinationTc,
-        r.OriginTc,
-        r.ServiceType
-    );
+    private BusRouteSearchResult MapToResult(BusRoute r)
+    {
+        var isCtb = r.Company == "CTB" || r.Company == "NWFB";
+        var isReturn = r.Bound.Equals("I", StringComparison.OrdinalIgnoreCase) || r.Bound.Equals("inbound", StringComparison.OrdinalIgnoreCase);
+
+        var orig = r.OriginTc;
+        var dest = r.DestinationTc;
+
+        // Apply identical UI data normalization for CTB inbound routes
+        if (isCtb && isReturn)
+        {
+            orig = r.DestinationTc;
+            dest = r.OriginTc;
+        }
+
+        return new BusRouteSearchResult(
+            r.RouteNumber,
+            r.Bound,
+            r.Company,
+            dest,
+            orig,
+            r.ServiceType
+        );
+    }
 
     public async Task RefreshAsync() => await InitializeAsync();
 }
