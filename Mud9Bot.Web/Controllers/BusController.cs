@@ -108,33 +108,43 @@ public class BusController(
 
     [HttpGet("eta/{company}/{stopId}/{route}/{serviceType}")]
     public async Task<IActionResult> GetEta(
-        string company, 
-        string stopId, 
-        string route, 
-        string serviceType, 
+        string company,
+        string stopId,
+        string route,
+        string serviceType,
         [FromQuery] string? bound)
     {
-        var etas = await busApiService.GetEtasAsync(company, stopId, route, serviceType);
-        
-        if (!etas.Any()) return Ok(new List<object>());
-
-        if (!string.IsNullOrEmpty(bound))
+        try
         {
-            var targetBound = bound.ToLower();
-            string[] inboundMatch = ["i", "inbound"];
-            string[] outboundMatch = ["o", "outbound"];
+            var etas = await busApiService.GetEtasAsync(company, stopId, route, serviceType);
 
-            bool isLookingForInbound = inboundMatch.Contains(targetBound);
-            bool isLookingForOutbound = outboundMatch.Contains(targetBound);
+            if (etas == null || !etas.Any()) return Ok(new List<object>());
 
-            etas = etas.Where(e => {
-                var eDir = e.Direction.ToLower();
-                if (isLookingForInbound) return inboundMatch.Contains(eDir);
-                if (isLookingForOutbound) return outboundMatch.Contains(eDir);
-                return eDir == targetBound;
-            }).ToList();
+            if (!string.IsNullOrEmpty(bound))
+            {
+                var targetBound = bound.ToLower();
+                string[] inboundMatch = ["i", "inbound"];
+                string[] outboundMatch = ["o", "outbound"];
+
+                bool isLookingForInbound = inboundMatch.Contains(targetBound);
+                bool isLookingForOutbound = outboundMatch.Contains(targetBound);
+
+                etas = etas.Where(e =>
+                {
+                    if (string.IsNullOrEmpty(e.Direction)) return true;
+                    var eDir = e.Direction.ToLower();
+                    if (isLookingForInbound) return inboundMatch.Contains(eDir);
+                    if (isLookingForOutbound) return outboundMatch.Contains(eDir);
+                    return eDir == targetBound;
+                }).ToList();
+            }
+
+            return Ok(etas);
         }
-
-        return Ok(etas);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[BusAPI] ❌ ETA Fetching crashed for {Route}", route);
+            return StatusCode(500, new { error = "Internal server error during ETA fetch" });
+        }
     }
 }

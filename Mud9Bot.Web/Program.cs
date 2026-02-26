@@ -103,52 +103,39 @@ app.UseCors("AllowAll");
 
 // API Security: Block direct browser navigation to JSON endpoints
 // 安全防護：攔截直接在網址列訪問 API 終點的行為
-app.Use(async (context, next) =>
-{
-    if (context.Request.Path.StartsWithSegments("/api"))
-    {
-        if (app.Environment.IsDevelopment())
-        {
-            await next();
-            return;
-        }
-        
-        var fetchMode = context.Request.Headers["Sec-Fetch-Mode"].ToString();
-        if (string.Equals(fetchMode, "navigate", StringComparison.OrdinalIgnoreCase))
-        {
-            context.Response.Redirect("/");
-            return; 
-        }
-    }
-    await next();
-});
-
-// Dynamic Subdomain Redirect Middleware
+// API Security & Subdomain Redirection
 app.Use(async (context, next) =>
 {
     string path = context.Request.Path.Value?.ToLower() ?? "";
     string host = context.Request.Host.Host.ToLower();
 
-    // 修正：偵測到 localhost 或開發模式時跳過導向，避免本地端偵錯失敗
-    if (host == "localhost" || host == "127.0.0.1" || host.Contains("ngrok") || app.Environment.IsDevelopment())
+    // 1. API Security: Block direct browser access to JSON
+    if (path.StartsWith("/api"))
     {
-        await next();
-        return;
+        var fetchMode = context.Request.Headers["Sec-Fetch-Mode"].ToString();
+        if (string.Equals(fetchMode, "navigate", StringComparison.OrdinalIgnoreCase) && !app.Environment.IsDevelopment())
+        {
+            context.Response.Redirect("/");
+            return; 
+        }
     }
 
-    string? targetSub = path switch {
-        "/admin.html" or "/admin" => "admin",
-        "/dashboard.html" or "/dashboard" or "/stats" => "stats",
-        "/bus.html" or "/bus" => "bus",
-        _ => null
-    };
-
-    if (targetSub != null && !host.StartsWith($"{targetSub}."))
+    // 2. Subdomain Redirection (Bypass for localhost/api)
+    if (host != "localhost" && !path.StartsWith("/api") && !app.Environment.IsDevelopment())
     {
-        string baseDomain = host.Replace("stats.", "").Replace("site.", "").Replace("admin.", "").Replace("bus.", "");
-        // ⚠️ 使用 false (302) 而非 301，防止瀏覽器死記硬背快取
-        context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
-        return;
+        string? targetSub = path switch {
+            "/admin" or "/admin.html" => "admin",
+            "/stats" or "/dashboard" or "/dashboard.html" => "stats",
+            "/bus" or "/bus.html" => "bus",
+            _ => null
+        };
+
+        if (targetSub != null && !host.StartsWith($"{targetSub}."))
+        {
+            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "");
+            context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
+            return;
+        }
     }
     await next();
 });
@@ -165,10 +152,21 @@ app.MapControllers();
 
 // 🚀 核心統一路由邏輯 (Root & Fallback)
 var serveHtmlDelegate = async (HttpContext context) => {
-    context.Response.ContentType = "text/html";
+    
     string host = context.Request.Host.Host.ToLower();
     string path = context.Request.Path.Value?.ToLower() ?? "";
 
+    // IMPORTANT: If this is an API call that reached the fallback, it's a 404, NOT an HTML file.
+    // 防止 API 呼叫失敗時回傳 HTML 內容，導致前端報錯。
+    if (path.StartsWith("/api"))
+    {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsJsonAsync(new { error = "API Endpoint Not Found" });
+        return;
+    }
+    
+    context.Response.ContentType = "text/html";
+    
     if (host.StartsWith("admin.") || path.StartsWith("/admin"))
     {
         await context.Response.SendFileAsync("wwwroot/admin.html");
