@@ -17,7 +17,7 @@ namespace Mud9Bot.Bus.Services;
 public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache cache) : IBusApiService
 {
     private const string KmbBaseUrl = "https://data.etabus.gov.hk/v1/transport/kmb/";
-    private const string LwbBaseUrl = "https://data.etabus.gov.hk/v1/transport/lwb/";
+    private const string LwbBaseUrl = "https://data.etabus.gov.hk/v1/transport/kmb/";
     private const string CitybusBaseUrl = "https://rt.data.gov.hk/v2/transport/citybus/";
 
     private (HttpClient Client, string BaseUrl) GetClient(string company)
