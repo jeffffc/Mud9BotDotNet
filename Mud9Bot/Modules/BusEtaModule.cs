@@ -19,7 +19,7 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
     /// 處理 /bus 指令，用嚟開個 Mini App 出嚟。
     /// </summary>
     [Command("bus")]
-    public async Task HandleBusCommand(Message message, params string[] args)
+    public async Task HandleBusCommand(Message message, string[] args, CancellationToken ct)
     {
         // Retrieve the WebApp URL and Log Group ID from configuration
         // 喺 appsettings.json 攞返個 WebAppUrl 同埋 Log Group ID
@@ -34,7 +34,8 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
             // 用返 Mud9Bot 嘅語氣覆 user 話用唔到住
             await botClient.SendMessage(
                 chatId: message.Chat.Id,
-                text: "呢個功能暫時仲未用得住喎，遲啲先啦！🌚"
+                text: "呢個功能暫時仲未用得住喎，遲啲先啦！🌚",
+                cancellationToken: ct
             );
 
             // 2. Send an extra message to the log group to alert the admin
@@ -47,7 +48,8 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
 
                 await botClient.SendMessage(
                     chatId: logGroupId,
-                    text: $"⚠️ 報告！有人試圖用 /bus 指令，但係 WebAppUrl 仲未 set 呀！\n\nUser: {userInfo}"
+                    text: $"⚠️ 報告！有人試圖用 /bus 指令，但係 WebAppUrl 仲未 set 呀！\n\nUser: {userInfo}",
+                    cancellationToken: ct
                 );
             }
 
@@ -69,7 +71,8 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
         await botClient.SendMessage(
             chatId: message.Chat.Id,
             text: "想知架車幾時到？撳下面粒掣入去睇吓啦，唔使再喺條街度戇居居等喇！🚀",
-            replyMarkup: keyboard
+            replyMarkup: keyboard,
+            cancellationToken: ct
         );
     }
 }
