@@ -19,7 +19,7 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
     /// 處理 /bus 指令，用嚟開個 Mini App 出嚟。
     /// </summary>
     [Command("bus")]
-    public async Task HandleBusCommand(Message message)
+    public async Task HandleBusCommand(Message message, params string[] args)
     {
         // Retrieve the WebApp URL and Log Group ID from configuration
         // 喺 appsettings.json 攞返個 WebAppUrl 同埋 Log Group ID
