@@ -182,7 +182,7 @@
         </div>
         <div class="flex flex-col w-[35%] pl-2.5 relative">
             <!-- Top scroll hint (pulsing up) -->
-            <div id="kbUpHint" class="absolute top-1 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
+            <div id="kbUpHint" class="absolute top-2 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" />
                 </svg>
@@ -191,7 +191,7 @@
             <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[238px] pb-4" onscroll="handleKbScroll()"></div>
 
             <!-- Bottom scroll hint (pulsing down) -->
-            <div id="kbDownHint" class="absolute bottom-1 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
+            <div id="kbDownHint" class="absolute bottom-6 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -435,7 +435,13 @@
 
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
         toggleKeyboard(false); tg.BackButton.show();
-        searchSection.classList.add('hidden'); searchResults.classList.add('hidden'); stopList.classList.remove('hidden'); window.scrollTo(0, 0);
+        searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
+
+        // Remove padding to ensure banner starts at the absolute top of the content area
+        document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
+        document.getElementById('mainContent').classList.add('p-0');
+
+        stopList.classList.remove('hidden'); window.scrollTo(0, 0);
 
         document.getElementById('displayRouteName').innerText = route;
         document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1');
@@ -451,6 +457,9 @@
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
             if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
+
+            // Ensure numeric order for consistency
+            stops.sort((a, b) => a.sequence - b.sequence);
 
             let closestIdx = -1;
             if (lastKnownPos) {
@@ -485,7 +494,7 @@
                     const scrollTargetIdx = Math.max(0, closestIdx - 2);
                     const targetEl = document.getElementById(`stop-row-${scrollTargetIdx}`);
                     if (targetEl) {
-                        const totalHeaderHeight = 53 + (document.getElementById('routeHeader')?.offsetHeight || 88);
+                        const totalHeaderHeight = (document.getElementById('appHeader')?.offsetHeight || 53) + (document.getElementById('routeHeader')?.offsetHeight || 88);
                         const elementAbsoluteTop = targetEl.getBoundingClientRect().top + window.pageYOffset;
                         window.scrollTo({ top: elementAbsoluteTop - totalHeaderHeight, behavior: 'smooth' });
                     }
@@ -538,7 +547,13 @@
 
     function backToSearch() {
         clearInterval(refreshInterval); visibleElements.clear();
-        tg.BackButton.hide(); stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); window.scrollTo(0, 0);
+        tg.BackButton.hide();
+
+        // Restore container padding for search view
+        document.getElementById('mainContent').classList.remove('p-0');
+        document.getElementById('mainContent').classList.add('p-4', 'pt-2');
+
+        stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); window.scrollTo(0, 0);
     }
 </script>
 </body>

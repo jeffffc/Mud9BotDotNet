@@ -86,8 +86,7 @@ public class BusController(
 
         // Debug logic for reversed bounds
         // 如果發現特定路線（如 272A）嘅 Bound 有問題，可以喺度針對性處理。
-        var stops = await query
-            .OrderBy(rs => rs.Sequence) 
+        var rawStops = await query
             .Select(rs => new {
                 rs.Sequence,
                 rs.StopId,
@@ -97,6 +96,11 @@ public class BusController(
                 rs.BusStop.Longitude
             })
             .ToListAsync();
+
+        // STRICT FIX: Manually sort by sequence in memory to ensure 1, 2, 3... order
+        // regardless of internal database indexing or bound specific anomalies.
+        // 嚴格執行 Sequence 數字排序，解決 Inbound 路線清單完全倒轉嘅問題。
+        var stops = rawStops.OrderBy(s => s.Sequence).ToList();
 
         if (stops.Any())
         {

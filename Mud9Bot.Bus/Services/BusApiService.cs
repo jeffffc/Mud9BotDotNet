@@ -82,8 +82,12 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         }
 
         var response = await client.GetFromJsonAsync<BusApiResponse<List<BusRouteStopDto>>>(url);
+        
+        // FIXED: Strictly order by sequence using numeric sort to avoid lexicographical ordering (1, 10, 2)
+        // 修正：因為 Sequence 喺 DTO 係 string，要轉做 int 先可以正確排序（1, 2, 3... 10）。
         return (response?.Data ?? [])
-            .OrderBy(s => s.Sequence).ToList();
+            .OrderBy(s => int.TryParse(s.Sequence.ToString(), out var val) ? val : 0)
+            .ToList();
     }
 
     public async Task<BusStopDto?> GetStopDetailsAsync(string company, string stopId)
@@ -119,6 +123,10 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         }
 
         var response = await client.GetFromJsonAsync<BusApiResponse<List<BusEtaDto>>>(url);
-        return response?.Data ?? [];
+        
+        // Ensuring the sequence order here helps the UI display arrivals correctly.
+        return (response?.Data ?? [])
+            .OrderBy(e => e.Sequence)
+            .ToList();
     }
 }
