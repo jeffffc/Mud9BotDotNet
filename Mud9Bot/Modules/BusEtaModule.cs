@@ -18,7 +18,7 @@ public class BusEtaModule(IConfiguration config, ILogger<BusEtaModule> logger)
     /// Handles the /bus command to launch the Mini App.
     /// 處理 /bus 指令，用嚟開個 Mini App 出嚟。
     /// </summary>
-    [Command("bus")]
+    [Command("bus", PrivateOnly = true)]
     public async Task HandleBusCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         // Retrieve the WebApp URL and Log Group ID from configuration
