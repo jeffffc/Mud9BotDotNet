@@ -12,9 +12,9 @@ using Mud9Bot.Data.Entities;
 using Mud9Bot.Data.Interfaces;
 using Mud9Bot.Data.Services;
 using Microsoft.AspNetCore.Mvc;
-using Mud9Bot.Bus.Services; // Ensure this is at the top
+using Mud9Bot.Transport.Services; // Ensure this is at the top
 using Microsoft.Extensions.DependencyInjection;
-using Mud9Bot.Bus.Extensions;
+using Mud9Bot.Transport.Extensions;
 using Mud9Bot.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -126,13 +126,12 @@ app.Use(async (context, next) =>
         string? targetSub = path switch {
             "/admin" or "/admin.html" => "admin",
             "/stats" or "/dashboard" or "/dashboard.html" => "stats",
-            "/bus" or "/bus.html" => "bus",
             _ => null
         };
 
         if (targetSub != null && !host.StartsWith($"{targetSub}."))
         {
-            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "");
+            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "").Replace("mtr.", "").Replace("transport.", "");
             context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
             return;
         }
@@ -176,9 +175,23 @@ var serveHtmlDelegate = async (HttpContext context) => {
     {
         await context.Response.SendFileAsync("wwwroot/dashboard.html");
     }
-    else if (host.StartsWith("bus.") || path.StartsWith("/bus"))
+    else if (path.StartsWith("/transport/bus") || path.StartsWith("/bus") || host.StartsWith("bus."))
     {
+        // Handles: 
+        // 1. localhost/transport/bus (Development)
+        // 2. transport.mud9bot.info/bus (Production Hub)
+        // 3. bus.mud9bot.info (Legacy/Direct Production)
         await context.Response.SendFileAsync("wwwroot/bus.html");
+    }
+    else if (path.StartsWith("/transport/mtr") || path.StartsWith("/mtr") || host.StartsWith("mtr."))
+    {
+        // Handles localhost/transport/mtr, transport.mud9bot.info/mtr, etc.
+        await context.Response.SendFileAsync("wwwroot/mtr.html"); 
+    }
+    else if (path.StartsWith("/transport") || host.StartsWith("transport."))
+    {
+        // Handles transport.mud9bot.info/ or localhost/transport as the main landing page
+        await context.Response.SendFileAsync("wwwroot/transport.html"); 
     }
     else
     {

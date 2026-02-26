@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities.Bus;
 
-namespace Mud9Bot.Bus.Services;
+namespace Mud9Bot.Transport.Services;
 
 public record BusRouteSearchResult(
     string route, 

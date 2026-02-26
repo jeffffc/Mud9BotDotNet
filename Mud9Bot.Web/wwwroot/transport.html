@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mud9Bot 交通助手</title>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; }
+        .service-card:active { transform: scale(0.96); }
+    </style>
+</head>
+<body class="antialiased select-none h-screen flex flex-col">
+<!-- Overlay Loading State for Auto-Routing -->
+<div id="loadingOverlay" class="hidden absolute inset-0 z-[100] bg-white flex flex-col items-center justify-center">
+    <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+    <p class="mt-4 text-gray-500 font-bold tracking-widest text-sm">載入中...</p>
+</div>
+
+<!-- Header -->
+<header id="appHeader" class="bg-white border-b border-gray-100 p-4 flex items-center justify-center sticky top-0 z-[60] shadow-sm">
+    <div class="flex items-center space-x-2">
+        <span class="text-2xl">🧭</span>
+        <span class="font-black text-gray-800 tracking-tight text-xl">Mud9Bot <span class="text-blue-500">Transport</span></span>
+    </div>
+</header>
+
+<!-- Main Content Menu -->
+<div class="flex-1 flex flex-col p-6 justify-center max-w-md mx-auto w-full gap-5">
+    <div class="text-center mb-2">
+        <h2 class="font-black text-gray-400 text-xs tracking-widest uppercase">請選擇你想查閱嘅交通工具</h2>
+    </div>
+
+    <!-- Bus Card -->
+    <div onclick="window.location.href='/bus'" class="service-card cursor-pointer bg-white border border-gray-100 rounded-3xl p-6 flex items-center shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-transform duration-200">
+        <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-3xl shadow-sm shrink-0">🚌</div>
+        <div class="ml-5 flex-1">
+            <h3 class="text-2xl font-black text-gray-800 tracking-wide">巴士</h3>
+            <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wide">九巴 • 城巴 • 港鐵巴士</p>
+        </div>
+        <div class="ml-auto text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+        </div>
+    </div>
+
+    <!-- MTR Card -->
+    <div onclick="window.location.href='/mtr'" class="service-card cursor-pointer bg-white border border-gray-100 rounded-3xl p-6 flex items-center shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-transform duration-200">
+        <div class="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-3xl shadow-sm shrink-0">🚇</div>
+        <div class="ml-5 flex-1">
+            <h3 class="text-2xl font-black text-gray-800 tracking-wide">港鐵</h3>
+            <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wide">MTR Next Train</p>
+        </div>
+        <div class="ml-auto text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    // 1. Check for Telegram startapp routing params
+    // If a user clicks t.me/Mud9Bot/transport?startapp=bus, this routes them instantly.
+    const startParam = tg.initDataUnsafe?.start_param;
+
+    if (startParam === 'bus') {
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+        window.location.replace('/bus');
+    } else if (startParam === 'mtr') {
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+        window.location.replace('/mtr');
+    }
+</script>
+</body>
+</html>

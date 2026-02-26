@@ -10,7 +10,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Data", "Mud9Bot.Dat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Web", "Mud9Bot.Web\Mud9Bot.Web.csproj", "{0A45494F-5B47-468B-978D-7A2CF05691C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Bus", "Mud9Bot.Bus\Mud9Bot.Bus.csproj", "{56710F47-3903-4B3C-B046-F6B52E6059C4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mud9Bot.Transport", "Mud9Bot.Transport\Mud9Bot.Transport.csproj", "{56710F47-3903-4B3C-B046-F6B52E6059C4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

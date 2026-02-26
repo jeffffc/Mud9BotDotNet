@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json.Serialization;
 
-namespace Mud9Bot.Bus.Models;
+namespace Mud9Bot.Transport.Models;
 
 /// <summary>
 /// Data models for deserializing responses from KMB and Citybus APIs.
@@ -51,4 +51,28 @@ public record BusEtaDto(
     [property: JsonPropertyName("eta")] DateTime? EtaTime,   // Actual arrival time
     [property: JsonPropertyName("rmk_tc")] string RemarkTc, // Remarks like "Scheduled" or "Last Bus"
     [property: JsonPropertyName("rmk_en")] string RemarkEn
+);
+
+// =========================================================================
+// MTR BUS SPECIFIC MODELS
+// =========================================================================
+
+public record MtrBusResponse(
+    [property: JsonPropertyName("status")] int Status,
+    // 修正：MTR API 嘅陣列 Key 係 "busStop"，之前錯寫咗做 "routeStops"
+    [property: JsonPropertyName("busStop")] List<MtrBusRouteStop>? RouteStops
+);
+
+public record MtrBusRouteStop(
+    [property: JsonPropertyName("busStopId")] string BusStopId,
+    [property: JsonPropertyName("busStopName")] string BusStopName,
+    [property: JsonPropertyName("busStopLat")] string Latitude,
+    [property: JsonPropertyName("busStopLon")] string Longitude,
+    [property: JsonPropertyName("busEta")] List<MtrBusEta>? BusEtas
+);
+
+public record MtrBusEta(
+    [property: JsonPropertyName("departureTime")] string DepartureTime, 
+    [property: JsonPropertyName("busTerminal")] string BusTerminal,
+    [property: JsonPropertyName("busRemark")] string BusRemark
 );

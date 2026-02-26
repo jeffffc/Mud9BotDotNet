@@ -123,6 +123,7 @@
         <button onclick="setFilter('KMB')" data-filter="KMB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">九巴</button>
         <button onclick="setFilter('LWB')" data-filter="LWB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">龍運</button>
         <button onclick="setFilter('CTB')" data-filter="CTB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">城巴</button>
+        <button onclick="setFilter('MTR')" data-filter="MTR" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">港鐵</button>
     </div>
 </div>
 
@@ -219,7 +220,8 @@
     const letterPad = document.getElementById('letterPad');
     const clearSearchBtn = document.getElementById('clearSearch');
 
-    const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴' };
+    // Updated Company Map with MTR
+    const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴', 'MTR': '港鐵' };
 
     let fullDirectory = [];
     let nearbyResults = [];

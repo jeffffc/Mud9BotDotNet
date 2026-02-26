@@ -5,10 +5,10 @@ using System.Net.Http.Json;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
-using Mud9Bot.Bus.Interfaces;
-using Mud9Bot.Bus.Models;
+using Mud9Bot.Transport.Interfaces;
+using Mud9Bot.Transport.Models;
 
-namespace Mud9Bot.Bus.Services;
+namespace Mud9Bot.Transport.Services;
 
 /// <summary>
 /// Service to fetch data from official Bus APIs.
@@ -21,6 +21,8 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
     // User Update: LWB API URL is same as KMB.
     private const string LwbBaseUrl = "https://data.etabus.gov.hk/v1/transport/kmb/";
     private const string CitybusBaseUrl = "https://rt.data.gov.hk/v2/transport/citybus/";
+    private const string MtrBusApiUrl = "https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule";
+
 
     private (HttpClient Client, string BaseUrl) GetClient(string company)
     {
@@ -111,6 +113,12 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
     public async Task<List<BusEtaDto>> GetEtasAsync(string company, string stopId, string routeNum, string serviceType = "1")
     {
+        // Intercept MTR requests and route to specific monolithic handler
+        if (company.ToUpper() == "MTR")
+        {
+            return await GetMtrEtasAsync(stopId, routeNum);
+        }
+        
         var (client, baseUrl) = GetClient(company);
         string url;
 
@@ -132,5 +140,59 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         return (response?.Data ?? [])
             .OrderBy(e => e.Sequence)
             .ToList();
+    }
+    
+    /// <summary>
+    /// Handles the MTR POST monolithic architecture.
+    /// Extracts specific stop data from the giant payload and maps it to our unified DTO.
+    /// </summary>
+    private async Task<List<BusEtaDto>> GetMtrEtasAsync(string stopId, string routeNum)
+    {
+        try 
+        {
+            var client = httpClientFactory.CreateClient();
+            var requestBody = new { language = "zh", routeName = routeNum.ToUpper() };
+            
+            var response = await client.PostAsJsonAsync(MtrBusApiUrl, requestBody);
+            var mtrData = await response.Content.ReadFromJsonAsync<MtrBusResponse>();
+            
+            if (mtrData?.RouteStops == null) return [];
+
+            // 1. Locate the specific stop in the monolithic payload
+            var stopData = mtrData.RouteStops.FirstOrDefault(s => s.BusStopId == stopId);
+            if (stopData?.BusEtas == null) return [];
+
+            var results = new List<BusEtaDto>();
+            int seq = 1;
+
+            foreach (var eta in stopData.BusEtas)
+            {
+                // Parse "yyyy-MM-dd HH:mm:ss"
+                DateTime? parsedEta = DateTime.TryParse(eta.DepartureTime, out var dt) ? dt : null;
+
+                // Determine logical direction from MTR's stopId (e.g., "K52-U-1" -> 'U')
+                var parts = stopId.Split('-');
+                string dir = parts.Length > 1 ? parts[1] : "O";
+                string mappedDir = dir.ToUpper() == "U" ? "O" : "I"; // Map U(Up) to O(Outbound), D(Down) to I(Inbound)
+
+                results.Add(new BusEtaDto(
+                    Route: routeNum,
+                    Direction: mappedDir,
+                    Sequence: seq++,
+                    StopId: stopId,
+                    DestinationTc: eta.BusTerminal ?? "總站",
+                    EtaTime: parsedEta,
+                    RemarkTc: eta.BusRemark ?? "",
+                    RemarkEn: eta.BusRemark ?? ""
+                ));
+            }
+
+            return results.OrderBy(e => e.EtaTime ?? DateTime.MaxValue).ToList();
+        }
+        catch 
+        {
+            // Silently fail and return empty array if MTR API is down
+            return [];
+        }
     }
 }

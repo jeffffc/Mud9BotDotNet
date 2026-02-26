@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Mud9Bot.Bus.Interfaces;
-using Mud9Bot.Bus.Services;
+using Mud9Bot.Transport.Interfaces;
+using Mud9Bot.Transport.Services;
 
-namespace Mud9Bot.Bus.Extensions;
+namespace Mud9Bot.Transport.Extensions;
 
 public static class ServiceCollectionExtensions
 {
@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient();
         services.AddMemoryCache();
         services.AddScoped<IBusApiService, BusApiService>();
+        services.AddScoped<IMtrApiService, MtrApiService>();
         services.AddScoped<BusDirectory>();
         
         // We can add the BusDirectory singleton here later

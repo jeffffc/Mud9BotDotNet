@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Mud9Bot.Bus.Interfaces;
-using Mud9Bot.Bus.Services;
+using Mud9Bot.Transport.Interfaces;
+using Mud9Bot.Transport.Services;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities.Bus;
 

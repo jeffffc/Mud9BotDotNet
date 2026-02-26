@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mud9Bot 港鐵助手</title>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; }
+        .secondary-bg { background-color: var(--tg-theme-secondary-bg-color, #f4f4f4); }
+        .stop-item:active { background-color: rgba(0,0,0,0.05); }
+
+        ::-webkit-scrollbar { display: none; }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+        #mainContent { padding-bottom: 20px; }
+
+        /* Toggle Switch UI */
+        .toggle-bg { background-color: #e5e7eb; transition: background-color 0.2s; }
+        .toggle-dot { transition: transform 0.2s; }
+        input:checked + .toggle-bg { background-color: #3b82f6; }
+        input:checked + .toggle-bg .toggle-dot { transform: translateX(100%); }
+    </style>
+</head>
+<body class="antialiased select-none">
+<!-- Overall App Header (Sticky) -->
+<header id="appHeader" class="bg-white border-b border-gray-100 p-3 flex items-center justify-between sticky top-0 z-[60]">
+    <div class="flex items-center space-x-2">
+        <span class="text-xl">🚇</span>
+        <span class="font-black text-gray-800 tracking-tight">Mud9Bot <span class="text-red-500">MTR</span></span>
+    </div>
+
+    <!-- Display Mode Toggle (Mins / Time) with Chinese Labels -->
+    <div class="flex items-center space-x-2">
+        <span class="text-[11px] font-black text-gray-400">分鐘</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="displayModeToggle" class="sr-only" onchange="toggleDisplayMode()">
+            <div class="toggle-bg block w-9 h-5 rounded-full">
+                <div class="toggle-dot absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full shadow-sm border border-gray-100"></div>
+            </div>
+        </label>
+        <span class="text-[11px] font-black text-gray-400">時間</span>
+    </div>
+</header>
+
+<!-- Main Content Area (Lines / Station List) -->
+<div id="mainContent" class="p-4 pt-4">
+    <!-- Lines Grid -->
+    <div id="linesContainer" class="space-y-3 pb-10">
+        <!-- Injected via JS -->
+    </div>
+
+    <!-- Station List Container -->
+    <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
+        <!-- Floating Header for Line Details -->
+        <div id="lineHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white transition-colors duration-300">
+            <div class="flex flex-col pr-4">
+                <span id="displayLineName" class="text-2xl font-black">--</span>
+                <span id="displayLineEn" class="text-xs opacity-90 font-bold mt-1 tracking-wide uppercase">--</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="refreshVisibleEtas()" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+                <button onclick="backToLines()" class="bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-xl font-black text-sm shrink-0 border border-white/30">返回</button>
+            </div>
+        </div>
+        <div id="stopsContainer" class="divide-y divide-gray-50 min-h-[400px]"></div>
+    </div>
+
+    <div id="loading" class="text-center py-20">
+        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-red-500 border-t-transparent"></div>
+        <p class="mt-4 text-gray-500 text-sm font-black tracking-widest">載入路綫中...</p>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.BackButton.onClick(() => backToLines());
+
+    const linesContainer = document.getElementById('linesContainer');
+    const stopList = document.getElementById('stopList');
+    const loading = document.getElementById('loading');
+
+    let displayMode = localStorage.getItem('mtr_eta_mode') || 'mins';
+    let refreshInterval = null;
+    let visibilityObserver = null;
+    let visibleElements = new Set();
+    let currentLineCode = '';
+
+    // Fallback dictionary for destinations (since MTR API returns station codes like "POA")
+    // MTR API 傳返嚟嘅目的地係車站代碼，所以我哋用一個字典儲起全綫車站名用嚟翻譯。
+    const stationMap = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initToggles();
+        initVisibilityObserver();
+        loadLines();
+    });
+
+    function initToggles() {
+        document.getElementById('displayModeToggle').checked = displayMode === 'time';
+    }
+
+    function toggleDisplayMode() {
+        displayMode = document.getElementById('displayModeToggle').checked ? 'time' : 'mins';
+        localStorage.setItem('mtr_eta_mode', displayMode);
+        refreshVisibleEtas();
+    }
+
+    async function loadLines() {
+        loading.classList.remove('hidden');
+        try {
+            const res = await fetch(`/api/mtr/lines`);
+            const lines = await res.json();
+
+            linesContainer.innerHTML = lines.map(l => `
+                <div onclick="loadStations('${l.lineCode}', '${l.nameTc}', '${l.nameEn}', '${l.colorCode}')" 
+                     class="p-5 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-transform shadow-sm relative overflow-hidden"
+                     style="border-left: 8px solid ${l.colorCode}">
+                    <div class="flex flex-col">
+                        <span class="font-black text-xl text-gray-800 tracking-wide">${l.nameTc}</span>
+                        <span class="text-[10px] font-bold text-gray-400 mt-1 uppercase">${l.nameEn}</span>
+                    </div>
+                    <div class="text-gray-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (e) {
+            linesContainer.innerHTML = '<div class="text-center py-20 text-red-500 font-bold">無法載入路綫，請稍後再試。</div>';
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+
+    async function loadStations(lineCode, nameTc, nameEn, colorCode) {
+        tg.BackButton.show();
+        linesContainer.classList.add('hidden');
+
+        document.getElementById('mainContent').classList.remove('p-4', 'pt-4');
+        document.getElementById('mainContent').classList.add('p-0');
+
+        stopList.classList.remove('hidden');
+        window.scrollTo(0, 0);
+
+        currentLineCode = lineCode;
+        document.getElementById('displayLineName').innerText = nameTc;
+        document.getElementById('displayLineEn').innerText = nameEn;
+        document.getElementById('lineHeader').style.backgroundColor = colorCode;
+
+        const container = document.getElementById('stopsContainer');
+        container.innerHTML = `<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-t-transparent" style="border-color: ${colorCode}; border-top-color: transparent;"></div></div>`;
+
+        try {
+            const res = await fetch(`/api/mtr/stations/${lineCode}`);
+            const stations = await res.json();
+
+            if (!stations.length) {
+                container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>';
+                return;
+            }
+
+            // Populate station map for resolving destination codes later
+            stations.forEach(s => stationMap[s.stationCode] = s.nameTc);
+
+            container.innerHTML = stations.map((s, idx) => `
+                <div class="stop-item p-4 flex flex-col gap-3 bg-white active:bg-gray-50 transition-colors" 
+                     data-station="${s.stationCode}">
+                    
+                    <!-- Station Header -->
+                    <div class="flex items-center space-x-3">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white shadow-sm shrink-0" style="background-color: ${colorCode}">
+                            ${idx + 1}
+                        </div>
+                        <span class="font-bold text-gray-800 text-lg leading-tight tracking-wide">${s.nameTc}</span>
+                    </div>
+
+                    <!-- ETAs Grid (Up & Down) -->
+                    <div class="grid grid-cols-2 gap-2 bg-gray-50 rounded-2xl p-3 border border-gray-100">
+                        <!-- UP Direction -->
+                        <div class="border-r border-gray-200 pr-2">
+                            <div class="dir-dest-up text-[10px] font-bold text-gray-500 mb-1 leading-none tracking-tighter truncate">上行方向</div>
+                            <div class="dir-eta-up text-lg font-mono font-black text-gray-800 tracking-tighter leading-none">--</div>
+                            <div class="dir-subs-up text-[10px] font-bold text-gray-400 mt-1.5 leading-none h-3"></div>
+                        </div>
+                        
+                        <!-- DOWN Direction -->
+                        <div class="pl-2 text-right">
+                            <div class="dir-dest-down text-[10px] font-bold text-gray-500 mb-1 leading-none tracking-tighter truncate">下行方向</div>
+                            <div class="dir-eta-down text-lg font-mono font-black text-gray-800 tracking-tighter leading-none">--</div>
+                            <div class="dir-subs-down text-[10px] font-bold text-gray-400 mt-1.5 leading-none h-3"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            visibleElements.clear();
+            container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el));
+            startGlobalRefresh();
+
+        } catch (e) {
+            container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>';
+        }
+    }
+
+    function initVisibilityObserver() {
+        visibilityObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const el = entry.target;
+                if (entry.isIntersecting) {
+                    visibleElements.add(el);
+                    triggerEtaForElement(el);
+                } else {
+                    visibleElements.delete(el);
+                }
+            });
+        }, { threshold: 0.1 });
+    }
+
+    function refreshVisibleEtas() {
+        tg.HapticFeedback.impactOccurred('light');
+        visibleElements.forEach(el => triggerEtaForElement(el, false));
+    }
+
+    function startGlobalRefresh() {
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+            visibleElements.forEach(el => triggerEtaForElement(el, true));
+        }, 15000); // MTR needs faster refresh (15s) due to train frequency
+    }
+
+    function triggerEtaForElement(el, isSilent = false) {
+        const stationCode = el.dataset.station;
+        showEta(currentLineCode, stationCode, el, isSilent);
+    }
+
+    async function showEta(line, station, element, isSilent = false) {
+        const upDest = element.querySelector('.dir-dest-up');
+        const upEta = element.querySelector('.dir-eta-up');
+        const upSubs = element.querySelector('.dir-subs-up');
+
+        const dnDest = element.querySelector('.dir-dest-down');
+        const dnEta = element.querySelector('.dir-eta-down');
+        const dnSubs = element.querySelector('.dir-subs-down');
+
+        if (!isSilent) {
+            upEta.innerText = "..."; dnEta.innerText = "...";
+        }
+
+        try {
+            const res = await fetch(`/api/mtr/eta/${line}/${station}`);
+            const data = await res.json();
+
+            renderEtaColumn(data.UP, upDest, upEta, upSubs);
+            renderEtaColumn(data.DOWN, dnDest, dnEta, dnSubs);
+        } catch (e) {
+            upEta.innerText = "Error"; dnEta.innerText = "Error";
+        }
+    }
+
+    function renderEtaColumn(dataArray, destEl, etaEl, subsEl) {
+        if (!dataArray || dataArray.length === 0) {
+            destEl.innerText = "終點站/無服務";
+            etaEl.innerText = "-";
+            subsEl.innerText = "";
+            return;
+        }
+
+        // Resolve destination code to Chinese Name
+        const first = dataArray[0];
+        const destName = stationMap[first.dest] || first.dest;
+        destEl.innerText = `往 ${destName}`;
+
+        const formatTime = (etaObj) => {
+            if (displayMode === 'time' && etaObj.time) {
+                // MTR returns time like "2026-02-27 01:52:00"
+                const d = new Date(etaObj.time.replace(' ', 'T'));
+                return isNaN(d) ? etaObj.ttnt : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            } else {
+                return (etaObj.ttnt === '' || etaObj.ttnt === '0') ? '即將到達' : `${etaObj.ttnt} 分鐘`;
+            }
+        };
+
+        etaEl.innerText = formatTime(first);
+
+        if (dataArray.length > 1) {
+            subsEl.innerText = dataArray.slice(1, 3).map(formatTime).join(' / ');
+        } else {
+            subsEl.innerText = "";
+        }
+    }
+
+    function backToLines() {
+        clearInterval(refreshInterval);
+        visibleElements.clear();
+        tg.BackButton.hide();
+
+        document.getElementById('mainContent').classList.remove('p-0');
+        document.getElementById('mainContent').classList.add('p-4', 'pt-4');
+
+        stopList.classList.add('hidden');
+        linesContainer.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+</script>
+</body>
+</html>

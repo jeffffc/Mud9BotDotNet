@@ -1,8 +1,8 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Caching.Memory;
-using Mud9Bot.Bus.Models;
+using Mud9Bot.Transport.Models;
 
-namespace Mud9Bot.Bus.Interfaces;
+namespace Mud9Bot.Transport.Interfaces;
 
 public interface IBusApiService
 {

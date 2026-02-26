@@ -1,27 +1,36 @@
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Mud9Bot.Attributes;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Entities.Bus;
-using Mud9Bot.Bus.Interfaces;
+using Mud9Bot.Transport.Interfaces;
+using Mud9Bot.Transport.Models;
 using Quartz;
 
 namespace Mud9Bot.Jobs;
 
 /// <summary>
-/// Syncs bus routes and stops. Daily at 6 AM.
+/// Syncs bus routes and stops. Daily at 8 AM.
 /// Fix: Optimization logic now "touches" stops to prevent accidental deactivation during cleanup.
 /// </summary>
-[QuartzJob(Name = "Bus Route Data Update", CronInterval = "0 0 6 * * ?", RunOnStartup = true)]
-public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService, ILogger<BusDataSyncJob> logger) : IJob
+[QuartzJob(Name = "Bus Route Data Update", CronInterval = "0 0 8 * * ?", RunOnStartup = true)]
+public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService, IHttpClientFactory httpClientFactory, ILogger<BusDataSyncJob> logger) : IJob
 {
     private readonly HashSet<string> _processedStopIds = new();
     private Dictionary<string, DateTime> _existingStopsMap = new();
+    
+    // Static list of known MTR Bus routes since they don't provide a /route discovery endpoint
+    private static readonly string[] MtrRoutes = [
+        "506", "K52", "K52A", "K53", "K54", "K58", 
+        "K65", "K65A", "K66", "K68", "K73", "K74", 
+        "K75A", "K75P", "K75S", "K76", "K76S"
+    ];
 
     public async Task Execute(IJobExecutionContext context)
     {
         var syncTime = DateTime.UtcNow;
-        var apiProviders = new[] { "KMB", "CTB", "NWFB" };
+        var apiProviders = new[] { "KMB", "CTB" };
         _processedStopIds.Clear();
 
         logger.LogInformation("[BusSync] 🔍 正在預取站點地圖 (Stop Map)...");
@@ -29,6 +38,16 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
             .Select(s => new { s.StopId, s.LastUpdated })
             .ToDictionaryAsync(x => x.StopId, x => x.LastUpdated);
 
+        // ==========================================
+        // MTR BUS SPECIFIC SYNC
+        // ==========================================
+        await SyncMtrRoutesAsync(dbContext, syncTime);
+        
+        
+        // ==========================================
+        // KMB/CTB BUS SPECIFIC SYNC
+        // ==========================================
+        
         foreach (var provider in apiProviders)
         {
             logger.LogInformation("[BusSync] 🚀 開始同步 {Provider} 來源之路線資料...", provider);
@@ -165,8 +184,106 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
 
         logger.LogInformation("大佬！所有巴士資料同步完畢！🚌✨");
     }
+    
+    /// <summary>
+    /// Processes MTR routes by extracting static topology from the monolithic ETA endpoint.
+    /// </summary>
+    private async Task SyncMtrRoutesAsync(BotDbContext dbContext, DateTime syncTime)
+    {
+        logger.LogInformation("[BusSync] 🚆 開始同步 MTR 港鐵巴士路線資料...");
+        var client = httpClientFactory.CreateClient();
+        const string MtrBusApiUrl = "https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule";
 
-    private List<string> GetBounds(Mud9Bot.Bus.Models.BusRouteDto apiRoute, string provider)
+        foreach (var route in MtrRoutes)
+        {
+            try
+            {
+                var requestBody = new { language = "zh", routeName = route };
+                var response = await client.PostAsJsonAsync(MtrBusApiUrl, requestBody);
+                if (!response.IsSuccessStatusCode) continue;
+
+                var mtrData = await response.Content.ReadFromJsonAsync<MtrBusResponse>();
+                
+                // 加上防呆機制：如果 Data Model 解析出嚟係 null，馬上提醒！
+                if (mtrData?.RouteStops == null || !mtrData.RouteStops.Any()) 
+                {
+                    logger.LogWarning("[BusSync] [MTR] ⚠️ {Route} 解析唔到站點資料 (可能係 BusApiModels 嘅 JSON 名唔啱，搵唔到 'busStop' 欄位)。", route);
+                    continue;
+                }
+
+                // MTR groups bounds inside the busStopId (e.g., "K52-U-1" for Up/Outbound, "K52-D-1" for Down/Inbound)
+                var upStops = mtrData.RouteStops.Where(s => s.BusStopId.Contains("-U-")).ToList();
+                var downStops = mtrData.RouteStops.Where(s => s.BusStopId.Contains("-D-")).ToList();
+
+                await ProcessMtrBound(dbContext, syncTime, route, "O", upStops);
+                await ProcessMtrBound(dbContext, syncTime, route, "I", downStops);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "[BusSync] [MTR] ❌ {Route} 同步失敗", route);
+            }
+        }
+        await dbContext.SaveChangesAsync();
+        logger.LogInformation("[BusSync] ✅ MTR 港鐵巴士同步完成。");
+    }
+
+    private async Task ProcessMtrBound(BotDbContext dbContext, DateTime syncTime, string route, string bound, List<MtrBusRouteStop> stops)
+    {
+        if (!stops.Any()) return;
+
+        string routeId = $"MTR_{route}_{bound}_1";
+        
+        var dbRoute = await dbContext.Set<BusRoute>().FirstOrDefaultAsync(r => r.Id == routeId);
+        if (dbRoute == null)
+        {
+            dbRoute = new BusRoute { Id = routeId, Company = "MTR", RouteNumber = route, Bound = bound, ServiceType = "1" };
+            dbContext.Add(dbRoute);
+        }
+        
+        // MTR doesn't explicitly provide Origin/Dest fields, so we infer them from the first and last stop names
+        dbRoute.OriginTc = stops.First().BusStopName;
+        dbRoute.DestinationTc = stops.Last().BusStopName;
+        dbRoute.OriginEn = dbRoute.OriginTc; 
+        dbRoute.DestinationEn = dbRoute.DestinationTc;
+        dbRoute.IsActive = true;
+        dbRoute.LastUpdated = syncTime;
+
+        int seq = 1;
+        foreach (var stop in stops)
+        {
+            string stopId = stop.BusStopId;
+            
+            var dbStop = await dbContext.Set<BusStop>().FindAsync(stopId);
+            if (dbStop == null)
+            {
+                dbStop = new BusStop { StopId = stopId };
+                dbContext.Add(dbStop);
+            }
+            dbStop.NameTc = stop.BusStopName;
+            dbStop.NameEn = stop.BusStopName;
+            dbStop.Latitude = double.TryParse(stop.Latitude, out var lat) ? lat : null;
+            dbStop.Longitude = double.TryParse(stop.Longitude, out var lon) ? lon : null;
+            dbStop.IsActive = true;
+            dbStop.LastUpdated = syncTime;
+            
+            _processedStopIds.Add(stopId);
+
+            string rsId = $"{routeId}_{seq}";
+            var dbRS = await dbContext.Set<BusRouteStop>().FirstOrDefaultAsync(x => x.Id == rsId);
+            if (dbRS == null)
+            {
+                dbRS = new BusRouteStop { Id = rsId, RouteId = routeId, StopId = stopId };
+                dbContext.Add(dbRS);
+            }
+            dbRS.Sequence = seq;
+            dbRS.IsActive = true;
+            dbRS.LastUpdated = syncTime;
+            
+            seq++;
+        }
+    }
+
+    private List<string> GetBounds(Mud9Bot.Transport.Models.BusRouteDto apiRoute, string provider)
     {
         var bounds = new List<string>();
         if (!string.IsNullOrEmpty(apiRoute.Bound)) bounds.Add(apiRoute.Bound);
@@ -175,7 +292,7 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         return bounds;
     }
 
-    private string DetermineActualCompany(Mud9Bot.Bus.Models.BusRouteDto apiRoute, string provider)
+    private string DetermineActualCompany(Mud9Bot.Transport.Models.BusRouteDto apiRoute, string provider)
     {
         if (!string.IsNullOrEmpty(apiRoute.CompanyId)) return apiRoute.CompanyId.ToUpper();
         if (provider == "KMB")
