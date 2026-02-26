@@ -2,6 +2,8 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Mud9Bot;
+using Mud9Bot.Bus.Extensions;
+using Mud9Bot.Bus.Services;
 using Mud9Bot.Data;
 using Mud9Bot.Data.Interfaces;
 using Mud9Bot.Data.Services;
@@ -32,6 +34,7 @@ if (string.IsNullOrEmpty(botToken))
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddSingleton<IBlacklistService, BlacklistService>();
 
+
 // 3. Register Database (PostgreSQL)
 builder.Services.AddDbContext<BotDbContext>(options =>
 {
@@ -60,7 +63,10 @@ builder.Services.AddHttpClient("Mud9BotClient", client =>
 builder.Services.AddSingleton<IHttpService, HttpService>();
 
 // --- DYNAMIC REGISTRATION ---
-builder.Services.AddBotServicesAndModules(Assembly.GetExecutingAssembly());
+var botAssembly = typeof(Program).Assembly;
+var busAssembly = typeof(BusApiService).Assembly;
+builder.Services.AddBotServicesAndModules(botAssembly, busAssembly);
+builder.Services.AddMemoryCache();
 // ----------------------------
 
 // 7. Register Handler & Worker

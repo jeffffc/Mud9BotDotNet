@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mud9Bot 巴士助手</title>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; }
+        .secondary-bg { background-color: var(--tg-theme-secondary-bg-color, #f4f4f4); }
+        .accent-btn { background-color: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #ffffff); }
+        .stop-item:active { background-color: rgba(0,0,0,0.05); }
+
+        /* Highlight for the closest stop */
+        .stop-highlight { background-color: rgba(36, 129, 204, 0.08) !important; border-left: 4px solid var(--tg-theme-button-color, #2481cc); }
+
+        /* Custom Keyboard Animation & Layout */
+        #customKeyboard {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(100%);
+            padding-top: 12px;
+        }
+        #customKeyboard.show {
+            transform: translateY(0);
+        }
+        .kb-key {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            font-weight: 800;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            height: 54px;
+            user-select: none;
+            transition: all 0.1s;
+            color: #333;
+        }
+        .kb-key:active { transform: scale(0.95); background-color: #f0f0f0; }
+
+        /* Pulsing hint for scrollable area */
+        @keyframes pulse-hint {
+            0%, 100% { opacity: 0.2; transform: translateX(-50%) translateY(0); }
+            50% { opacity: 1; transform: translateX(-50%) translateY(4px); }
+        }
+        @keyframes pulse-hint-up {
+            0%, 100% { opacity: 0.2; transform: translateX(-50%) translateY(0); }
+            50% { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+        }
+        .scroll-hint-down { animation: pulse-hint 2s infinite; }
+        .scroll-hint-up { animation: pulse-hint-up 2s infinite; }
+
+        .filter-chip {
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            color: #4b5563;
+        }
+        .filter-chip.active {
+            background-color: var(--tg-theme-button-color, #2481cc) !important;
+            color: var(--tg-theme-button-text-color, #ffffff) !important;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar { display: none; }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+        #mainContent { padding-bottom: 20px; }
+        #mainContent.keyboard-open { padding-bottom: 420px; }
+
+        #routeHeader {
+            background-color: var(--tg-theme-button-color, #2481cc);
+        }
+
+        /* Toggle Switch UI */
+        .toggle-bg { background-color: #e5e7eb; transition: background-color 0.2s; }
+        .toggle-dot { transition: transform 0.2s; }
+        input:checked + .toggle-bg { background-color: #3b82f6; }
+        input:checked + .toggle-bg .toggle-dot { transform: translateX(100%); }
+    </style>
+</head>
+<body class="antialiased select-none">
+<!-- Overall App Header (Sticky) -->
+<header id="appHeader" class="bg-white border-b border-gray-100 p-3 flex items-center justify-between sticky top-0 z-[60]">
+    <div class="flex items-center space-x-2">
+        <span class="text-xl">🚌</span>
+        <span class="font-black text-gray-800 tracking-tight">Mud9Bot <span class="text-blue-500">BUS</span></span>
+    </div>
+
+    <!-- Display Mode Toggle (Mins / Time) with Chinese Labels -->
+    <div class="flex items-center space-x-2">
+        <span class="text-[11px] font-black text-gray-400">分鐘</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="displayModeToggle" class="sr-only" onchange="toggleDisplayMode()">
+            <div class="toggle-bg block w-9 h-5 rounded-full">
+                <div class="toggle-dot absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full shadow-sm border border-gray-100"></div>
+            </div>
+        </label>
+        <span class="text-[11px] font-black text-gray-400">時間</span>
+    </div>
+</header>
+
+<!-- Search & Filter Section (Sticky below Header) -->
+<div id="searchSection" class="sticky top-[53px] z-50 bg-white/80 backdrop-blur-md border-b border-gray-50">
+    <div class="p-4 pb-2">
+        <div class="relative w-full">
+            <input type="text" id="routeSearch"
+                   inputmode="none"
+                   placeholder="搵路線 (例如 74C, 968)"
+                   autocomplete="off"
+                   class="w-full p-4 rounded-2xl border-none focus:ring-2 focus:ring-blue-500 bg-gray-100 text-black outline-none font-bold text-lg">
+            <button id="clearSearch" class="hidden absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="px-4 pb-4 flex space-x-2 overflow-x-auto no-scrollbar">
+        <button onclick="setFilter('ALL')" data-filter="ALL" class="filter-chip active px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">全部</button>
+        <button onclick="setFilter('NEARBY')" data-filter="NEARBY" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 flex items-center shrink-0 font-bold">📍 附近</button>
+        <button onclick="setFilter('KMB')" data-filter="KMB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">九巴</button>
+        <button onclick="setFilter('LWB')" data-filter="LWB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">龍運</button>
+        <button onclick="setFilter('CTB')" data-filter="CTB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">城巴</button>
+    </div>
+</div>
+
+<!-- Main Content Area (Results / Stop List) -->
+<div id="mainContent" class="p-4 pt-2">
+    <div id="searchResults" class="space-y-3 pb-10"></div>
+
+    <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
+        <!-- Floating Header for Route Details - Fixed docking logic -->
+        <div id="routeHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white">
+            <div class="flex flex-col pr-4">
+                <div class="flex items-center space-x-2">
+                    <span id="displayRouteName" class="text-3xl font-black">--</span>
+                    <span id="specialTagHeader" class="hidden text-[11px] bg-amber-400 text-white px-2 py-1 rounded-lg font-black whitespace-nowrap shadow-sm">特別班次</span>
+                </div>
+                <span id="displayRouteSub" class="text-xs opacity-90 font-bold mt-1 tracking-wide">--</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="refreshVisibleEtas()" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+                <button onclick="backToSearch()" class="bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-xl font-black text-sm shrink-0 border border-white/30">返回</button>
+            </div>
+        </div>
+        <div id="stopsContainer" class="divide-y divide-gray-50 min-h-[400px]"></div>
+    </div>
+
+    <div id="loading" class="hidden text-center py-20">
+        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+        <p class="mt-4 text-gray-500 text-sm font-black tracking-widest">正在處理中...</p>
+    </div>
+</div>
+
+<!-- Custom High-Performance Keyboard -->
+<div id="customKeyboard" class="fixed bottom-0 left-0 right-0 bg-gray-200 shadow-[0_-15px_50px_rgba(0,0,0,0.2)] z-[100] border-t border-gray-300 p-3 safe-area-bottom rounded-t-[2.5rem]">
+    <div class="flex">
+        <div class="grid grid-cols-3 gap-2.5 w-[65%] pr-2.5 border-r border-gray-300">
+            <button class="kb-key" onclick="keyTap('1')">1</button>
+            <button class="kb-key" onclick="keyTap('2')">2</button>
+            <button class="kb-key" onclick="keyTap('3')">3</button>
+            <button class="kb-key" onclick="keyTap('4')">4</button>
+            <button class="kb-key" onclick="keyTap('5')">5</button>
+            <button class="kb-key" onclick="keyTap('6')">6</button>
+            <button class="kb-key" onclick="keyTap('7')">7</button>
+            <button class="kb-key" onclick="keyTap('8')">8</button>
+            <button class="kb-key" onclick="keyTap('9')">9</button>
+            <button class="kb-key bg-red-50 text-red-500 text-[11px]" onclick="keyTap('CLEAR')">清除</button>
+            <button class="kb-key" onclick="keyTap('0')">0</button>
+            <button class="kb-key bg-gray-50" onclick="keyTap('BACK')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z" />
+                </svg>
+            </button>
+        </div>
+        <div class="flex flex-col w-[35%] pl-2.5 relative">
+            <!-- Top scroll hint (pulsing up) -->
+            <div id="kbUpHint" class="absolute top-1 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" />
+                </svg>
+            </div>
+
+            <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[238px] pb-4" onscroll="handleKbScroll()"></div>
+
+            <!-- Bottom scroll hint (pulsing down) -->
+            <div id="kbDownHint" class="absolute bottom-1 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+        </div>
+    </div>
+    <button onclick="toggleKeyboard(false)" class="w-full mt-3 py-3 text-[10px] text-gray-400 font-black uppercase tracking-[0.4em]">收起鍵盤</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.BackButton.onClick(() => backToSearch());
+
+    const searchInput = document.getElementById('routeSearch');
+    const searchResults = document.getElementById('searchResults');
+    const searchSection = document.getElementById('searchSection');
+    const stopList = document.getElementById('stopList');
+    const loading = document.getElementById('loading');
+    const keyboard = document.getElementById('customKeyboard');
+    const letterPad = document.getElementById('letterPad');
+    const clearSearchBtn = document.getElementById('clearSearch');
+
+    const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴' };
+
+    let fullDirectory = [];
+    let nearbyResults = [];
+    let filteredPool = [];
+    let visibleCount = 30;
+    let currentFilter = 'ALL';
+    let searchTimeout = null;
+    let refreshInterval = null;
+    let lastKnownPos = null;
+    let visibilityObserver = null;
+    let visibleElements = new Set();
+
+    let displayMode = localStorage.getItem('bus_eta_mode') || 'mins';
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initApp();
+        initToggles();
+        window.addEventListener('scroll', handleInfiniteScroll);
+        initVisibilityObserver();
+    });
+
+    function initToggles() {
+        document.getElementById('displayModeToggle').checked = displayMode === 'time';
+    }
+
+    function toggleDisplayMode() {
+        displayMode = document.getElementById('displayModeToggle').checked ? 'time' : 'mins';
+        localStorage.setItem('bus_eta_mode', displayMode);
+        refreshVisibleEtas();
+    }
+
+    // Keyboard scroll hint logic
+    function handleKbScroll() {
+        const el = document.getElementById('letterPad');
+        const up = document.getElementById('kbUpHint');
+        const down = document.getElementById('kbDownHint');
+
+        // Show up hint if we've scrolled down a bit
+        up.classList.toggle('opacity-0', el.scrollTop < 10);
+
+        // Show down hint if we are NOT at the bottom
+        const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
+        down.classList.toggle('opacity-0', isAtBottom);
+    }
+
+    async function initApp() {
+        const cached = localStorage.getItem('bus_dir_v2');
+        const expiry = localStorage.getItem('bus_dir_exp_v2');
+        navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
+
+        if (cached && expiry && Date.now() < parseInt(expiry)) {
+            fullDirectory = JSON.parse(cached);
+            applyLocalFilter();
+        } else {
+            loading.classList.remove('hidden');
+            try {
+                const res = await fetch(`/api/bus/search?q=ALL`);
+                fullDirectory = await res.json();
+                fullDirectory.sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }));
+                localStorage.setItem('bus_dir_v2', JSON.stringify(fullDirectory));
+                localStorage.setItem('bus_dir_exp_v2', (Date.now() + 86400000).toString());
+                applyLocalFilter();
+            } catch (e) { console.error(e); }
+            loading.classList.add('hidden');
+        }
+    }
+
+    function initVisibilityObserver() {
+        visibilityObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const el = entry.target;
+                if (entry.isIntersecting) {
+                    visibleElements.add(el);
+                    triggerEtaForElement(el);
+                } else {
+                    visibleElements.delete(el);
+                }
+            });
+        }, { threshold: 0.1 });
+    }
+
+    function handleInfiniteScroll() {
+        if (!stopList.classList.contains('hidden')) return;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const clientHeight = window.innerHeight;
+        if (scrollTop + clientHeight >= scrollHeight - 350) {
+            if (visibleCount < filteredPool.length) {
+                visibleCount += 10;
+                renderResults();
+            }
+        }
+    }
+
+    function setFilter(filter) {
+        tg.HapticFeedback.selectionChanged();
+        currentFilter = filter;
+        document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-filter') === filter));
+        visibleCount = 30;
+        window.scrollTo(0, 0);
+        if (filter === 'NEARBY') { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); requestNearby(); }
+        else { applyLocalFilter(); }
+    }
+
+    async function requestNearby() {
+        loading.classList.remove('hidden');
+        searchResults.innerHTML = '<div class="text-center py-20 opacity-40 text-sm font-bold animate-pulse">正在精確定位中...</div>';
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            lastKnownPos = pos;
+            try {
+                const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
+                nearbyResults = await res.json();
+                if (!nearbyResults || nearbyResults.length === 0) {
+                    searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
+                } else {
+                    filteredPool = nearbyResults;
+                    renderResults();
+                }
+            } catch (e) { searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>'; }
+            finally { loading.classList.add('hidden'); }
+        }, (err) => {
+            loading.classList.add('hidden');
+        }, { timeout: 8000, enableHighAccuracy: true });
+    }
+
+    function applyLocalFilter() {
+        const query = searchInput.value.trim().toUpperCase();
+        let sourcePool = currentFilter === 'NEARBY' ? nearbyResults : fullDirectory;
+        let pool = [...sourcePool];
+        if (query) pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
+        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') pool = pool.filter(r => r.company === currentFilter);
+        filteredPool = pool;
+        renderResults();
+        updateKeyboard();
+    }
+
+    function renderResults() {
+        if (filteredPool.length === 0) {
+            searchResults.innerHTML = '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關路線喎...</div>';
+            return;
+        }
+        const html = filteredPool.slice(0, visibleCount).map(r => {
+            const boundText = (r.bound === 'I' || r.bound === 'inbound') ? '回程' : '去程';
+            return `
+                <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${(r.dest_tc || '未知').replace(/'/g, "\\'")}', '${r.service_type || '1'}', '${(r.orig_tc || '總站').replace(/'/g, "\\'")}')" 
+                     class="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all shadow-sm relative overflow-hidden">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex flex-col items-center justify-center min-w-[60px]">
+                            <span class="font-black text-2xl text-blue-600 leading-none">${r.route}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded mt-1.5 bg-gray-100 text-gray-500 font-black tracking-tighter">${companyMap[r.company] || r.company}</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="flex items-center flex-wrap">
+                                <span class="text-sm font-bold text-gray-800">往 ${r.dest_tc}</span>
+                                ${r.service_type && r.service_type !== '1' ? '<span class="ml-1 text-[9px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">特別班次</span>' : ''}
+                            </div>
+                            <span class="text-[10px] text-gray-400 font-bold mt-0.5">由 ${r.orig_tc || '總站'} 開出</span>
+                        </div>
+                    </div>
+                    <div class="text-[10px] font-black text-blue-500 bg-blue-50 px-3 py-1.5 rounded-xl uppercase tracking-widest">${boundText}</div>
+                </div>
+            `;
+        }).join('');
+        searchResults.innerHTML = html;
+        searchResults.classList.remove('hidden');
+    }
+
+    function updateKeyboard() {
+        const val = searchInput.value.trim().toUpperCase();
+        const validLettersSet = new Set();
+        fullDirectory.forEach(r => {
+            const route = r.route.toUpperCase();
+            if (val === "") { if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]); }
+            else if (route.startsWith(val)) {
+                const next = route.slice(val.length);
+                if (next.length > 0 && /[A-Z]/.test(next[0])) validLettersSet.add(next[0]);
+            }
+        });
+        const letters = Array.from(validLettersSet).sort();
+        letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-blue-50 text-blue-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
+
+        // Trigger initial scroll hint check
+        setTimeout(handleKbScroll, 100);
+    }
+
+    function keyTap(val) {
+        tg.HapticFeedback.selectionChanged();
+        if (val === 'BACK') searchInput.value = searchInput.value.slice(0, -1);
+        else if (val === 'CLEAR') searchInput.value = '';
+        else searchInput.value += val;
+        clearSearchBtn.classList.toggle('hidden', searchInput.value.length === 0);
+        window.scrollTo(0, 0);
+        applyLocalFilter();
+    }
+
+    async function performSearch(query) {
+        visibleCount = 30;
+        window.scrollTo(0, 0);
+        applyLocalFilter();
+    }
+
+    searchInput.addEventListener('click', () => { toggleKeyboard(true); setTimeout(() => { searchInput.focus(); searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length); }, 50); });
+    searchInput.addEventListener('input', (e) => { clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0); clearTimeout(searchTimeout); searchTimeout = setTimeout(() => performSearch(e.target.value.trim()), 100); });
+    clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); performSearch(''); });
+
+    function toggleKeyboard(show) {
+        keyboard.classList.toggle('show', show);
+        document.getElementById('mainContent').classList.toggle('keyboard-open', show);
+        if (show) updateKeyboard();
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+        return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+    }
+
+    async function loadRoute(route, bound, company, dest, serviceType, orig) {
+        toggleKeyboard(false); tg.BackButton.show();
+        searchSection.classList.add('hidden'); searchResults.classList.add('hidden'); stopList.classList.remove('hidden'); window.scrollTo(0, 0);
+
+        document.getElementById('displayRouteName').innerText = route;
+        document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1');
+        document.getElementById('displayRouteSub').innerText = `往 ${dest} • ${companyMap[company] || company}`;
+
+        const container = document.getElementById('stopsContainer');
+        container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div></div>';
+
+        const effectiveBound = (company === 'KMB' || company === 'LWB') ? (bound.toLowerCase() === 'inbound' ? 'I' : 'O') : bound;
+        const routeId = `${company}_${route}_${effectiveBound}_${serviceType}`;
+
+        try {
+            const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
+            const stops = await res.json();
+            if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
+
+            let closestIdx = -1;
+            if (lastKnownPos) {
+                let minVal = Infinity;
+                stops.forEach((s, idx) => {
+                    const dist = getDistance(lastKnownPos.coords.latitude, lastKnownPos.coords.longitude, s.latitude, s.longitude);
+                    if (dist < minVal) { minVal = dist; closestIdx = idx; }
+                });
+            }
+
+            container.innerHTML = stops.map((s, idx) => `
+                <div id="stop-row-${idx}" class="stop-item p-5 flex justify-between items-start bg-white active:bg-gray-50 transition-colors ${idx === closestIdx ? 'stop-highlight' : ''}" 
+                     data-company="${company}" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
+                    <div class="flex items-center space-x-4 pt-1">
+                        <div class="w-8 h-8 rounded-full border-2 border-blue-500 flex items-center justify-center text-[11px] font-black text-blue-500 shadow-sm shrink-0">${s.sequence}</div>
+                        <span class="font-bold text-gray-800 text-base leading-tight">${s.nameTc}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="eta-main text-lg font-mono font-black text-blue-600 tracking-tighter leading-none">--</div>
+                        <div class="eta-subs text-[10px] font-bold text-gray-400 mt-1 leading-none">...</div>
+                    </div>
+                </div>
+            `).join('');
+
+            visibleElements.clear();
+            container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el));
+            startGlobalRefresh();
+
+            // Auto-scroll logic to put closest stop at 3rd row
+            if (closestIdx !== -1) {
+                setTimeout(() => {
+                    const scrollTargetIdx = Math.max(0, closestIdx - 2);
+                    const targetEl = document.getElementById(`stop-row-${scrollTargetIdx}`);
+                    if (targetEl) {
+                        const totalHeaderHeight = 53 + (document.getElementById('routeHeader')?.offsetHeight || 88);
+                        const elementAbsoluteTop = targetEl.getBoundingClientRect().top + window.pageYOffset;
+                        window.scrollTo({ top: elementAbsoluteTop - totalHeaderHeight, behavior: 'smooth' });
+                    }
+                }, 500);
+            }
+        } catch (e) { container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>'; }
+    }
+
+    function refreshVisibleEtas() {
+        tg.HapticFeedback.impactOccurred('light');
+        visibleElements.forEach(el => triggerEtaForElement(el, false));
+    }
+
+    function startGlobalRefresh() {
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => { visibleElements.forEach(el => triggerEtaForElement(el, true)); }, 30000);
+    }
+
+    function triggerEtaForElement(el, isSilent = false) {
+        const d = el.dataset;
+        showEta(d.company, d.stop, d.route, d.bound, d.type, el, isSilent);
+    }
+
+    async function showEta(company, stopId, route, bound, serviceType, element, isSilent = false) {
+        const mainText = element.querySelector('.eta-main');
+        const subsText = element.querySelector('.eta-subs');
+        if (!isSilent) mainText.innerText = "...";
+        try {
+            const res = await fetch(`/api/bus/eta/${company}/${stopId}/${route}/${serviceType}?bound=${bound}`);
+            const data = await res.json();
+            if (!data || data.length === 0) { mainText.innerText = "暫無班次"; subsText.innerText = ""; return; }
+
+            const now = new Date();
+            const formatted = data.slice(0, 3).map(e => {
+                if (!e.eta) return { display: e.rmk_tc || "末班已過" };
+
+                const arrivalTime = new Date(e.eta);
+                if (displayMode === 'time') {
+                    return { display: arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) };
+                } else {
+                    const diff = Math.floor((arrivalTime - now) / 60000);
+                    return { display: diff <= 0 ? "即將到站" : `${diff}分` };
+                }
+            });
+
+            mainText.innerText = formatted[0].display;
+            subsText.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
+        } catch (e) { mainText.innerText = "Error"; }
+    }
+
+    function backToSearch() {
+        clearInterval(refreshInterval); visibleElements.clear();
+        tg.BackButton.hide(); stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); window.scrollTo(0, 0);
+    }
+</script>
+</body>
+</html>

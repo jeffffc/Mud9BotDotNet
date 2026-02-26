@@ -41,7 +41,7 @@ public class BotDbContext : DbContext
         var entityTypes = Assembly.GetExecutingAssembly().GetTypes()
             .Where(t => t.IsClass 
                         && !t.IsAbstract 
-                        && t.Namespace == "Mud9Bot.Data.Entities");
+                        && (t.Namespace == ("Mud9Bot.Data.Entities") || t.Namespace == ("Mud9Bot.Data.Entities.Bus")));
 
         foreach (var type in entityTypes)
         {

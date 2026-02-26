@@ -11,7 +11,11 @@ using Mud9Bot.Data;
 using Mud9Bot.Data.Entities;
 using Mud9Bot.Data.Interfaces;
 using Mud9Bot.Data.Services;
-using Microsoft.AspNetCore.Mvc; // Ensure this is at the top
+using Microsoft.AspNetCore.Mvc;
+using Mud9Bot.Bus.Services; // Ensure this is at the top
+using Microsoft.Extensions.DependencyInjection;
+using Mud9Bot.Bus.Extensions;
+using Mud9Bot.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +52,11 @@ builder.Services.AddAuthorization();
 // Core Logic Services (Shared with Bot project) / 核心邏輯服務 (與 Bot 專案共用)
 builder.Services.AddSingleton<ISettingsService, SettingsService>();
 builder.Services.AddSingleton<IBlacklistService, BlacklistService>();
+builder.Services.AddBusSharedServices();
+
+builder.Services.AddControllers();
+
+builder.Services.AddSingleton<TelegramAuthService>();
 
 // Utility Services / 工具類服務
 builder.Services.AddHttpClient(); // Required for Telegram Broadcast / 廣播功能必要組件
@@ -66,6 +75,14 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     await services.GetRequiredService<ISettingsService>().InitializeAsync();
     await services.GetRequiredService<IBlacklistService>().InitializeAsync();
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    // Correct: Get the service from the Provider (scope.ServiceProvider)
+    var busDirectory = scope.ServiceProvider.GetRequiredService<BusDirectory>();
+    // This loads the data from DB into Memory
+    await busDirectory.InitializeAsync();
 }
 
 app.UseAuthentication();
@@ -90,6 +107,12 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/api"))
     {
+        if (app.Environment.IsDevelopment())
+        {
+            await next();
+            return;
+        }
+        
         var fetchMode = context.Request.Headers["Sec-Fetch-Mode"].ToString();
         if (string.Equals(fetchMode, "navigate", StringComparison.OrdinalIgnoreCase))
         {
@@ -107,7 +130,7 @@ app.Use(async (context, next) =>
     string host = context.Request.Host.Host.ToLower();
 
     // 修正：偵測到 localhost 或開發模式時跳過導向，避免本地端偵錯失敗
-    if (host == "localhost" || host == "127.0.0.1" || app.Environment.IsDevelopment())
+    if (host == "localhost" || host == "127.0.0.1" || host.Contains("ngrok") || app.Environment.IsDevelopment())
     {
         await next();
         return;
@@ -116,12 +139,13 @@ app.Use(async (context, next) =>
     string? targetSub = path switch {
         "/admin.html" or "/admin" => "admin",
         "/dashboard.html" or "/dashboard" or "/stats" => "stats",
+        "/bus.html" or "/bus" => "bus",
         _ => null
     };
 
     if (targetSub != null && !host.StartsWith($"{targetSub}."))
     {
-        string baseDomain = host.Replace("stats.", "").Replace("site.", "").Replace("admin.", "");
+        string baseDomain = host.Replace("stats.", "").Replace("site.", "").Replace("admin.", "").Replace("bus.", "");
         // ⚠️ 使用 false (302) 而非 301，防止瀏覽器死記硬背快取
         context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
         return;
@@ -129,8 +153,15 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
 app.UseDefaultFiles(); 
 app.UseStaticFiles(); 
+app.MapControllers();
 
 // 🚀 核心統一路由邏輯 (Root & Fallback)
 var serveHtmlDelegate = async (HttpContext context) => {
@@ -145,6 +176,10 @@ var serveHtmlDelegate = async (HttpContext context) => {
     else if (host.StartsWith("stats.") || host.StartsWith("site.") || path.StartsWith("/stats") || path.StartsWith("/dashboard"))
     {
         await context.Response.SendFileAsync("wwwroot/dashboard.html");
+    }
+    else if (host.StartsWith("bus.") || path.StartsWith("/bus"))
+    {
+        await context.Response.SendFileAsync("wwwroot/bus.html");
     }
     else
     {

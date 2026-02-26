@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Mud9Bot.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mud9Bot.Data.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    partial class BotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260225181827_BusETA2")]
+    partial class BusETA2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -263,89 +266,72 @@ namespace Mud9Bot.Data.Migrations
             modelBuilder.Entity("Mud9Bot.Data.Entities.Bus.BusRoute", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
+                        .HasColumnType("text");
 
                     b.Property<string>("Bound")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("bound");
+                        .HasColumnType("text");
 
                     b.Property<string>("Company")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("company");
+                        .HasColumnType("text");
 
                     b.Property<string>("DestinationEn")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("destination_en");
+                        .HasColumnType("text");
 
                     b.Property<string>("DestinationTc")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("destination_tc");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_updated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("OriginEn")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("origin_en");
+                        .HasColumnType("text");
 
                     b.Property<string>("OriginTc")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("origin_tc");
+                        .HasColumnType("text");
 
                     b.Property<string>("RouteNumber")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("route_number");
+                        .HasColumnType("text");
 
                     b.Property<string>("ServiceType")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("service_type");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
-                    b.ToTable("bus_routes");
+                    b.ToTable("BusRoute");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Bus.BusRouteStop", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_updated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RouteId")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("route_id");
+                        .HasColumnType("text");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer")
-                        .HasColumnName("sequence");
+                        .HasColumnType("integer");
 
                     b.Property<string>("StopId")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("stop_id");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -353,44 +339,37 @@ namespace Mud9Bot.Data.Migrations
 
                     b.HasIndex("StopId");
 
-                    b.ToTable("bus_route_stops");
+                    b.ToTable("BusRouteStop");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.Bus.BusStop", b =>
                 {
                     b.Property<string>("StopId")
-                        .HasColumnType("text")
-                        .HasColumnName("stop_id");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("LastUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_updated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<double?>("Latitude")
-                        .HasColumnType("double precision")
-                        .HasColumnName("latitude");
+                        .HasColumnType("double precision");
 
                     b.Property<double?>("Longitude")
-                        .HasColumnType("double precision")
-                        .HasColumnName("longitude");
+                        .HasColumnType("double precision");
 
                     b.Property<string>("NameEn")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_en");
+                        .HasColumnType("text");
 
                     b.Property<string>("NameTc")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name_tc");
+                        .HasColumnType("text");
 
                     b.HasKey("StopId");
 
-                    b.ToTable("bus_stops");
+                    b.ToTable("BusStop");
                 });
 
             modelBuilder.Entity("Mud9Bot.Data.Entities.CommandLog", b =>
@@ -787,7 +766,7 @@ namespace Mud9Bot.Data.Migrations
                         {
                             SettingKey = "broadcast_delay_ms",
                             Description = "Delay between messages during global broadcast (ms)",
-                            LastUpdated = new DateTime(2026, 2, 25, 18, 21, 35, 517, DateTimeKind.Utc).AddTicks(4790),
+                            LastUpdated = new DateTime(2026, 2, 25, 18, 18, 26, 991, DateTimeKind.Utc).AddTicks(850),
                             SettingValue = "35"
                         },
                         new
