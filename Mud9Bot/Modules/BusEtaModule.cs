@@ -12,14 +12,14 @@ namespace Mud9Bot.Modules;
 /// Module to handle Bus ETA requests via Telegram WebApp.
 /// 處理巴士 ETA 請求嘅 WebApp 模組。
 /// </summary>
-public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, ILogger<BusEtaModule> logger)
+public class BusEtaModule(IConfiguration config, ILogger<BusEtaModule> logger)
 {
     /// <summary>
     /// Handles the /bus command to launch the Mini App.
     /// 處理 /bus 指令，用嚟開個 Mini App 出嚟。
     /// </summary>
     [Command("bus")]
-    public async Task HandleBusCommand(Message message, string[] args, CancellationToken ct)
+    public async Task HandleBusCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
     {
         // Retrieve the WebApp URL and Log Group ID from configuration
         // 喺 appsettings.json 攞返個 WebAppUrl 同埋 Log Group ID
@@ -32,7 +32,7 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
         {
             // 1. Reply to user using Mud9Bot's persona
             // 用返 Mud9Bot 嘅語氣覆 user 話用唔到住
-            await botClient.SendMessage(
+            await bot.SendMessage(
                 chatId: message.Chat.Id,
                 text: "呢個功能暫時仲未用得住喎，遲啲先啦！🌚",
                 cancellationToken: ct
@@ -46,7 +46,7 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
                     ? $"@{message.From.Username ?? "N/A"} ({message.From.Id})" 
                     : "Unknown User";
 
-                await botClient.SendMessage(
+                await bot.SendMessage(
                     chatId: logGroupId,
                     text: $"⚠️ 報告！有人試圖用 /bus 指令，但係 WebAppUrl 仲未 set 呀！\n\nUser: {userInfo}",
                     cancellationToken: ct
@@ -68,7 +68,7 @@ public class BusEtaModule(IConfiguration config, ITelegramBotClient botClient, I
 
         // Send a playful Cantonese message with the launch button
         // 用返 Mud9bot 嘅搞怪口吻覆 user
-        await botClient.SendMessage(
+        await bot.SendMessage(
             chatId: message.Chat.Id,
             text: "想知架車幾時到？撳下面粒掣入去睇吓啦，唔使再喺條街度戇居居等喇！🚀",
             replyMarkup: keyboard,
