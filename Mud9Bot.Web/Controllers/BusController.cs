@@ -32,6 +32,7 @@ public class BusController(
     public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng)
     {
         // Increased offset to 0.01 (~1km) for better discovery range
+        
         double offset = 0.01; 
         double minLat = lat - offset;
         double maxLat = lat + offset;
