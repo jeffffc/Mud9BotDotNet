@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mud9Bot 小巴助手</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; }
+        .secondary-bg { background-color: var(--tg-theme-secondary-bg-color, #f4f4f4); }
+        .accent-btn { background-color: #16a34a; color: #ffffff; }
+        .stop-item:active { background-color: rgba(0,0,0,0.05); }
+
+        .stop-highlight { background-color: rgba(22, 163, 74, 0.08) !important; border-left: 4px solid #16a34a; }
+
+        #customKeyboard {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(100%);
+            padding-top: 12px;
+        }
+        #customKeyboard.show { transform: translateY(0); }
+        .kb-key {
+            display: flex; align-items: center; justify-content: center;
+            background: white; border-radius: 12px; font-weight: 800;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 54px;
+            user-select: none; transition: all 0.1s; color: #333;
+        }
+        .kb-key:active { transform: scale(0.95); background-color: #f0f0f0; }
+
+        /* Scroll hints */
+        @keyframes pulse-hint {
+            0%, 100% { opacity: 0.2; transform: translateX(-50%) translateY(0); }
+            50% { opacity: 1; transform: translateX(-50%) translateY(4px); }
+        }
+        @keyframes pulse-hint-up {
+            0%, 100% { opacity: 0.2; transform: translateX(-50%) translateY(0); }
+            50% { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+        }
+        .scroll-hint-down { animation: pulse-hint 2s infinite; }
+        .scroll-hint-up { animation: pulse-hint-up 2s infinite; }
+
+        .filter-chip { transition: all 0.2s; border: 1px solid transparent; color: #4b5563; }
+        .filter-chip.active {
+            background-color: #16a34a !important;
+            color: #ffffff !important;
+            font-weight: bold;
+        }
+
+        ::-webkit-scrollbar { display: none; }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        #mainContent { padding-bottom: 20px; }
+        #mainContent.keyboard-open { padding-bottom: 420px; }
+        #routeHeader { background-color: #16a34a; }
+
+        .toggle-bg { background-color: #e5e7eb; transition: background-color 0.2s; }
+        .toggle-dot { transition: transform 0.2s; }
+        input:checked + .toggle-bg { background-color: #16a34a; }
+        input:checked + .toggle-bg .toggle-dot { transform: translateX(100%); }
+    </style>
+</head>
+<body class="antialiased select-none">
+<header id="appHeader" class="bg-white border-b border-gray-100 p-3 flex items-center justify-between sticky top-0 z-[60]">
+    <div class="flex items-center space-x-2">
+        <span class="text-xl">🚐</span>
+        <span class="font-black text-gray-800 tracking-tight">Mud9Bot <span class="text-green-600">MINIBUS</span></span>
+    </div>
+    <div class="flex items-center space-x-2">
+        <span class="text-[11px] font-black text-gray-400">分鐘</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="displayModeToggle" class="sr-only" onchange="toggleDisplayMode()">
+            <div class="toggle-bg block w-9 h-5 rounded-full">
+                <div class="toggle-dot absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full shadow-sm border border-gray-100"></div>
+            </div>
+        </label>
+        <span class="text-[11px] font-black text-gray-400">時間</span>
+    </div>
+</header>
+
+<div id="searchSection" class="sticky top-[53px] z-50 bg-white/80 backdrop-blur-md border-b border-gray-50">
+    <div class="p-4 pb-2">
+        <div class="relative w-full">
+            <input type="text" id="routeSearch" inputmode="none" placeholder="搵小巴 (例如 1A, 20M)" autocomplete="off"
+                   class="w-full p-4 rounded-2xl border-none focus:ring-2 focus:ring-green-500 bg-gray-100 text-black outline-none font-bold text-lg">
+            <button id="clearSearch" class="hidden absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="px-4 pb-4 flex space-x-2 overflow-x-auto no-scrollbar">
+        <button onclick="setFilter('ALL')" data-filter="ALL" class="filter-chip active px-6 py-2.5 rounded-full text-xs bg-gray-100 shrink-0 font-bold">全部小巴</button>
+        <button onclick="setFilter('NEARBY')" data-filter="NEARBY" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 flex items-center shrink-0 font-bold">📍 附近</button>
+        <button onclick="setFilter('GMB_HKI')" data-filter="GMB_HKI" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 shrink-0 font-bold">港島</button>
+        <button onclick="setFilter('GMB_KLN')" data-filter="GMB_KLN" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 shrink-0 font-bold">九龍</button>
+        <button onclick="setFilter('GMB_NT')" data-filter="GMB_NT" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 shrink-0 font-bold">新界</button>
+    </div>
+</div>
+
+<div id="mainContent" class="p-4 pt-2">
+    <div id="searchResults" class="space-y-3 pb-10"></div>
+    <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
+        <div id="routeHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white">
+            <div class="flex flex-col pr-4">
+                <div class="flex items-center space-x-2">
+                    <span id="displayRouteName" class="text-3xl font-black">--</span>
+                </div>
+                <span id="displayRouteSub" class="text-xs opacity-90 font-bold mt-1 tracking-wide">--</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div id="reverseBtnContainer"></div>
+                <button onclick="refreshVisibleEtas()" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                </button>
+                <button onclick="backToSearch()" class="bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-xl font-black text-sm shrink-0 border border-white/30">返回</button>
+            </div>
+        </div>
+        <div id="stopsContainer" class="divide-y divide-gray-50 min-h-[400px]"></div>
+    </div>
+    <div id="loading" class="hidden text-center py-20">
+        <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
+        <p class="mt-4 text-gray-500 text-sm font-black tracking-widest">正在載入小巴路線...</p>
+    </div>
+</div>
+
+<div id="customKeyboard" class="fixed bottom-0 left-0 right-0 bg-gray-200 shadow-[0_-15px_50px_rgba(0,0,0,0.2)] z-[100] border-t border-gray-300 p-3 safe-area-bottom rounded-t-[2.5rem]">
+    <div class="flex">
+        <div class="grid grid-cols-3 gap-2.5 w-[65%] pr-2.5 border-r border-gray-300">
+            <button class="kb-key" onclick="keyTap('1')">1</button>
+            <button class="kb-key" onclick="keyTap('2')">2</button>
+            <button class="kb-key" onclick="keyTap('3')">3</button>
+            <button class="kb-key" onclick="keyTap('4')">4</button>
+            <button class="kb-key" onclick="keyTap('5')">5</button>
+            <button class="kb-key" onclick="keyTap('6')">6</button>
+            <button class="kb-key" onclick="keyTap('7')">7</button>
+            <button class="kb-key" onclick="keyTap('8')">8</button>
+            <button class="kb-key" onclick="keyTap('9')">9</button>
+            <button class="kb-key bg-red-50 text-red-500 text-[11px]" onclick="keyTap('CLEAR')">清除</button>
+            <button class="kb-key" onclick="keyTap('0')">0</button>
+            <button class="kb-key bg-gray-50" onclick="keyTap('BACK')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z" /></svg>
+            </button>
+        </div>
+        <div class="flex flex-col w-[35%] pl-2.5 relative">
+            <div id="kbUpHint" class="absolute top-2 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" /></svg>
+            </div>
+            <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[238px] pb-4" onscroll="handleKbScroll()"></div>
+            <div id="kbDownHint" class="absolute bottom-6 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
+            </div>
+        </div>
+    </div>
+    <button onclick="toggleKeyboard(false)" class="w-full mt-3 py-3 text-[10px] text-gray-400 font-black uppercase tracking-[0.4em]">收起鍵盤</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready(); tg.expand();
+    tg.BackButton.onClick(() => backToSearch());
+
+    const searchInput = document.getElementById('routeSearch');
+    const searchResults = document.getElementById('searchResults');
+    const searchSection = document.getElementById('searchSection');
+    const stopList = document.getElementById('stopList');
+    const loading = document.getElementById('loading');
+    const keyboard = document.getElementById('customKeyboard');
+    const letterPad = document.getElementById('letterPad');
+    const clearSearchBtn = document.getElementById('clearSearch');
+
+    const regionMap = { 'GMB_HKI': '港島', 'GMB_KLN': '九龍', 'GMB_NT': '新界', 'GMB': '小巴' };
+
+    let fullDirectory = [];
+    let nearbyResults = [];
+    let filteredPool = [];
+    let visibleCount = 30;
+    let currentFilter = 'ALL';
+    let lastKnownPos = null;
+    let searchTimeout = null;
+    let refreshInterval = null;
+    let visibilityObserver = null;
+    let visibleElements = new Set();
+    let displayMode = localStorage.getItem('gmb_eta_mode') || 'mins';
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initApp();
+        document.getElementById('displayModeToggle').checked = displayMode === 'time';
+        initVisibilityObserver();
+        window.addEventListener('scroll', handleInfiniteScroll);
+    });
+
+    function toggleDisplayMode() {
+        displayMode = document.getElementById('displayModeToggle').checked ? 'time' : 'mins';
+        localStorage.setItem('gmb_eta_mode', displayMode);
+        refreshVisibleEtas();
+    }
+
+    function handleKbScroll() {
+        const el = document.getElementById('letterPad');
+        const up = document.getElementById('kbUpHint');
+        const down = document.getElementById('kbDownHint');
+        up.classList.toggle('opacity-0', el.scrollTop < 10);
+        const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
+        down.classList.toggle('opacity-0', isAtBottom);
+    }
+
+    async function initApp() {
+        // Bumped cache to v2 to ensure users pull the new regional company tags (GMB_HKI, GMB_KLN, GMB_NT)
+        const cached = localStorage.getItem('minibus_dir_v2');
+        const expiry = localStorage.getItem('minibus_dir_exp_v2');
+        navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
+
+        if (cached && expiry && Date.now() < parseInt(expiry)) {
+            fullDirectory = JSON.parse(cached);
+            applyLocalFilter();
+        } else {
+            loading.classList.remove('hidden');
+            try {
+                const res = await fetch(`/api/bus/search?q=ALL`);
+                const allData = await res.json();
+
+                // Filter specifically for items starting with GMB (catches GMB_HKI, GMB_KLN, etc.)
+                fullDirectory = allData.filter(r => r.company && r.company.startsWith('GMB'));
+
+                // MULTI-TIER SORTING: 1. Route Number -> 2. Service Type -> 3. Bound
+                fullDirectory.sort((a, b) => {
+                    const routeCompare = a.route.localeCompare(b.route, undefined, { numeric: true });
+                    if (routeCompare !== 0) return routeCompare;
+
+                    const stA = a.service_type || '1';
+                    const stB = b.service_type || '1';
+                    const stCompare = stA.localeCompare(stB, undefined, { numeric: true });
+                    if (stCompare !== 0) return stCompare;
+
+                    const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
+                    return isBoundI(a) - isBoundI(b);
+                });
+
+                localStorage.setItem('minibus_dir_v2', JSON.stringify(fullDirectory));
+                localStorage.setItem('minibus_dir_exp_v2', (Date.now() + 86400000).toString());
+                applyLocalFilter();
+            } catch (e) { console.error(e); }
+            loading.classList.add('hidden');
+        }
+    }
+
+    function initVisibilityObserver() {
+        visibilityObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    visibleElements.add(entry.target);
+                    triggerEtaForElement(entry.target);
+                } else { visibleElements.delete(entry.target); }
+            });
+        }, { threshold: 0.1 });
+    }
+
+    function handleInfiniteScroll() {
+        if (!stopList.classList.contains('hidden')) return;
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 350) {
+            if (visibleCount < filteredPool.length) { visibleCount += 15; renderResults(); }
+        }
+    }
+
+    function setFilter(filter) {
+        tg.HapticFeedback.selectionChanged();
+        currentFilter = filter;
+        document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-filter') === filter));
+        visibleCount = 30;
+        window.scrollTo(0, 0);
+        if (filter === 'NEARBY') { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); requestNearby(); }
+        else { applyLocalFilter(); }
+    }
+
+    async function requestNearby() {
+        loading.classList.remove('hidden');
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            lastKnownPos = pos;
+            try {
+                const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
+                const data = await res.json();
+                nearbyResults = data.filter(r => r.company && r.company.startsWith('GMB'));
+                filteredPool = nearbyResults;
+                renderResults();
+            } catch (e) { } finally { loading.classList.add('hidden'); }
+        }, null, { timeout: 8000 });
+    }
+
+    function applyLocalFilter() {
+        const query = searchInput.value.trim().toUpperCase();
+        let pool = currentFilter === 'NEARBY' ? nearbyResults : fullDirectory;
+
+        // Filter by specific region if selected
+        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') {
+            pool = pool.filter(r => r.company === currentFilter);
+        }
+
+        // Filter by search query
+        if (query) pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
+
+        filteredPool = pool;
+        renderResults();
+        updateKeyboard();
+    }
+
+    function renderResults() {
+        const html = filteredPool.slice(0, visibleCount).map(r => `
+            <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${r.dest_tc.replace(/'/g, "\\'")}', '${r.service_type}', '${r.orig_tc.replace(/'/g, "\\'")}')" 
+                 class="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all shadow-sm">
+                <div class="flex items-center space-x-4">
+                    <div class="flex flex-col items-center justify-center min-w-[60px]">
+                        <span class="font-black text-2xl text-green-600 leading-none">${r.route}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded mt-1.5 bg-green-50 text-green-600 font-black tracking-tighter">${regionMap[r.company] || '小巴'}</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-gray-800">往 ${r.dest_tc}</span>
+                        <span class="text-[10px] text-gray-400 font-bold mt-0.5">由 ${r.orig_tc} 開出</span>
+                    </div>
+                </div>
+                <div class="text-[10px] font-black text-green-500 bg-green-50 px-3 py-1.5 rounded-xl uppercase tracking-widest">${r.bound === 'I' ? '回程' : '去程'}</div>
+            </div>
+        `).join('');
+        searchResults.innerHTML = html || '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關小巴...</div>';
+    }
+
+    function updateKeyboard() {
+        const val = searchInput.value.trim().toUpperCase();
+        const validLettersSet = new Set();
+
+        let targetPool = currentFilter === 'ALL' ? fullDirectory : filteredPool;
+
+        targetPool.forEach(r => {
+            const route = r.route.toUpperCase();
+            if (val === "" && /[A-Z]/.test(route[0])) validLettersSet.add(route[0]);
+            else if (route.startsWith(val)) {
+                const next = route.slice(val.length);
+                if (next.length > 0 && /[A-Z]/.test(next[0])) validLettersSet.add(next[0]);
+            }
+        });
+        const letters = Array.from(validLettersSet).sort();
+        letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-green-50 text-green-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
+        setTimeout(handleKbScroll, 100);
+    }
+
+    function keyTap(val) {
+        tg.HapticFeedback.selectionChanged();
+        if (val === 'BACK') searchInput.value = searchInput.value.slice(0, -1);
+        else if (val === 'CLEAR') searchInput.value = '';
+        else searchInput.value += val;
+        clearSearchBtn.classList.toggle('hidden', searchInput.value.length === 0);
+        window.scrollTo(0, 0);
+        applyLocalFilter();
+    }
+
+    async function performSearch() {
+        visibleCount = 30;
+        window.scrollTo(0, 0);
+        applyLocalFilter();
+    }
+
+    // 支援手動輸入 / Native Keyboard Input Support
+    searchInput.addEventListener('click', () => { toggleKeyboard(true); setTimeout(() => searchInput.focus(), 50); });
+    searchInput.addEventListener('input', (e) => {
+        clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0);
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => performSearch(), 100);
+    });
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.classList.add('hidden');
+        performSearch();
+    });
+
+    function toggleKeyboard(show) {
+        keyboard.classList.toggle('show', show);
+        document.getElementById('mainContent').classList.toggle('keyboard-open', show);
+        if (show) updateKeyboard();
+    }
+
+    async function loadRoute(route, bound, company, dest, serviceType, orig) {
+        toggleKeyboard(false); tg.BackButton.show();
+        searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
+        document.getElementById('mainContent').classList.add('p-0');
+        stopList.classList.remove('hidden'); window.scrollTo(0, 0);
+
+        document.getElementById('displayRouteName').innerText = route;
+        const regionLabel = regionMap[company] || '小巴';
+        document.getElementById('displayRouteSub').innerText = `往 ${dest} • 綠色${regionLabel}`;
+
+        // GMB Counterpart Logic: Swap Orig/Dest to find the matching variant
+        const routeMatches = fullDirectory.filter(r => r.route === route && r.company === company);
+        const counterpart = routeMatches.find(r => r.orig_tc.trim() === dest.trim() && r.dest_tc.trim() === orig.trim());
+        const revContainer = document.getElementById('reverseBtnContainer');
+
+        if (counterpart) {
+            revContainer.innerHTML = `
+                <button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${counterpart.dest_tc.replace(/'/g, "\\'")}', '${counterpart.service_type}', '${counterpart.orig_tc.replace(/'/g, "\\'")}')" 
+                        class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                </button>`;
+        } else {
+            revContainer.innerHTML = `<span id="routeTag" class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] font-black text-white/50 border border-transparent whitespace-nowrap animate-pulse">讀取中...</span>`;
+        }
+
+        const container = document.getElementById('stopsContainer');
+        container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-green-500 border-t-transparent"></div></div>';
+
+        try {
+            // Note: The database ID formulation still uses standard "GMB", not the regional company code.
+            const routeId = `GMB_${route}_${bound}_${serviceType}`;
+            const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
+            const stops = await res.json();
+
+            if (!counterpart) {
+                const isCircular = stops.length > 2 && stops[0].nameTc.trim() === stops[stops.length-1].nameTc.trim();
+                document.getElementById('routeTag').innerText = isCircular ? '循環線' : '無回程';
+                document.getElementById('routeTag').classList.remove('animate-pulse');
+            }
+
+            let closestIdx = -1;
+            if (lastKnownPos) {
+                let minVal = Infinity;
+                stops.forEach((s, idx) => {
+                    const dist = Math.sqrt(Math.pow(lastKnownPos.coords.latitude - s.latitude, 2) + Math.pow(lastKnownPos.coords.longitude - s.longitude, 2));
+                    if (dist < minVal) { minVal = dist; closestIdx = idx; }
+                });
+            }
+
+            container.innerHTML = stops.map((s, idx) => `
+                <div id="stop-row-${idx}" class="stop-item p-5 flex justify-between items-start bg-white active:bg-gray-50 transition-colors ${idx === closestIdx ? 'stop-highlight' : ''}" 
+                     data-company="GMB" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
+                    <div class="flex items-center space-x-4 pt-1">
+                        <div class="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center text-[11px] font-black text-green-500 shadow-sm shrink-0">${s.sequence}</div>
+                        <span class="font-bold text-gray-800 text-base leading-tight">${s.nameTc}</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="eta-main text-lg font-mono font-black text-green-600 tracking-tighter leading-none">--</div>
+                        <div class="eta-subs text-[10px] font-bold text-gray-400 mt-1 leading-none">...</div>
+                    </div>
+                </div>
+            `).join('');
+
+            visibleElements.clear();
+            container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el));
+            startGlobalRefresh();
+
+            if (closestIdx !== -1) {
+                const target = document.getElementById(`stop-row-${Math.max(0, closestIdx - 2)}`);
+                if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset - 150, behavior: 'smooth' });
+            }
+        } catch (e) { container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>'; }
+    }
+
+    function refreshVisibleEtas() { visibleElements.forEach(el => triggerEtaForElement(el, false)); }
+    function startGlobalRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(() => visibleElements.forEach(el => triggerEtaForElement(el, true)), 30000); }
+
+    function triggerEtaForElement(el, silent = false) {
+        const d = el.dataset;
+        const main = el.querySelector('.eta-main');
+        const subs = el.querySelector('.eta-subs');
+        if (!silent) main.innerText = "...";
+
+        // Pass generic GMB to API for ETA fetch mapping
+        fetch(`/api/bus/eta/GMB/${d.stop}/${d.route}/${d.type}?bound=${d.bound}`)
+            .then(r => r.json()).then(data => {
+            if (!data.length) { main.innerText = "暫無班次"; subs.innerText = ""; return; }
+            const now = new Date();
+            const formatted = data.slice(0, 3).map(e => {
+                if (!e.eta) return { display: e.rmk_tc || "末班已過" };
+                const arrival = new Date(e.eta);
+                if (displayMode === 'time') {
+                    return { display: arrival.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) };
+                } else {
+                    const diff = Math.max(0, Math.floor((arrival - now) / 60000));
+                    return { display: diff <= 0 ? "即將到站" : `${diff}分` };
+                }
+            });
+            main.innerText = formatted[0].display;
+            subs.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
+        }).catch(() => { main.innerText = "Error"; });
+    }
+
+    function backToSearch() {
+        clearInterval(refreshInterval); visibleElements.clear(); tg.BackButton.hide();
+        document.getElementById('mainContent').classList.remove('p-0');
+        stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); window.scrollTo(0, 0);
+    }
+</script>
+</body>
+</html>

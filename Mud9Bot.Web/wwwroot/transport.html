@@ -45,6 +45,18 @@
         </div>
     </div>
 
+    <!-- Minibus Card -->
+    <div onclick="window.location.href='/minibus'" class="service-card cursor-pointer bg-white border border-gray-100 rounded-3xl p-6 flex items-center shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-transform duration-200">
+        <div class="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center text-3xl shadow-sm shrink-0">🚐</div>
+        <div class="ml-5 flex-1">
+            <h3 class="text-2xl font-black text-gray-800 tracking-wide">小巴</h3>
+            <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wide">綠色專線小巴 GMB</p>
+        </div>
+        <div class="ml-auto text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+        </div>
+    </div>
+
     <!-- MTR Card -->
     <div onclick="window.location.href='/mtr'" class="service-card cursor-pointer bg-white border border-gray-100 rounded-3xl p-6 flex items-center shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-transform duration-200">
         <div class="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-3xl shadow-sm shrink-0">🚇</div>
@@ -73,6 +85,10 @@
     } else if (startParam === 'mtr') {
         document.getElementById('loadingOverlay').classList.remove('hidden');
         window.location.replace('/mtr');
+    }
+    else if (startParam === 'minibus' || startParam === 'gmb') {
+        document.getElementById('loadingOverlay').classList.remove('hidden');
+        window.location.replace('/minibus');
     }
 </script>
 </body>

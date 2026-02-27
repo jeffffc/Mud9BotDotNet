@@ -65,6 +65,19 @@ public class TransportEtaModule(IConfiguration config, ILogger<TransportEtaModul
             ct
         );
     }
+    
+    [Command("minibus", "gmb", PrivateOnly = true)]
+    public async Task HandleMinibusCommand(ITelegramBotClient bot, Message message, string[] args, CancellationToken ct)
+    {
+        await LaunchWebApp(
+            bot, 
+            message, 
+            path: "minibus", 
+            buttonText: "撳我搵小巴 🚐💨", 
+            replyText: "想知小巴幾時到？撳下面粒掣入去睇吓啦，費事排長龍等呀！🚀", 
+            ct
+        );
+    }
 
     /// <summary>
     /// Shared helper method to launch the WebApp with a specific sub-path.

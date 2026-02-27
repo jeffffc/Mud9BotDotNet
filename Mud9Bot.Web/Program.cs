@@ -177,11 +177,12 @@ var serveHtmlDelegate = async (HttpContext context) => {
     }
     else if (path.StartsWith("/transport/bus") || path.StartsWith("/bus") || host.StartsWith("bus."))
     {
-        // Handles: 
-        // 1. localhost/transport/bus (Development)
-        // 2. transport.mud9bot.info/bus (Production Hub)
-        // 3. bus.mud9bot.info (Legacy/Direct Production)
         await context.Response.SendFileAsync("wwwroot/bus.html");
+    }
+    else if (path.StartsWith("/transport/minibus") || path.StartsWith("/minibus") || host.StartsWith("minibus."))
+    {
+        // Handles the new Minibus Mini App path
+        await context.Response.SendFileAsync("wwwroot/minibus.html");
     }
     else if (path.StartsWith("/transport/mtr") || path.StartsWith("/mtr") || host.StartsWith("mtr."))
     {
