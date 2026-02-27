@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Mud9Bot.Attributes;
@@ -39,10 +40,9 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
             .ToDictionaryAsync(x => x.StopId, x => x.LastUpdated);
 
         // ==========================================
-        // MTR BUS SPECIFIC SYNC
+        // MTR BUS SPECIFIC SYNC (CSV BASED)
         // ==========================================
-        await SyncMtrRoutesAsync(dbContext, syncTime);
-        
+        await SyncMtrRoutesFromCsvAsync(dbContext, syncTime);
         
         // ==========================================
         // KMB/CTB BUS SPECIFIC SYNC
@@ -185,113 +185,214 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         logger.LogInformation("大佬！所有巴士資料同步完畢！🚌✨");
     }
     
-    private async Task SyncMtrRoutesAsync(BotDbContext dbContext, DateTime syncTime)
+    /// <summary>
+    /// Fetches MTR Bus metadata from Official CSV files.
+    /// This removes the dependency on live API uptime and guarantees we have names and coordinates!
+    /// </summary>
+    private async Task SyncMtrRoutesFromCsvAsync(BotDbContext dbContext, DateTime syncTime)
     {
-        logger.LogInformation("[BusSync] 🚆 開始同步 MTR 港鐵巴士路線資料...");
+        logger.LogInformation("[BusSync] 🚆 開始同步 MTR 港鐵巴士路線資料 (透過 CSV)...");
         var client = httpClientFactory.CreateClient();
-        const string MtrBusApiUrl = "https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule";
-
-        foreach (var route in MtrRoutes)
+        
+        try
         {
-            try
-            {
-                var requestBody = new { language = "zh", routeName = route };
-                var response = await client.PostAsJsonAsync(MtrBusApiUrl, requestBody);
-                if (!response.IsSuccessStatusCode) continue;
+            var routesCsv = await client.GetStringAsync("https://opendata.mtr.com.hk/data/mtr_bus_routes.csv");
+            var stopsCsv = await client.GetStringAsync("https://opendata.mtr.com.hk/data/mtr_bus_stops.csv");
 
-                var mtrData = await response.Content.ReadFromJsonAsync<MtrBusResponse>();
+            // 1. Parse Routes to get Names and Terminals
+            var routeInfoMap = new Dictionary<string, (string OrigTc, string DestTc, string OrigEn, string DestEn)>();
+            var routeLines = routesCsv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            
+            for (int i = 1; i < routeLines.Length; i++) // Skip header
+            {
+                var cols = ParseCsvLine(routeLines[i]);
+                if (cols.Count < 7) continue;
+
+                var routeId = cols[0].Trim();
+                var nameTc = cols[1].Trim(); // e.g., "屯門碼頭至兆麟"
+                var nameEn = cols[2].Trim(); // e.g., "Tuen Mun Ferry Pier to Siu Lun"
+                var refId = cols[6].Trim();  // e.g., "506" or "506-1"
+
+                // Split string by "至" and " to " to determine Origin and Destination
+                var tcParts = nameTc.Split("至", 2);
+                var enParts = nameEn.Split(" to ", 2);
+
+                string origTc = tcParts.Length > 0 ? tcParts[0] : nameTc;
+                string destTc = tcParts.Length > 1 ? tcParts[1] : nameTc;
                 
-                if (mtrData?.RouteStops == null || !mtrData.RouteStops.Any()) 
-                {
-                    logger.LogInformation("[BusSync] [MTR] ℹ️ {Route} 目前無站點資料 (可能非服務時間)。", route);
-                    continue;
-                }
+                string origEn = enParts.Length > 0 ? enParts[0] : nameEn;
+                string destEn = enParts.Length > 1 ? enParts[1] : nameEn;
 
-                // FIXED: 終極防彈 GroupBy，精準抽出 "D" 同 "U"
-                var groupedStops = mtrData.RouteStops
-                    .Where(s => !string.IsNullOrEmpty(s.BusStopId) && s.BusStopId.Contains("-"))
-                    .GroupBy(s => {
-                        var parts = s.BusStopId.Split('-');
-                        // parts[1] is "D010", we need just "D"
-                        if (parts.Length > 1 && parts[1].Length >= 1) {
-                            return parts[1].Substring(0, 1).ToUpper(); 
-                        }
-                        return "O";
-                    });
+                // Clean up any "(循環線)" tags for cleaner UI
+                destTc = destTc.Replace(" (循環線)", "").Trim();
+                destEn = destEn.Replace(" (Circular)", "").Trim();
 
-                foreach (var group in groupedStops)
-                {
-                    string rawBound = group.Key;
-                    string mappedBound = rawBound == "D" ? "I" : "O"; 
-                    
-                    await ProcessMtrBound(dbContext, syncTime, route, mappedBound, group.ToList());
-                }
+                routeInfoMap[refId] = (origTc, destTc, origEn, destEn);
             }
-            catch (Exception ex)
+
+            // 2. Parse Stops and Link to Routes
+            var stopLines = stopsCsv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var stopsData = new List<MtrCsvStopRecord>();
+            
+            for (int i = 1; i < stopLines.Length; i++)
             {
-                logger.LogError(ex, "[BusSync] [MTR] ❌ {Route} 同步失敗", route);
+                var cols = ParseCsvLine(stopLines[i]);
+                if (cols.Count < 9) continue;
+                
+                stopsData.Add(new MtrCsvStopRecord
+                {
+                    RouteId = cols[0].Trim(),
+                    Direction = cols[1].Trim().ToUpper(), // Will be 'O' or 'I'
+                    Seq = int.TryParse(cols[2], out int sq) ? sq : 0,
+                    StopId = cols[3].Trim(),
+                    Lat = double.TryParse(cols[4], out double lat) ? lat : (double?)null,
+                    Lon = double.TryParse(cols[5], out double lon) ? lon : (double?)null,
+                    NameTc = cols[6].Trim(),
+                    NameEn = cols[7].Trim(),
+                    RefId = cols[8].Trim()
+                });
             }
+
+            // Group strictly by Reference ID and Direction
+            var groupedStops = stopsData.GroupBy(s => new { s.RefId, s.Direction });
+
+            foreach (var group in groupedStops)
+            {
+                string refId = group.Key.RefId;
+                string bound = group.Key.Direction == "D" || group.Key.Direction == "I" ? "I" : "O"; 
+                var firstStop = group.First();
+                string routeNumber = firstStop.RouteId;
+                
+                // Determine Service Type dynamically
+                string serviceType = "1";
+                if (refId != routeNumber && refId.Contains('-'))
+                {
+                    var parts = refId.Split('-');
+                    if (parts.Length > 1 && int.TryParse(parts[1], out int varNum))
+                    {
+                        serviceType = (varNum + 1).ToString();
+                    }
+                    else serviceType = "2";
+                }
+
+                string dbRouteId = $"MTR_{routeNumber}_{bound}_{serviceType}";
+
+                // Resolve Terminals
+                string origTc = $"{routeNumber} 總站", destTc = "終點站";
+                string origEn = "", destEn = "";
+                
+                if (routeInfoMap.TryGetValue(refId, out var names))
+                {
+                    // If it's the inbound (return) trip, swap the names correctly before saving to DB
+                    if (bound == "I")
+                    {
+                        origTc = names.DestTc; destTc = names.OrigTc;
+                        origEn = names.DestEn; destEn = names.OrigEn;
+                    }
+                    else
+                    {
+                        origTc = names.OrigTc; destTc = names.DestTc;
+                        origEn = names.OrigEn; destEn = names.DestEn;
+                    }
+                }
+
+                // 3. Upsert Route to DB (FIXED: Using FindAsync to prevent Tracking crashes)
+                var dbRoute = await dbContext.Set<BusRoute>().FindAsync(dbRouteId);
+                if (dbRoute == null)
+                {
+                    dbRoute = new BusRoute { Id = dbRouteId, Company = "MTR", RouteNumber = routeNumber, Bound = bound, ServiceType = serviceType };
+                    dbContext.Add(dbRoute);
+                }
+                dbRoute.OriginTc = origTc;
+                dbRoute.DestinationTc = destTc;
+                dbRoute.OriginEn = origEn;
+                dbRoute.DestinationEn = destEn;
+                dbRoute.IsActive = true;
+                dbRoute.LastUpdated = syncTime;
+
+                // 4. Upsert Stops to DB
+                foreach (var stop in group.OrderBy(s => s.Seq))
+                {
+                    if (string.IsNullOrEmpty(stop.StopId)) continue;
+                    
+                    var dbStop = await dbContext.Set<BusStop>().FindAsync(stop.StopId);
+                    if (dbStop == null)
+                    {
+                        dbStop = new BusStop { StopId = stop.StopId };
+                        dbContext.Add(dbStop);
+                    }
+                    dbStop.NameTc = stop.NameTc;
+                    dbStop.NameEn = stop.NameEn;
+                    dbStop.Latitude = stop.Lat;
+                    dbStop.Longitude = stop.Lon;
+                    dbStop.IsActive = true;
+                    dbStop.LastUpdated = syncTime;
+                    
+                    _processedStopIds.Add(stop.StopId);
+
+                    string rsId = $"{dbRouteId}_{stop.Seq}";
+                    // FIXED: Using FindAsync to prevent Tracking crashes
+                    var dbRS = await dbContext.Set<BusRouteStop>().FindAsync(rsId);
+                    if (dbRS == null)
+                    {
+                        dbRS = new BusRouteStop { Id = rsId, RouteId = dbRouteId, StopId = stop.StopId };
+                        dbContext.Add(dbRS);
+                    }
+                    dbRS.Sequence = stop.Seq;
+                    dbRS.IsActive = true;
+                    dbRS.LastUpdated = syncTime;
+                }
+            }
+
+            await dbContext.SaveChangesAsync();
+            logger.LogInformation("[BusSync] ✅ MTR 港鐵巴士同步完成 (共處理 {Count} 個路綫方向)。", groupedStops.Count());
         }
-        await dbContext.SaveChangesAsync();
-        logger.LogInformation("[BusSync] ✅ MTR 港鐵巴士同步完成。");
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[BusSync] [MTR] ❌ 讀取或解析 CSV 時發生錯誤");
+        }
     }
 
-    private async Task ProcessMtrBound(BotDbContext dbContext, DateTime syncTime, string route, string bound, List<MtrBusRouteStop> stops)
+    // Custom CSV parser to handle fields that contain commas wrapped in quotes
+    private List<string> ParseCsvLine(string line)
     {
-        if (!stops.Any()) return;
-
-        string routeId = $"MTR_{route}_{bound}_1";
+        var result = new List<string>();
+        bool inQuotes = false;
+        var current = new StringBuilder();
         
-        var dbRoute = await dbContext.Set<BusRoute>().FirstOrDefaultAsync(r => r.Id == routeId);
-        if (dbRoute == null)
+        for (int i = 0; i < line.Length; i++)
         {
-            dbRoute = new BusRoute { Id = routeId, Company = "MTR", RouteNumber = route, Bound = bound, ServiceType = "1" };
-            dbContext.Add(dbRoute);
-        }
-        
-        dbRoute.OriginTc = $"{route} 總站";
-        dbRoute.DestinationTc = $"{route} 終點站";
-        dbRoute.OriginEn = dbRoute.OriginTc; 
-        dbRoute.DestinationEn = dbRoute.DestinationTc;
-        dbRoute.IsActive = true;
-        dbRoute.LastUpdated = syncTime;
-
-        int seq = 1;
-        foreach (var stop in stops)
-        {
-            string stopId = stop.BusStopId;
-            if (string.IsNullOrEmpty(stopId)) continue;
-            
-            var dbStop = await dbContext.Set<BusStop>().FindAsync(stopId);
-            if (dbStop == null)
+            char c = line[i];
+            if (c == '\"')
             {
-                dbStop = new BusStop { StopId = stopId };
-                dbContext.Add(dbStop);
+                inQuotes = !inQuotes;
             }
-            
-            // 修正：API 冇畀車站中文名，唯有硬食 StopId (e.g. "K12-D010")
-            dbStop.NameTc = stopId;
-            dbStop.NameEn = stopId;
-            dbStop.Latitude = null; // API 無站點坐標
-            dbStop.Longitude = null;
-            dbStop.IsActive = true;
-            dbStop.LastUpdated = syncTime;
-            
-            _processedStopIds.Add(stopId);
-
-            string rsId = $"{routeId}_{seq}";
-            var dbRS = await dbContext.Set<BusRouteStop>().FirstOrDefaultAsync(x => x.Id == rsId);
-            if (dbRS == null)
+            else if (c == ',' && !inQuotes)
             {
-                dbRS = new BusRouteStop { Id = rsId, RouteId = routeId, StopId = stopId };
-                dbContext.Add(dbRS);
+                result.Add(current.ToString());
+                current.Clear();
             }
-            dbRS.Sequence = seq;
-            dbRS.IsActive = true;
-            dbRS.LastUpdated = syncTime;
-            
-            seq++;
+            else
+            {
+                // Ignore trailing carriage returns on Linux/Windows boundary
+                if (c != '\r') current.Append(c);
+            }
         }
+        result.Add(current.ToString());
+        return result;
+    }
+
+    private class MtrCsvStopRecord
+    {
+        public string RouteId { get; set; } = "";
+        public string Direction { get; set; } = "";
+        public int Seq { get; set; }
+        public string StopId { get; set; } = "";
+        public double? Lat { get; set; }
+        public double? Lon { get; set; }
+        public string NameTc { get; set; } = "";
+        public string NameEn { get; set; } = "";
+        public string RefId { get; set; } = "";
     }
 
     private List<string> GetBounds(Mud9Bot.Transport.Models.BusRouteDto apiRoute, string provider)
