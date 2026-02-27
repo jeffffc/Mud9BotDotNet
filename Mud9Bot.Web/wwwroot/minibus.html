@@ -362,36 +362,53 @@
 
     // Uses the working location logic with isMinibusFilter
     async function requestNearby() {
+        // 1. FIX THE VISUAL BUG: Clear the pool instantly so the infinite scroll
+        // observer doesn't accidentally re-render the old list over the loading screen!
+        filteredPool = [];
+        visibleCount = 100;
+
         loading.classList.remove('hidden');
         searchResults.innerHTML = '<div class="text-center py-20 opacity-40 text-sm font-bold animate-pulse">正在精確定位中...</div>';
 
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            lastKnownPos = pos;
-            try {
-                const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
-                const data = await res.json();
+        // 2. SPEED UP: initApp() already fetches GPS in the background when the app opens.
+        // If we have it, fire the API instantly without waiting 1-2 seconds for a new GPS lock!
+        if (lastKnownPos) {
+            await fetchNearbyApi(lastKnownPos);
+        } else {
+            // 3. Fallback to your exact working geolocation logic
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => { await fetchNearbyApi(pos); },
+                (err) => { loading.classList.add('hidden'); },
+                { timeout: 8000, enableHighAccuracy: true }
+            );
+        }
+    }
 
-                // Ensure nearby only shows green minibuses
-                nearbyResults = data.filter(isMinibusFilter);
+    // Your exact API logic, just isolated into a helper function
+    async function fetchNearbyApi(pos) {
+        lastKnownPos = pos;
+        try {
+            const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
+            const data = await res.json();
 
-                if (!nearbyResults || nearbyResults.length === 0) {
-                    searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
-                    filteredPool = [];
-                } else {
-                    filteredPool = nearbyResults;
-                    renderResults();
-                }
-                updateKeyboard();
-            } catch (e) {
-                searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>';
+            // NOTE: Use isMinibusFilter for minibus.html, and isBusFilter for bus.html
+            nearbyResults = data.filter(isMinibusFilter);
+
+            if (!nearbyResults || nearbyResults.length === 0) {
+                searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
                 filteredPool = [];
-                updateKeyboard();
-            } finally {
-                loading.classList.add('hidden');
+            } else {
+                filteredPool = nearbyResults;
+                renderResults();
             }
-        }, (err) => {
+            updateKeyboard();
+        } catch (e) {
+            searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>';
+            filteredPool = [];
+            updateKeyboard();
+        } finally {
             loading.classList.add('hidden');
-        }, { timeout: 8000, enableHighAccuracy: true });
+        }
     }
 
     function applyLocalFilter() {
