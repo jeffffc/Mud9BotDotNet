@@ -153,7 +153,7 @@
 
 <!-- Main Content Area (Results / Stop List) -->
 <div id="mainContent" class="p-4 pt-2">
-    <div id="searchResults" class="space-y-3 pb-2"></div>
+    <div id="searchResults" class="space-y-3 pb-10"></div>
 
     <!-- Infinite Scroll Sentinel -->
     <div id="infiniteSentinel" class="h-20 flex items-center justify-center opacity-0">
@@ -161,7 +161,6 @@
     </div>
 
     <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
-        <!-- Floating Header for Route Details -->
         <div id="routeHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white">
             <div class="flex flex-col pr-4">
                 <div class="flex items-center space-x-2">
@@ -172,9 +171,7 @@
             </div>
 
             <div class="flex items-center space-x-2">
-                <!-- Reverse Button Container -->
                 <div id="reverseBtnContainer"></div>
-
                 <button onclick="refreshVisibleEtas()" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -214,16 +211,12 @@
             </button>
         </div>
         <div class="flex flex-col w-[35%] pl-2.5 relative">
-            <!-- Top scroll hint (pulsing up) -->
             <div id="kbUpHint" class="absolute top-2 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" />
                 </svg>
             </div>
-
             <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[238px] pb-4" onscroll="handleKbScroll()"></div>
-
-            <!-- Bottom scroll hint (pulsing down) -->
             <div id="kbDownHint" class="absolute bottom-6 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
@@ -236,8 +229,7 @@
 
 <script>
     const tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
+    tg.ready(); tg.expand();
     tg.BackButton.onClick(() => backToSearch());
 
     // Switch App Function with Animation
@@ -274,6 +266,48 @@
     let visibleElements = new Set();
     let displayMode = localStorage.getItem('bus_eta_mode') || 'mins';
 
+    // -------------------------------------------------------------------------
+    // HONG KONG STYLE MULTI-TIER SORTING HELPERS
+    // -------------------------------------------------------------------------
+    const parseRoute = (r) => {
+        const match = (r || "").match(/^([A-Z]*)(\d+)([A-Z]*)$/i);
+        if (!match) return { prefix: "", number: 9999, suffix: "", startsWithDigit: false };
+        return {
+            prefix: match[1].toUpperCase(),
+            number: parseInt(match[2], 10),
+            suffix: match[3].toUpperCase(),
+            startsWithDigit: match[1] === ""
+        };
+    };
+
+    const getCompanyWeight = (c) => {
+        const weights = { 'KMB': 1, 'CTB': 2, 'NWFB': 2, 'LWB': 3, 'MTR': 4, 'NLB': 5 };
+        return weights[c] || 99;
+    };
+
+    const masterSort = (a, b) => {
+        const pA = parseRoute(a.route);
+        const pB = parseRoute(b.route);
+        if (pA.startsWithWithDigit !== pB.startsWithWithDigit) return pA.startsWithWithDigit ? -1 : 1;
+        if (pA.startsWithWithDigit) {
+            if (pA.number !== pB.number) return pA.number - pB.number;
+            if (pA.suffix !== pB.suffix) return pA.suffix.localeCompare(pB.suffix);
+        } else {
+            if (pA.prefix !== pB.prefix) return pA.prefix.localeCompare(pB.prefix);
+            if (pA.number !== pB.number) return pA.number - pB.number;
+            if (pA.suffix !== pB.suffix) return pA.suffix.localeCompare(pB.suffix);
+        }
+        const weightA = getCompanyWeight(a.company);
+        const weightB = getCompanyWeight(b.company);
+        if (weightA !== weightB) return weightA - weightB;
+        const stA = parseInt(a.service_type || "1", 10);
+        const stB = parseInt(b.service_type || "1", 10);
+        if (stA !== stB) return stA - stB;
+        const bA = (a.bound === 'I' || a.bound === 'inbound') ? 1 : 0;
+        const bB = (b.bound === 'I' || b.bound === 'inbound') ? 1 : 0;
+        return bA - bB;
+    };
+
     const isBusFilter = (r) => {
         const t = (r.type || r.Type || "").toLowerCase();
         if (t) return t === 'bus';
@@ -285,16 +319,10 @@
         initToggles();
         initPaginationObserver();
         initVisibilityObserver();
-
-        setTimeout(() => {
-            document.body.classList.remove('page-flip-in');
-        }, 500);
+        setTimeout(() => { document.body.classList.remove('page-flip-in'); }, 500);
     });
 
-    function initToggles() {
-        document.getElementById('displayModeToggle').checked = displayMode === 'time';
-    }
-
+    function initToggles() { document.getElementById('displayModeToggle').checked = displayMode === 'time'; }
     function toggleDisplayMode() {
         displayMode = document.getElementById('displayModeToggle').checked ? 'time' : 'mins';
         localStorage.setItem('bus_eta_mode', displayMode);
@@ -305,7 +333,6 @@
         const el = document.getElementById('letterPad');
         const up = document.getElementById('kbUpHint');
         const down = document.getElementById('kbDownHint');
-
         up.classList.toggle('opacity-0', el.scrollTop < 10);
         const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
         down.classList.toggle('opacity-0', isAtBottom);
@@ -324,67 +351,38 @@
                 }
             }
         }, { rootMargin: '600px' });
-
         observer.observe(sentinel);
     }
 
     async function initApp() {
-        // Tracker init: Using the exact line from the working version
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
-
         try {
-            const metaRes = await fetch('/api/bus/metadata');
+            const metaRes = await fetch('/api/bus/metadata?type=bus');
             const meta = await metaRes.json();
-
-            const cachedData = localStorage.getItem('bus_dir_data');
-            const cachedMeta = localStorage.getItem('bus_dir_meta');
-
-            if (cachedData && cachedMeta) {
-                const localMeta = JSON.parse(cachedMeta);
-                if (localMeta.lastUpdated === meta.lastUpdated && localMeta.routeCount > 0) {
-                    const raw = JSON.parse(cachedData);
-                    fullDirectory = raw.filter(isBusFilter);
-                    applyLocalFilter();
-                    return;
-                }
+            const cachedData = localStorage.getItem('bus_only_v6');
+            const cachedMeta = localStorage.getItem('bus_only_exp_v6');
+            if (cachedData && cachedMeta && Date.now() < parseInt(cachedMeta)) {
+                fullDirectory = JSON.parse(cachedData);
+                applyLocalFilter();
+                return;
             }
-
             loading.classList.remove('hidden');
-            const res = await fetch(`/api/bus/search?q=ALL`);
-            const allData = await res.json();
-
-            localStorage.setItem('bus_dir_data', JSON.stringify(allData));
-            localStorage.setItem('bus_dir_meta', JSON.stringify(meta));
-
-            fullDirectory = allData.filter(isBusFilter);
-
-            fullDirectory.sort((a, b) => {
-                const rc = a.route.localeCompare(b.route, undefined, { numeric: true });
-                if (rc !== 0) return rc;
-                const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
-                const bc = isBoundI(a) - isBoundI(b);
-                if (bc !== 0) return bc;
-                return (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
-            });
-
+            const res = await fetch(`/api/bus/search?q=ALL&type=bus`);
+            fullDirectory = await res.json();
+            fullDirectory.sort(masterSort);
+            localStorage.setItem('bus_only_v6', JSON.stringify(fullDirectory));
+            localStorage.setItem('bus_only_exp_v6', (Date.now() + 86400000).toString());
             applyLocalFilter();
-        } catch (e) {
-            console.error("Sync error:", e);
-        } finally {
-            loading.classList.add('hidden');
-        }
+        } catch (e) { console.error(e); }
+        finally { loading.classList.add('hidden'); }
     }
 
     function initVisibilityObserver() {
         visibilityObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const el = entry.target;
-                if (entry.isIntersecting) {
-                    visibleElements.add(el);
-                    triggerEtaForElement(el);
-                } else {
-                    visibleElements.delete(el);
-                }
+                if (entry.isIntersecting) { visibleElements.add(el); triggerEtaForElement(el); }
+                else { visibleElements.delete(el); }
             });
         }, { threshold: 0.1 });
     }
@@ -395,105 +393,59 @@
         document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-filter') === filter));
         visibleCount = 100;
         window.scrollTo(0, 0);
-
-        if (filter === 'NEARBY') {
-            searchInput.value = '';
-            clearSearchBtn.classList.add('hidden');
-            requestNearby();
-        } else {
-            applyLocalFilter();
-        }
+        if (filter === 'NEARBY') { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); requestNearby(); }
+        else { applyLocalFilter(); }
     }
 
-    // Reverted to exactly match the provided working logic, while keeping isBusFilter.
     async function requestNearby() {
-        // 1. FIX THE VISUAL BUG: Clear the pool instantly so the infinite scroll
-        // observer doesn't accidentally re-render the old list over the loading screen!
         filteredPool = [];
         visibleCount = 100;
-
         loading.classList.remove('hidden');
         searchResults.innerHTML = '<div class="text-center py-20 opacity-40 text-sm font-bold animate-pulse">正在精確定位中...</div>';
-
-        // 2. SPEED UP: initApp() already fetches GPS in the background when the app opens.
-        // If we have it, fire the API instantly without waiting 1-2 seconds for a new GPS lock!
-        if (lastKnownPos) {
-            await fetchNearbyApi(lastKnownPos);
-        } else {
-            // 3. Fallback to your exact working geolocation logic
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => { await fetchNearbyApi(pos); },
-                (err) => { loading.classList.add('hidden'); },
-                { timeout: 8000, enableHighAccuracy: true }
-            );
-        }
-    }
-
-    // Your exact API logic, just isolated into a helper function
-    async function fetchNearbyApi(pos) {
-        lastKnownPos = pos;
-        try {
-            const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
-            const data = await res.json();
-
-            // NOTE: Use isMinibusFilter for minibus.html, and isBusFilter for bus.html
-            nearbyResults = data.filter(isBusFilter);
-
-            if (!nearbyResults || nearbyResults.length === 0) {
-                searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
-                filteredPool = [];
-            } else {
-                filteredPool = nearbyResults;
-                renderResults();
-            }
-            updateKeyboard();
-        } catch (e) {
-            searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>';
-            filteredPool = [];
-            updateKeyboard();
-        } finally {
-            loading.classList.add('hidden');
-        }
+        const fetchNearbyData = async (pos) => {
+            lastKnownPos = pos;
+            try {
+                const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}&type=bus`);
+                nearbyResults = await res.json();
+                nearbyResults.sort(masterSort);
+                if (!nearbyResults.length) { searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>'; }
+                else { filteredPool = nearbyResults; renderResults(); }
+                updateKeyboard();
+            } catch (e) { searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>'; }
+            finally { loading.classList.add('hidden'); }
+        };
+        if (lastKnownPos) { await fetchNearbyData(lastKnownPos); }
+        else { navigator.geolocation.getCurrentPosition(async (pos) => await fetchNearbyData(pos), (err) => { loading.classList.add('hidden'); }, { timeout: 8000, enableHighAccuracy: true }); }
     }
 
     function applyLocalFilter() {
         const query = (searchInput.value || "").trim().toUpperCase();
         let sourcePool = currentFilter === 'NEARBY' ? nearbyResults : fullDirectory;
         let pool = [...sourcePool];
-
-        if (query) {
-            pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
-        }
-
+        if (query) pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
         if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') {
             pool = pool.filter(r => (r.company || "").toUpperCase().trim() === currentFilter.toUpperCase());
         }
-
         filteredPool = pool;
+        filteredPool.sort(masterSort);
         renderResults();
         updateKeyboard();
     }
 
     function renderResults() {
-        if (filteredPool.length === 0 && currentFilter !== 'NEARBY') {
+        if (!filteredPool.length && currentFilter !== 'NEARBY') {
             searchResults.innerHTML = '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關路線喎...</div>';
             return;
         }
-
         const html = filteredPool.slice(0, visibleCount).map(r => {
             const isReturn = (r.bound === 'I' || r.bound === 'inbound');
             const boundText = isReturn ? '回程' : '去程';
-
             let displayOrig = r.orig_tc || '總站';
             let displayDest = r.dest_tc || '未知';
-
             if ((r.company === 'CTB' || r.company === 'NWFB') && isReturn) {
-                displayOrig = r.dest_tc || '總站';
-                displayDest = r.orig_tc || '未知';
+                displayOrig = r.dest_tc || '總站'; displayDest = r.orig_tc || '未知';
             }
-
             const isSpecial = r.service_type && r.service_type !== '1' && r.company !== 'NLB' && !(r.company || "").toUpperCase().startsWith('GMB');
-
             return `
                 <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${displayDest.replace(/'/g, "\\'")}', '${r.service_type || '1'}', '${displayOrig.replace(/'/g, "\\'")}')" 
                      class="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all shadow-sm relative overflow-hidden">
@@ -514,32 +466,24 @@
                 </div>
             `;
         }).join('');
-
-        if (html) {
-            searchResults.innerHTML = html;
-        }
+        if (html) searchResults.innerHTML = html;
         searchResults.classList.remove('hidden');
     }
 
     function updateKeyboard() {
         const val = (searchInput.value || "").trim().toUpperCase();
         const validLettersSet = new Set();
-
         let targetPool = currentFilter === 'ALL' || currentFilter === 'NEARBY' ? filteredPool : fullDirectory;
-
         targetPool.forEach(r => {
             const route = r.route.toUpperCase();
-            if (val === "") {
-                if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]);
-            } else if (route.startsWith(val)) {
+            if (val === "") { if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]); }
+            else if (route.startsWith(val)) {
                 const next = route.slice(val.length);
                 if (next.length > 0 && /[A-Z]/.test(next[0])) validLettersSet.add(next[0]);
             }
         });
-
         const letters = Array.from(validLettersSet).sort();
         letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-blue-50 text-blue-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
-
         setTimeout(handleKbScroll, 100);
     }
 
@@ -548,38 +492,22 @@
         if (val === 'BACK') searchInput.value = searchInput.value.slice(0, -1);
         else if (val === 'CLEAR') searchInput.value = '';
         else searchInput.value += val;
-
         clearSearchBtn.classList.toggle('hidden', searchInput.value.length === 0);
         window.scrollTo(0, 0);
         applyLocalFilter();
     }
 
-    async function performSearch(query) {
-        visibleCount = 100;
-        window.scrollTo(0, 0);
-        applyLocalFilter();
-    }
-
+    async function performSearch(query) { visibleCount = 100; window.scrollTo(0, 0); applyLocalFilter(); }
     searchInput.addEventListener('click', () => {
         toggleKeyboard(true);
-        setTimeout(() => {
-            searchInput.focus();
-            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-        }, 50);
+        setTimeout(() => { searchInput.focus(); searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length); }, 50);
     });
-
     searchInput.addEventListener('input', (e) => {
         clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0);
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => performSearch(e.target.value.trim()), 100);
     });
-
-    clearSearchBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        clearSearchBtn.classList.add('hidden');
-        performSearch('');
-    });
-
+    clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); performSearch(''); });
     function toggleKeyboard(show) {
         keyboard.classList.toggle('show', show);
         document.getElementById('mainContent').classList.toggle('keyboard-open', show);
@@ -592,115 +520,57 @@
     }
 
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
-        toggleKeyboard(false);
-        tg.BackButton.show();
-        searchSection.classList.add('hidden');
-        searchResults.classList.add('hidden');
-        sentinel.classList.add('hidden');
-
-        document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
-        document.getElementById('mainContent').classList.add('p-0');
-        stopList.classList.remove('hidden');
-        window.scrollTo(0, 0);
-
+        toggleKeyboard(false); tg.BackButton.show();
+        searchSection.classList.add('hidden'); searchResults.classList.add('hidden'); sentinel.classList.add('hidden');
+        document.getElementById('mainContent').classList.remove('p-4', 'pt-2'); document.getElementById('mainContent').classList.add('p-0');
+        stopList.classList.remove('hidden'); window.scrollTo(0, 0);
         document.getElementById('displayRouteName').innerText = route;
         document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1' || company === 'NLB' || (company || "").toUpperCase().startsWith('GMB'));
         document.getElementById('displayRouteSub').innerText = `往 ${dest} • ${companyMap[company] || company}`;
-
         const routeMatches = fullDirectory.filter(r => r.route === route && r.company === company);
         let counterpart = null;
-
-        if (company === 'NLB') {
-            counterpart = routeMatches.find(r => r.orig_tc.trim() === dest.trim() && r.dest_tc.trim() === orig.trim());
-        } else {
+        if (company === 'NLB') { counterpart = routeMatches.find(r => r.orig_tc.trim() === dest.trim() && r.dest_tc.trim() === orig.trim()); }
+        else {
             const isCurrentlyInbound = (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND');
-            const oppositeCandidates = routeMatches.filter(r => {
-                const isReturn = (r.bound === 'I' || r.bound === 'inbound' || r.bound === 'INBOUND');
-                return isCurrentlyInbound !== isReturn;
-            });
+            const oppositeCandidates = routeMatches.filter(r => { const isReturn = (r.bound === 'I' || r.bound === 'inbound' || r.bound === 'INBOUND'); return isCurrentlyInbound !== isReturn; });
             if (oppositeCandidates.length > 0) {
-                counterpart = oppositeCandidates.find(r => r.service_type === serviceType)
-                    || oppositeCandidates.find(r => (r.service_type || '1') === '1')
-                    || oppositeCandidates[0];
+                counterpart = oppositeCandidates.find(r => r.service_type === serviceType) || oppositeCandidates.find(r => (r.service_type || '1') === '1') || oppositeCandidates[0];
             }
         }
-
         const revContainer = document.getElementById('reverseBtnContainer');
         if (counterpart) {
-            let cDest = counterpart.dest_tc || '未知';
-            let cOrig = counterpart.orig_tc || '總站';
+            let cDest = counterpart.dest_tc || '未知'; let cOrig = counterpart.orig_tc || '總站';
             if ((counterpart.company === 'CTB' || counterpart.company === 'NWFB') && (counterpart.bound === 'I' || counterpart.bound === 'inbound')) {
-                cOrig = counterpart.dest_tc || '總站';
-                cDest = counterpart.orig_tc || '未知';
+                cOrig = counterpart.dest_tc || '總站'; cDest = counterpart.orig_tc || '未知';
             }
-
-            revContainer.innerHTML = `
-                <button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${cDest.replace(/'/g, "\\'")}', '${counterpart.service_type || '1'}', '${cOrig.replace(/'/g, "\\'")}')" 
-                        class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                </button>`;
-        } else {
-            revContainer.innerHTML = `<span id="routeTag" class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] font-black text-white/50 border border-transparent whitespace-nowrap animate-pulse">讀取中...</span>`;
-        }
-
+            revContainer.innerHTML = `<button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${cDest.replace(/'/g, "\\'")}', '${counterpart.service_type || '1'}', '${cOrig.replace(/'/g, "\\'")}')" class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg></button>`;
+        } else { revContainer.innerHTML = `<span id="routeTag" class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] font-black text-white/50 border border-transparent whitespace-nowrap animate-pulse">讀取中...</span>`; }
         const container = document.getElementById('stopsContainer');
         container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div></div>';
-
-        const apiCompany = (company || "").toUpperCase().startsWith('GMB_') ? 'GMB' : company;
-        const effectiveBound = (company === 'KMB' || company === 'LWB')
-            ? (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND' ? 'I' : 'O')
-            : bound;
-        const routeId = `${apiCompany}_${route}_${effectiveBound}_${serviceType}`;
-
+        const effectiveBound = (company === 'KMB' || company === 'LWB') ? (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND' ? 'I' : 'O') : bound;
+        const routeId = `${company}_${route}_${effectiveBound}_${serviceType}`;
         try {
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
-
-            if (!stops.length) {
-                container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>';
-                return;
-            }
-
+            if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
             if (!counterpart) {
-                const firstStopName = stops[0].nameTc.trim();
-                const lastStopName = stops[stops.length - 1].nameTc.trim();
+                const firstStopName = stops[0].nameTc.trim(); const lastStopName = stops[stops.length - 1].nameTc.trim();
                 const isCircular = firstStopName === lastStopName || dest.includes('循環線') || dest.includes('Circular') || orig.trim() === dest.trim();
-
                 const tagEl = document.getElementById('routeTag');
-                if (tagEl) {
-                    tagEl.innerText = isCircular ? '循環線' : '無回程';
-                    tagEl.classList.remove('animate-pulse', 'text-white/50');
-                    tagEl.classList.add('text-white/80');
-                }
+                if (tagEl) { tagEl.innerText = isCircular ? '循環線' : '無回程'; tagEl.classList.remove('animate-pulse', 'text-white/50'); tagEl.classList.add('text-white/80'); }
             }
-
             let closestIdx = -1;
             if (lastKnownPos) {
                 let minVal = Infinity;
-                stops.forEach((s, idx) => {
-                    const dist = getDistance(lastKnownPos.coords.latitude, lastKnownPos.coords.longitude, s.latitude, s.longitude);
-                    if (dist < minVal) { minVal = dist; closestIdx = idx; }
-                });
+                stops.forEach((s, idx) => { const dist = getDistance(lastKnownPos.coords.latitude, lastKnownPos.coords.longitude, s.latitude, s.longitude); if (dist < minVal) { minVal = dist; closestIdx = idx; } });
             }
-
             container.innerHTML = stops.map((s, idx) => `
-                <div id="stop-row-${idx}" class="stop-item p-5 flex justify-between items-start bg-white active:bg-gray-50 transition-colors ${idx === closestIdx ? 'stop-highlight' : ''}" 
-                     data-company="${apiCompany}" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
-                    <div class="flex items-center space-x-4 pt-1">
-                        <div class="w-8 h-8 rounded-full border-2 border-blue-500 flex items-center justify-center text-[11px] font-black text-blue-500 shadow-sm shrink-0">${s.sequence}</div>
-                        <span class="font-bold text-gray-800 text-base leading-tight">${s.nameTc}</span>
-                    </div>
-                    <div class="text-right">
-                        <div class="eta-main text-lg font-mono font-black text-blue-600 tracking-tighter leading-none">--</div>
-                        <div class="eta-subs text-[10px] font-bold text-gray-400 mt-1 leading-none">...</div>
-                    </div>
+                <div id="stop-row-${idx}" class="stop-item p-5 flex justify-between items-start bg-white active:bg-gray-50 transition-colors ${idx === closestIdx ? 'stop-highlight' : ''}" data-company="${company}" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
+                    <div class="flex items-center space-x-4 pt-1"><div class="w-8 h-8 rounded-full border-2 border-blue-500 flex items-center justify-center text-[11px] font-black text-blue-500 shadow-sm shrink-0">${s.sequence}</div><span class="font-bold text-gray-800 text-base leading-tight">${s.nameTc}</span></div>
+                    <div class="text-right"><div class="eta-main text-lg font-mono font-black text-blue-600 tracking-tighter leading-none">--</div><div class="eta-subs text-[10px] font-bold text-gray-400 mt-1 leading-none">...</div></div>
                 </div>
             `).join('');
-
-            visibleElements.clear();
-            container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el));
-            startGlobalRefresh();
-
+            visibleElements.clear(); container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el)); startGlobalRefresh();
             if (closestIdx !== -1) {
                 setTimeout(() => {
                     const scrollTargetIdx = Math.max(0, closestIdx - 2);
@@ -711,83 +581,38 @@
                     }
                 }, 500);
             }
-        } catch (e) {
-            container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>';
-        }
+        } catch (e) { container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>'; }
     }
 
-    function refreshVisibleEtas() {
-        tg.HapticFeedback.impactOccurred('light');
-        visibleElements.forEach(el => triggerEtaForElement(el, false));
-    }
-
-    function startGlobalRefresh() {
-        clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => {
-            visibleElements.forEach(el => triggerEtaForElement(el, true));
-        }, 30000);
-    }
-
-    function triggerEtaForElement(el, isSilent = false) {
-        const d = el.dataset;
-        showEta(d.company, d.stop, d.route, d.bound, d.type, el, isSilent);
-    }
+    function refreshVisibleEtas() { tg.HapticFeedback.impactOccurred('light'); visibleElements.forEach(el => triggerEtaForElement(el, false)); }
+    function startGlobalRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(() => { visibleElements.forEach(el => triggerEtaForElement(el, true)); }, 30000); }
+    function triggerEtaForElement(el, isSilent = false) { const d = el.dataset; showEta(d.company, d.stop, d.route, d.bound, d.type, el, isSilent); }
 
     async function showEta(company, stopId, route, bound, serviceType, element, isSilent = false) {
-        const mainText = element.querySelector('.eta-main');
-        const subsText = element.querySelector('.eta-subs');
-
+        const mainText = element.querySelector('.eta-main'); const subsText = element.querySelector('.eta-subs');
         if (!isSilent) mainText.innerText = "...";
-
         try {
             const res = await fetch(`/api/bus/eta/${company}/${stopId}/${route}/${serviceType}?bound=${bound}`);
             const data = await res.json();
-
-            if (!data || data.length === 0) {
-                mainText.innerText = "暫無班次";
-                subsText.innerText = "";
-                return;
-            }
-
+            if (!data || data.length === 0) { mainText.innerText = "暫無班次"; subsText.innerText = ""; return; }
             const now = new Date();
             const formatted = data.slice(0, 3).map(e => {
                 if (!e.eta) return { display: e.rmk_tc || "末班已過" };
-
                 const arrivalTime = new Date(e.eta);
-                if (displayMode === 'time') {
-                    return { display: arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) };
-                } else {
-                    const diff = Math.floor((arrivalTime - now) / 60000);
-                    return { display: diff <= 0 ? "即將到站" : `${diff}分` };
-                }
+                if (displayMode === 'time') { return { display: arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }; }
+                else { const diff = Math.floor((arrivalTime - now) / 60000); return { display: diff <= 0 ? "即將到站" : `${diff}分` }; }
             });
-
             mainText.innerText = formatted[0].display;
             subsText.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
-        } catch (e) {
-            mainText.innerText = "Error";
-        }
+        } catch (e) { mainText.innerText = "Error"; }
     }
 
     function backToSearch() {
-        clearInterval(refreshInterval);
-        visibleElements.clear();
-        tg.BackButton.hide();
+        clearInterval(refreshInterval); visibleElements.clear(); tg.BackButton.hide();
         window.scrollTo(0, 0);
-
-        document.getElementById('mainContent').classList.remove('p-0');
-        document.getElementById('mainContent').classList.add('p-4', 'pt-2');
-
-        stopList.classList.add('hidden');
-        searchSection.classList.remove('hidden');
-        searchResults.classList.remove('hidden');
-        sentinel.classList.remove('hidden');
-
-        // Anti-glitch repaint hack for iOS Safari
-        setTimeout(() => {
-            searchSection.style.transform = 'translateZ(0)';
-            setTimeout(() => { searchSection.style.transform = ''; }, 50);
-        }, 10);
+        document.getElementById('mainContent').classList.remove('p-0'); document.getElementById('mainContent').classList.add('p-4', 'pt-2');
+        stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); sentinel.classList.remove('hidden');
+        setTimeout(() => { searchSection.style.transform = 'translateZ(0)'; setTimeout(() => { searchSection.style.transform = ''; }, 50); }, 10);
     }
 </script>
 </body>

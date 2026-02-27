@@ -17,13 +17,12 @@ public class BusController(
     ILogger<BusController> logger) : ControllerBase
 {
     /// <summary>
-    /// Updated Metadata endpoint with Self-Healing.
-    /// Ensures we don't send "0 routes" to the frontend if the cache is still warming up.
+    /// Updated Metadata endpoint with type support.
+    /// allows frontend to check count for specific types (bus/minibus).
     /// </summary>
     [HttpGet("metadata")]
-    public async Task<IActionResult> GetMetadata()
+    public async Task<IActionResult> GetMetadata([FromQuery] string? type)
     {
-        // Trigger a load if a request comes in before the startup task finishes
         if (busDirectory.GetCacheCount() == 0)
         {
             await busDirectory.InitializeAsync();
@@ -31,19 +30,23 @@ public class BusController(
 
         return Ok(new {
             lastUpdated = busDirectory.GetLastUpdated().Ticks,
-            routeCount = busDirectory.GetCacheCount()
+            routeCount = busDirectory.GetCacheCount(type)
         });
     }
     
+    /// <summary>
+    /// Updated Search endpoint with type filtering.
+    /// Usage: /api/bus/search?q=ALL&type=bus
+    /// </summary>
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string? q)
+    public async Task<IActionResult> Search([FromQuery] string? q, [FromQuery] string? type)
     {
-        var results = await busDirectory.SearchRoutesAsync(q ?? "");
+        var results = await busDirectory.SearchRoutesAsync(q ?? "", type);
         return Ok(results);
     }
 
     [HttpGet("nearby")]
-    public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng)
+    public async Task<IActionResult> GetNearby([FromQuery] double lat, [FromQuery] double lng, [FromQuery] string? type)
     {
         double offset = 0.01; 
         var nearbyStops = await dbContext.Set<BusStop>()
@@ -57,7 +60,16 @@ public class BusController(
             .Select(rs => rs.BusRoute).Where(r => r.IsActive).Distinct()
             .OrderBy(r => r.RouteNumber).Take(50).ToListAsync();
 
-        return Ok(rawRoutes.Select(busDirectory.MapToResult).ToList());
+        var routes = rawRoutes.Select(busDirectory.MapToResult);
+        
+        // Apply type filter if requested for nearby routes
+        if (!string.IsNullOrEmpty(type))
+        {
+            var targetType = type.ToLower();
+            routes = routes.Where(r => r.type == targetType);
+        }
+
+        return Ok(routes.ToList());
     }
 
     [HttpGet("route/{routeId}/stops")]
