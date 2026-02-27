@@ -74,3 +74,40 @@ public record MtrBusEta(
     [property: JsonPropertyName("departureTimeText")] string DepartureTimeText,
     [property: JsonPropertyName("busRemark")] string? BusRemark
 );
+
+// =========================================================================
+// NLB (LANTAU BUS) SPECIFIC MODELS
+// =========================================================================
+
+public record NlbRouteResponse(
+    [property: JsonPropertyName("routes")] List<NlbRouteDto> Routes
+);
+
+public record NlbRouteDto(
+    [property: JsonPropertyName("routeId")] string RouteId,
+    [property: JsonPropertyName("routeNo")] string RouteNo,
+    [property: JsonPropertyName("routeName_c")] string NameTc,
+    [property: JsonPropertyName("routeName_e")] string NameEn
+);
+
+public record NlbStopResponse(
+    [property: JsonPropertyName("stops")] List<NlbStopDto> Stops
+);
+
+public record NlbStopDto(
+    [property: JsonPropertyName("stopId")] string StopId,
+    [property: JsonPropertyName("stopName_c")] string NameTc,
+    [property: JsonPropertyName("stopName_e")] string NameEn,
+    [property: JsonPropertyName("latitude")] string Latitude,
+    [property: JsonPropertyName("longitude")] string Longitude
+);
+
+public record NlbEtaResponse(
+    [property: JsonPropertyName("estimatedArrivals")] List<NlbEtaItem> Etas
+);
+
+public record NlbEtaItem(
+    [property: JsonPropertyName("estimatedArrivalTime")] string ArrivalTime,
+    [property: JsonPropertyName("routeVariantName")] string VariantName,
+    [property: JsonPropertyName("departed")] string Departed
+);

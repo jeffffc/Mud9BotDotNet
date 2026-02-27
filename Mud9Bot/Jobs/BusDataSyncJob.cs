@@ -41,8 +41,11 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
             .ToDictionaryAsync(x => x.StopId, x => x.LastUpdated);
 
         // ==========================================
-        // MTR BUS SPECIFIC SYNC (CSV BASED)
+        // NLB (SEPARATE API) / MTR BUS SPECIFIC SYNC (CSV BASED)
         // ==========================================
+        
+        await SyncNlbRoutesAsync(dbContext, syncTime);
+        
         await SyncMtrRoutesFromCsvAsync(dbContext, syncTime);
         
         // ==========================================
@@ -446,5 +449,91 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         }
         _processedStopIds.Add(stopId);
         return true;
+    }
+    
+    private async Task SyncNlbRoutesAsync(BotDbContext dbContext, DateTime syncTime)
+    {
+        logger.LogInformation("[BusSync] 正在同步嶼巴 (NLB) 資料...");
+        var client = httpClientFactory.CreateClient();
+        
+        try
+        {
+            var routeRes = await client.GetFromJsonAsync<NlbRouteResponse>("https://rt.data.gov.hk/v2/transport/nlb/route.php?action=list");
+            if (routeRes?.Routes == null) return;
+
+            foreach (var nlbRoute in routeRes.Routes)
+            {
+                string routeNo = nlbRoute.RouteNo;
+                string nlbId = nlbRoute.RouteId;
+                
+                var names = nlbRoute.NameTc.Split('>', 2);
+                string orig = names[0].Trim();
+                string dest = names.Length > 1 ? names[1].Trim() : orig;
+
+                // FIXED: Use standard ID format {Company}_{Route}_{Bound}_{ServiceType}
+                // 將 Bound 固定為 "O"，並將 NLB 內部 ID 存入 ServiceType，確保與前端格式一致
+                string dbRouteId = $"NLB_{routeNo}_O_{nlbId}";
+                
+                var dbRoute = await dbContext.Set<BusRoute>().FindAsync(dbRouteId);
+                if (dbRoute == null)
+                {
+                    dbRoute = new BusRoute { 
+                        Id = dbRouteId, 
+                        Company = "NLB", 
+                        RouteNumber = routeNo, 
+                        Bound = "O", 
+                        ServiceType = nlbId 
+                    };
+                    dbContext.Add(dbRoute);
+                }
+                dbRoute.OriginTc = orig; 
+                dbRoute.DestinationTc = dest;
+                dbRoute.OriginEn = nlbRoute.NameEn; 
+                dbRoute.DestinationEn = nlbRoute.NameEn;
+                dbRoute.IsActive = true; 
+                dbRoute.LastUpdated = syncTime;
+
+                // Fetch stops for this specific variant
+                var stopRes = await client.GetFromJsonAsync<NlbStopResponse>($"https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=list&routeId={nlbId}");
+                if (stopRes?.Stops != null)
+                {
+                    int seq = 1;
+                    foreach (var nlbStop in stopRes.Stops)
+                    {
+                        var dbStop = await dbContext.Set<BusStop>().FindAsync(nlbStop.StopId);
+                        if (dbStop == null)
+                        {
+                            dbStop = new BusStop { StopId = nlbStop.StopId };
+                            dbContext.Add(dbStop);
+                        }
+                        dbStop.NameTc = nlbStop.NameTc;
+                        dbStop.NameEn = nlbStop.NameEn;
+                        dbStop.Latitude = double.TryParse(nlbStop.Latitude, out var lat) ? lat : null;
+                        dbStop.Longitude = double.TryParse(nlbStop.Longitude, out var lon) ? lon : null;
+                        dbStop.IsActive = true;
+                        dbStop.LastUpdated = syncTime;
+                        _processedStopIds.Add(nlbStop.StopId);
+
+                        // FIXED: Link stops to the newly formatted routeId
+                        string rsId = $"{dbRouteId}_{seq}";
+                        var dbRS = await dbContext.Set<BusRouteStop>().FindAsync(rsId);
+                        if (dbRS == null)
+                        {
+                            dbRS = new BusRouteStop { Id = rsId, RouteId = dbRouteId, StopId = nlbStop.StopId };
+                            dbContext.Add(dbRS);
+                        }
+                        dbRS.Sequence = seq; 
+                        dbRS.IsActive = true; 
+                        dbRS.LastUpdated = syncTime;
+                        seq++;
+                    }
+                }
+            }
+            await dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex) 
+        { 
+            logger.LogError(ex, "[BusSync] [NLB] 同步失敗"); 
+        }
     }
 }

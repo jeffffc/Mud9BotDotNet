@@ -121,8 +121,9 @@
         <button onclick="setFilter('ALL')" data-filter="ALL" class="filter-chip active px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">全部</button>
         <button onclick="setFilter('NEARBY')" data-filter="NEARBY" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 flex items-center shrink-0 font-bold">📍 附近</button>
         <button onclick="setFilter('KMB')" data-filter="KMB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">九巴</button>
-        <button onclick="setFilter('LWB')" data-filter="LWB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">龍運</button>
         <button onclick="setFilter('CTB')" data-filter="CTB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">城巴</button>
+        <button onclick="setFilter('LWB')" data-filter="LWB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">龍運</button>
+        <button onclick="setFilter('NLB')" data-filter="NLB" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">嶼巴</button>
         <button onclick="setFilter('MTR')" data-filter="MTR" class="filter-chip px-6 py-2.5 rounded-full text-xs bg-gray-100 border-gray-100 shrink-0 font-bold">港鐵</button>
     </div>
 </div>
@@ -221,7 +222,7 @@
     const clearSearchBtn = document.getElementById('clearSearch');
 
     // Updated Company Map with MTR
-    const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴', 'MTR': '港鐵' };
+    const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴', 'MTR': '港鐵', 'NLB': '嶼巴' };
 
     let fullDirectory = [];
     let nearbyResults = [];
@@ -269,8 +270,8 @@
 
     async function initApp() {
         // BUMPED: version changed from v2 to v3 to clear legacy local cache and force MTR download
-        const cached = localStorage.getItem('bus_dir_v4');
-        const expiry = localStorage.getItem('bus_dir_exp_v4');
+        const cached = localStorage.getItem('bus_dir_v5');
+        const expiry = localStorage.getItem('bus_dir_exp_v5');
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
         if (cached && expiry && Date.now() < parseInt(expiry)) {
@@ -278,11 +279,13 @@
             applyLocalFilter();
         } else {
             loading.classList.remove('hidden');
-            // Clean up old v2 cache keys if they exist
+            // Clean up old cache keys if they exist
             localStorage.removeItem('bus_dir_v2');
             localStorage.removeItem('bus_dir_exp_v2');
             localStorage.removeItem('bus_dir_v3');
             localStorage.removeItem('bus_dir_exp_v3');
+            localStorage.removeItem('bus_dir_v4');
+            localStorage.removeItem('bus_dir_exp_v4');
 
             try {
                 const res = await fetch(`/api/bus/search?q=ALL`);
@@ -307,9 +310,9 @@
                     return (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
                 });
 
-                // Store in v3
-                localStorage.setItem('bus_dir_v4', JSON.stringify(fullDirectory));
-                localStorage.setItem('bus_dir_exp_v4', (Date.now() + 86400000).toString());
+                // Store in v5
+                localStorage.setItem('bus_dir_v5', JSON.stringify(fullDirectory));
+                localStorage.setItem('bus_dir_exp_v5', (Date.now() + 86400000).toString());
                 applyLocalFilter();
             } catch (e) { console.error(e); }
             loading.classList.add('hidden');
@@ -481,68 +484,51 @@
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
         toggleKeyboard(false); tg.BackButton.show();
         searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
-
         document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
         document.getElementById('mainContent').classList.add('p-0');
-
         stopList.classList.remove('hidden'); window.scrollTo(0, 0);
 
         document.getElementById('displayRouteName').innerText = route;
-        document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1');
-
-        // Because 'dest' is passed from renderResults, the CTB name swap automatically applies here too!
+        document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1' || company === 'NLB');
         document.getElementById('displayRouteSub').innerText = `往 ${dest} • ${companyMap[company] || company}`;
 
-        // --- Reverse Direction Button Logic (尋找相反方向路線邏輯) ---
-        const isCurrentlyInbound = (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND');
         const routeMatches = fullDirectory.filter(r => r.route === route && r.company === company);
-
         let counterpart = null;
-        const oppositeCandidates = routeMatches.filter(r => {
-            const isReturn = (r.bound === 'I' || r.bound === 'inbound' || r.bound === 'INBOUND');
-            return isCurrentlyInbound !== isReturn; // Find the opposite direction
-        });
 
-        if (oppositeCandidates.length > 0) {
-            // Priority 1: Same service type (同一個特別班次)
-            // Priority 2: Regular service type '1' (常規班次)
-            // Priority 3: First available opposite (任何可用的相反方向)
-            counterpart = oppositeCandidates.find(r => r.service_type === serviceType)
-                || oppositeCandidates.find(r => (r.service_type || '1') === '1')
-                || oppositeCandidates[0];
+        if (company === 'NLB') {
+            counterpart = routeMatches.find(r =>
+                r.orig_tc.trim() === dest.trim() &&
+                r.dest_tc.trim() === orig.trim()
+            );
+        } else {
+            const isCurrentlyInbound = (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND');
+            const oppositeCandidates = routeMatches.filter(r => {
+                const isReturn = (r.bound === 'I' || r.bound === 'inbound' || r.bound === 'INBOUND');
+                return isCurrentlyInbound !== isReturn;
+            });
+            if (oppositeCandidates.length > 0) {
+                counterpart = oppositeCandidates.find(r => r.service_type === serviceType)
+                    || oppositeCandidates.find(r => (r.service_type || '1') === '1')
+                    || oppositeCandidates[0];
+            }
         }
 
         const revContainer = document.getElementById('reverseBtnContainer');
         if (counterpart) {
             let cDest = counterpart.dest_tc || '未知';
             let cOrig = counterpart.orig_tc || '總站';
-            const cIsReturn = (counterpart.bound === 'I' || counterpart.bound === 'inbound' || counterpart.bound === 'INBOUND');
-
-            // Apply CTB logic for correct naming on the counterpart
-            if ((counterpart.company === 'CTB' || counterpart.company === 'NWFB') && cIsReturn) {
-                cOrig = counterpart.dest_tc || '總站';
-                cDest = counterpart.orig_tc || '未知';
+            if ((counterpart.company === 'CTB' || counterpart.company === 'NWFB') && (counterpart.bound === 'I' || counterpart.bound === 'inbound')) {
+                cOrig = counterpart.dest_tc || '總站'; cDest = counterpart.orig_tc || '未知';
             }
-
-            // Swap button
             revContainer.innerHTML = `
                 <button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${cDest.replace(/'/g, "\\'")}', '${counterpart.service_type || '1'}', '${cOrig.replace(/'/g, "\\'")}')" 
                         class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                 </button>`;
         } else {
-            // No counterpart exists (沒有相反方向)
-            if ((orig || '').trim() === (dest || '').trim()) {
-                // Circular route (循環線)
-                revContainer.innerHTML = `<span class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-xs font-black text-white/70 border border-transparent whitespace-nowrap">循環線</span>`;
-            } else {
-                // No return route (無回程)
-                revContainer.innerHTML = `<span class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-xs font-black text-white/70 border border-transparent whitespace-nowrap">無回程</span>`;
-            }
+            // SHOW PLACEHOLDER while stops load for end-to-end check
+            revContainer.innerHTML = `<span id="routeTag" class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] font-black text-white/50 border border-transparent whitespace-nowrap animate-pulse">讀取中...</span>`;
         }
-        // -------------------------------------------------------------
 
         const container = document.getElementById('stopsContainer');
         container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div></div>';
@@ -550,13 +536,28 @@
         const effectiveBound = (company === 'KMB' || company === 'LWB')
             ? (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND' ? 'I' : 'O')
             : bound;
-
         const routeId = `${company}_${route}_${effectiveBound}_${serviceType}`;
 
         try {
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
             if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
+
+            // --- ROBUST END-TO-END CIRCULAR DETECTION ---
+            if (!counterpart) {
+                const firstStopName = stops[0].nameTc.trim();
+                const lastStopName = stops[stops.length - 1].nameTc.trim();
+                const isCircular = firstStopName === lastStopName ||
+                    dest.includes('循環線') ||
+                    dest.includes('Circular') ||
+                    orig.trim() === dest.trim();
+                const tagEl = document.getElementById('routeTag');
+                if (tagEl) {
+                    tagEl.innerText = isCircular ? '循環線' : '無回程';
+                    tagEl.classList.remove('animate-pulse', 'text-white/50');
+                    tagEl.classList.add('text-white/80');
+                }
+            }
 
             let closestIdx = -1;
             if (lastKnownPos) {
@@ -585,7 +586,6 @@
             container.querySelectorAll('.stop-item').forEach(el => visibilityObserver.observe(el));
             startGlobalRefresh();
 
-            // Auto-scroll logic to put closest stop at 3rd row
             if (closestIdx !== -1) {
                 setTimeout(() => {
                     const scrollTargetIdx = Math.max(0, closestIdx - 2);

@@ -125,6 +125,12 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
             return await GetMtrEtasAsync(stopId, routeNum);
         }
         
+        // 🚀 NEXT STEP: Intercept NLB Requests
+        if (company.ToUpper() == "NLB")
+        {
+            return await GetNlbEtasAsync(stopId, serviceType, routeNum);
+        }
+        
         var (client, baseUrl) = GetClient(company);
         string url;
 
@@ -204,5 +210,39 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         {
             return [];
         }
+    }
+    
+    private async Task<List<BusEtaDto>> GetNlbEtasAsync(string stopId, string nlbRouteId, string routeNum)
+    {
+        try
+        {
+            var client = httpClientFactory.CreateClient();
+            // action=estimatedArrivals requires the internal routeId (serviceType) and stopId
+            string url = $"https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=estimatedArrivals&routeId={nlbRouteId}&stopId={stopId}&language=1";
+        
+            var nlbData = await client.GetFromJsonAsync<NlbEtaResponse>(url);
+            if (nlbData?.Etas == null) return [];
+
+            var results = new List<BusEtaDto>();
+            int seq = 1;
+
+            foreach (var eta in nlbData.Etas)
+            {
+                DateTime? arrival = DateTime.TryParse(eta.ArrivalTime, out var dt) ? dt : null;
+            
+                results.Add(new BusEtaDto(
+                    Route: routeNum,
+                    Direction: "O", 
+                    Sequence: seq++,
+                    StopId: stopId,
+                    DestinationTc: eta.VariantName ?? "嶼巴總站",
+                    EtaTime: arrival,
+                    RemarkTc: eta.Departed == "1" ? "已離開" : "",
+                    RemarkEn: ""
+                ));
+            }
+            return results.OrderBy(e => e.EtaTime ?? DateTime.MaxValue).ToList();
+        }
+        catch { return []; }
     }
 }
