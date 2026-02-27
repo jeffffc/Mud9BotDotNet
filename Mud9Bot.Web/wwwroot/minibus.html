@@ -120,7 +120,13 @@
 </div>
 
 <div id="mainContent" class="p-4 pt-2">
-    <div id="searchResults" class="space-y-3 pb-10"></div>
+    <div id="searchResults" class="space-y-3 pb-2"></div>
+
+    <!-- Infinite Scroll Sentinel -->
+    <div id="infiniteSentinel" class="h-20 flex items-center justify-center opacity-0">
+        <div class="animate-spin rounded-full h-5 w-5 border-2 border-green-500 border-t-transparent"></div>
+    </div>
+
     <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
         <div id="routeHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white">
             <div class="flex flex-col pr-4">
@@ -141,7 +147,7 @@
     </div>
     <div id="loading" class="hidden text-center py-20">
         <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent"></div>
-        <p class="mt-4 text-gray-500 text-sm font-black tracking-widest">正在載入小巴路線...</p>
+        <p class="mt-4 text-gray-500 text-sm font-black tracking-widest">正在處理中...</p>
     </div>
 </div>
 
@@ -199,13 +205,14 @@
     const keyboard = document.getElementById('customKeyboard');
     const letterPad = document.getElementById('letterPad');
     const clearSearchBtn = document.getElementById('clearSearch');
+    const sentinel = document.getElementById('infiniteSentinel');
 
     const regionMap = { 'GMB_HKI': '港島', 'GMB_KLN': '九龍', 'GMB_NT': '新界', 'GMB': '小巴' };
 
     let fullDirectory = [];
     let nearbyResults = [];
     let filteredPool = [];
-    let visibleCount = 30;
+    let visibleCount = 100; // Start with more entries
     let currentFilter = 'ALL';
     let lastKnownPos = null;
     let searchTimeout = null;
@@ -214,11 +221,18 @@
     let visibleElements = new Set();
     let displayMode = localStorage.getItem('gmb_eta_mode') || 'mins';
 
+    // Bulletproof Filter Function for Minibus
+    const isMinibusFilter = (r) => {
+        const t = (r.type || r.Type || "").toLowerCase();
+        if (t) return t === 'minibus';
+        return (r.company || r.Company || "").toUpperCase().startsWith('GMB');
+    };
+
     window.addEventListener('DOMContentLoaded', () => {
         initApp();
         document.getElementById('displayModeToggle').checked = displayMode === 'time';
+        initPaginationObserver();
         initVisibilityObserver();
-        window.addEventListener('scroll', handleInfiniteScroll);
 
         // Remove animation class after it plays so fixed elements (keyboard) behave perfectly
         setTimeout(() => {
@@ -241,49 +255,80 @@
         down.classList.toggle('opacity-0', isAtBottom);
     }
 
+    // Intersection Observer for 100% Reliable Infinite Scrolling
+    function initPaginationObserver() {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && stopList.classList.contains('hidden')) {
+                if (visibleCount < filteredPool.length) {
+                    sentinel.classList.add('opacity-100');
+                    setTimeout(() => {
+                        visibleCount += 50; // Load 50 more at a time
+                        renderResults();
+                        sentinel.classList.remove('opacity-100');
+                    }, 50);
+                }
+            }
+        }, { rootMargin: '600px' });
+
+        observer.observe(sentinel);
+    }
+
     async function initApp() {
-        
+        // AUTOMATIC CACHE HANDSHAKE
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
         try {
+            // 1. Fetch lightweight metadata from server
             const metaRes = await fetch('/api/bus/metadata');
             const meta = await metaRes.json();
 
+            // Note: We use the shared bus_dir_data key so both apps share the same database payload!
             const cachedData = localStorage.getItem('bus_dir_data');
             const cachedMeta = localStorage.getItem('bus_dir_meta');
 
+            // Robust check: If meta exists AND routeCount > 0 AND timestamp matches
             if (cachedData && cachedMeta) {
                 const localMeta = JSON.parse(cachedMeta);
-                if (localMeta.lastUpdated === meta.lastUpdated) {
-                    fullDirectory = JSON.parse(cachedData);
+                if (localMeta.lastUpdated === meta.lastUpdated && localMeta.routeCount > 0) {
+                    const raw = JSON.parse(cachedData);
+                    fullDirectory = raw.filter(isMinibusFilter); // Filter purely for minibus
                     applyLocalFilter();
-                    return; // Handshake complete, data is fresh!
+                    return; // EXIT EARLY - Database hasn't changed.
                 }
             }
 
-            // Database changed: Clear legacy keys and download fresh GMB list
+            // 3. Database has changed or cache is empty - Download fresh list.
             loading.classList.remove('hidden');
             const res = await fetch(`/api/bus/search?q=ALL`);
             const allData = await res.json();
 
-            // Filter specifically for GMB items for this app's pool
-            fullDirectory = allData.filter(r => r.company && r.company.startsWith('GMB'));
+            // Standardize: Save full dataset but only use minibuses for this UI
+            localStorage.setItem('bus_dir_data', JSON.stringify(allData));
+            localStorage.setItem('bus_dir_meta', JSON.stringify(meta));
 
+            // Filter specifically for GMB items for this app's pool
+            fullDirectory = allData.filter(isMinibusFilter);
+
+            // MULTI-TIER SORTING: 1. Route Number -> 2. Service Type -> 3. Bound
             fullDirectory.sort((a, b) => {
                 const rc = a.route.localeCompare(b.route, undefined, { numeric: true });
                 if (rc !== 0) return rc;
-                const stCompare = (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
+
+                const stA = a.service_type || '1';
+                const stB = b.service_type || '1';
+                const stCompare = stA.localeCompare(stB, undefined, { numeric: true });
                 if (stCompare !== 0) return stCompare;
+
                 const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
                 return isBoundI(a) - isBoundI(b);
             });
 
-            localStorage.setItem('minibus_dir_data', JSON.stringify(fullDirectory));
-            localStorage.setItem('minibus_dir_meta', JSON.stringify(meta));
-
             applyLocalFilter();
-        } catch (e) { console.error("Sync error:", e); }
-        finally { loading.classList.add('hidden'); }
+        } catch (e) {
+            console.error("Sync error:", e);
+        } finally {
+            loading.classList.add('hidden');
+        }
     }
 
     function initVisibilityObserver() {
@@ -292,53 +337,76 @@
                 if (entry.isIntersecting) {
                     visibleElements.add(entry.target);
                     triggerEtaForElement(entry.target);
-                } else { visibleElements.delete(entry.target); }
+                } else {
+                    visibleElements.delete(entry.target);
+                }
             });
         }, { threshold: 0.1 });
-    }
-
-    function handleInfiniteScroll() {
-        if (!stopList.classList.contains('hidden')) return;
-        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 350) {
-            if (visibleCount < filteredPool.length) { visibleCount += 15; renderResults(); }
-        }
     }
 
     function setFilter(filter) {
         tg.HapticFeedback.selectionChanged();
         currentFilter = filter;
         document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-filter') === filter));
-        visibleCount = 30;
+        visibleCount = 100;
         window.scrollTo(0, 0);
-        if (filter === 'NEARBY') { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); requestNearby(); }
-        else { applyLocalFilter(); }
+
+        if (filter === 'NEARBY') {
+            searchInput.value = '';
+            clearSearchBtn.classList.add('hidden');
+            requestNearby();
+        } else {
+            applyLocalFilter();
+        }
     }
 
+    // Uses the working location logic with isMinibusFilter
     async function requestNearby() {
         loading.classList.remove('hidden');
+        searchResults.innerHTML = '<div class="text-center py-20 opacity-40 text-sm font-bold animate-pulse">正在精確定位中...</div>';
+
         navigator.geolocation.getCurrentPosition(async (pos) => {
             lastKnownPos = pos;
             try {
                 const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
                 const data = await res.json();
-                nearbyResults = data.filter(r => r.company && r.company.startsWith('GMB'));
-                filteredPool = nearbyResults;
-                renderResults();
-            } catch (e) { } finally { loading.classList.add('hidden'); }
-        }, null, { timeout: 8000 });
+
+                // Ensure nearby only shows green minibuses
+                nearbyResults = data.filter(isMinibusFilter);
+
+                if (!nearbyResults || nearbyResults.length === 0) {
+                    searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
+                    filteredPool = [];
+                } else {
+                    filteredPool = nearbyResults;
+                    renderResults();
+                }
+                updateKeyboard();
+            } catch (e) {
+                searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>';
+                filteredPool = [];
+                updateKeyboard();
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }, (err) => {
+            loading.classList.add('hidden');
+        }, { timeout: 8000, enableHighAccuracy: true });
     }
 
     function applyLocalFilter() {
-        const query = searchInput.value.trim().toUpperCase();
+        const query = (searchInput.value || "").trim().toUpperCase();
         let pool = currentFilter === 'NEARBY' ? nearbyResults : fullDirectory;
 
-        // Filter by specific region if selected
-        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') {
-            pool = pool.filter(r => r.company === currentFilter);
+        // Filter by search query
+        if (query) {
+            pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
         }
 
-        // Filter by search query
-        if (query) pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
+        // Filter by specific region if selected - FIXED uppercase matching
+        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') {
+            pool = pool.filter(r => (r.company || "").toUpperCase().trim() === currentFilter.toUpperCase());
+        }
 
         filteredPool = pool;
         renderResults();
@@ -346,6 +414,11 @@
     }
 
     function renderResults() {
+        if (filteredPool.length === 0 && currentFilter !== 'NEARBY') {
+            searchResults.innerHTML = '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關小巴...</div>';
+            return;
+        }
+
         const html = filteredPool.slice(0, visibleCount).map(r => `
             <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${r.dest_tc.replace(/'/g, "\\'")}', '${r.service_type}', '${r.orig_tc.replace(/'/g, "\\'")}')" 
                  class="p-4 bg-white border border-gray-100 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all shadow-sm">
@@ -362,25 +435,32 @@
                 <div class="text-[10px] font-black text-green-500 bg-green-50 px-3 py-1.5 rounded-xl uppercase tracking-widest">${r.bound === 'I' ? '回程' : '去程'}</div>
             </div>
         `).join('');
-        searchResults.innerHTML = html || '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關小巴...</div>';
+
+        if (html) {
+            searchResults.innerHTML = html;
+        }
+        searchResults.classList.remove('hidden');
     }
 
     function updateKeyboard() {
-        const val = searchInput.value.trim().toUpperCase();
+        const val = (searchInput.value || "").trim().toUpperCase();
         const validLettersSet = new Set();
 
-        let targetPool = currentFilter === 'ALL' ? fullDirectory : filteredPool;
+        let targetPool = currentFilter === 'ALL' || currentFilter === 'NEARBY' ? filteredPool : fullDirectory;
 
         targetPool.forEach(r => {
             const route = r.route.toUpperCase();
-            if (val === "" && /[A-Z]/.test(route[0])) validLettersSet.add(route[0]);
-            else if (route.startsWith(val)) {
+            if (val === "") {
+                if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]);
+            } else if (route.startsWith(val)) {
                 const next = route.slice(val.length);
                 if (next.length > 0 && /[A-Z]/.test(next[0])) validLettersSet.add(next[0]);
             }
         });
+
         const letters = Array.from(validLettersSet).sort();
         letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-green-50 text-green-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
+
         setTimeout(handleKbScroll, 100);
     }
 
@@ -389,24 +469,33 @@
         if (val === 'BACK') searchInput.value = searchInput.value.slice(0, -1);
         else if (val === 'CLEAR') searchInput.value = '';
         else searchInput.value += val;
+
         clearSearchBtn.classList.toggle('hidden', searchInput.value.length === 0);
         window.scrollTo(0, 0);
         applyLocalFilter();
     }
 
     async function performSearch() {
-        visibleCount = 30;
+        visibleCount = 100;
         window.scrollTo(0, 0);
         applyLocalFilter();
     }
 
     // 支援手動輸入 / Native Keyboard Input Support
-    searchInput.addEventListener('click', () => { toggleKeyboard(true); setTimeout(() => searchInput.focus(), 50); });
+    searchInput.addEventListener('click', () => {
+        toggleKeyboard(true);
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+        }, 50);
+    });
+
     searchInput.addEventListener('input', (e) => {
         clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0);
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => performSearch(), 100);
     });
+
     clearSearchBtn.addEventListener('click', () => {
         searchInput.value = '';
         clearSearchBtn.classList.add('hidden');
@@ -419,14 +508,22 @@
         if (show) updateKeyboard();
     }
 
+    function getDistance(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+        return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+    }
+
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
-        toggleKeyboard(false); tg.BackButton.show();
-        searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
+        toggleKeyboard(false);
+        tg.BackButton.show();
+        searchSection.classList.add('hidden');
+        searchResults.classList.add('hidden');
+        sentinel.classList.add('hidden');
 
         document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
         document.getElementById('mainContent').classList.add('p-0');
-
-        stopList.classList.remove('hidden'); window.scrollTo(0, 0);
+        stopList.classList.remove('hidden');
+        window.scrollTo(0, 0);
 
         document.getElementById('displayRouteName').innerText = route;
         const regionLabel = regionMap[company] || '小巴';
@@ -456,17 +553,26 @@
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
 
+            if (!stops.length) {
+                container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>';
+                return;
+            }
+
             if (!counterpart) {
                 const isCircular = stops.length > 2 && stops[0].nameTc.trim() === stops[stops.length-1].nameTc.trim();
-                document.getElementById('routeTag').innerText = isCircular ? '循環線' : '無回程';
-                document.getElementById('routeTag').classList.remove('animate-pulse');
+                const tagEl = document.getElementById('routeTag');
+                if (tagEl) {
+                    tagEl.innerText = isCircular ? '循環線' : '無回程';
+                    tagEl.classList.remove('animate-pulse', 'text-white/50');
+                    tagEl.classList.add('text-white/80');
+                }
             }
 
             let closestIdx = -1;
             if (lastKnownPos) {
                 let minVal = Infinity;
                 stops.forEach((s, idx) => {
-                    const dist = Math.sqrt(Math.pow(lastKnownPos.coords.latitude - s.latitude, 2) + Math.pow(lastKnownPos.coords.longitude - s.longitude, 2));
+                    const dist = getDistance(lastKnownPos.coords.latitude, lastKnownPos.coords.longitude, s.latitude, s.longitude);
                     if (dist < minVal) { minVal = dist; closestIdx = idx; }
                 });
             }
@@ -490,45 +596,79 @@
             startGlobalRefresh();
 
             if (closestIdx !== -1) {
-                const target = document.getElementById(`stop-row-${Math.max(0, closestIdx - 2)}`);
-                if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset - 150, behavior: 'smooth' });
+                setTimeout(() => {
+                    const scrollTargetIdx = Math.max(0, closestIdx - 2);
+                    const targetEl = document.getElementById(`stop-row-${scrollTargetIdx}`);
+                    if (targetEl) {
+                        const totalHeaderHeight = (document.getElementById('appHeader')?.offsetHeight || 53) + (document.getElementById('routeHeader')?.offsetHeight || 88);
+                        window.scrollTo({ top: targetEl.getBoundingClientRect().top + window.pageYOffset - totalHeaderHeight, behavior: 'smooth' });
+                    }
+                }, 500);
             }
-        } catch (e) { container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>'; }
+        } catch (e) {
+            container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>';
+        }
     }
 
-    function refreshVisibleEtas() { visibleElements.forEach(el => triggerEtaForElement(el, false)); }
-    function startGlobalRefresh() { clearInterval(refreshInterval); refreshInterval = setInterval(() => visibleElements.forEach(el => triggerEtaForElement(el, true)), 30000); }
+    function refreshVisibleEtas() {
+        tg.HapticFeedback.impactOccurred('light');
+        visibleElements.forEach(el => triggerEtaForElement(el, false));
+    }
 
-    function triggerEtaForElement(el, silent = false) {
+    function startGlobalRefresh() {
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+            visibleElements.forEach(el => triggerEtaForElement(el, true));
+        }, 30000);
+    }
+
+    function triggerEtaForElement(el, isSilent = false) {
         const d = el.dataset;
-        const main = el.querySelector('.eta-main');
-        const subs = el.querySelector('.eta-subs');
-        if (!silent) main.innerText = "...";
+        showEta(d.company, d.stop, d.route, d.bound, d.type, el, isSilent);
+    }
 
-        // Pass generic GMB to API for ETA fetch mapping
-        fetch(`/api/bus/eta/GMB/${d.stop}/${d.route}/${d.type}?bound=${d.bound}`)
-            .then(r => r.json()).then(data => {
-            if (!data.length) { main.innerText = "暫無班次"; subs.innerText = ""; return; }
+    async function showEta(company, stopId, route, bound, serviceType, element, isSilent = false) {
+        const mainText = element.querySelector('.eta-main');
+        const subsText = element.querySelector('.eta-subs');
+
+        if (!isSilent) mainText.innerText = "...";
+
+        try {
+            // Pass generic GMB to API for ETA fetch mapping
+            const res = await fetch(`/api/bus/eta/GMB/${stopId}/${route}/${serviceType}?bound=${bound}`);
+            const data = await res.json();
+
+            if (!data || data.length === 0) {
+                mainText.innerText = "暫無班次";
+                subsText.innerText = "";
+                return;
+            }
+
             const now = new Date();
             const formatted = data.slice(0, 3).map(e => {
                 if (!e.eta) return { display: e.rmk_tc || "末班已過" };
-                const arrival = new Date(e.eta);
+
+                const arrivalTime = new Date(e.eta);
                 if (displayMode === 'time') {
-                    return { display: arrival.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) };
+                    return { display: arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) };
                 } else {
-                    const diff = Math.max(0, Math.floor((arrival - now) / 60000));
+                    const diff = Math.max(0, Math.floor((arrivalTime - now) / 60000));
                     return { display: diff <= 0 ? "即將到站" : `${diff}分` };
                 }
             });
-            main.innerText = formatted[0].display;
-            subs.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
-        }).catch(() => { main.innerText = "Error"; });
+
+            mainText.innerText = formatted[0].display;
+            subsText.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
+        } catch (e) {
+            mainText.innerText = "Error";
+        }
     }
 
     function backToSearch() {
-        clearInterval(refreshInterval); visibleElements.clear(); tg.BackButton.hide();
+        clearInterval(refreshInterval);
+        visibleElements.clear();
+        tg.BackButton.hide();
 
-        // Scroll to top BEFORE toggling classes to avoid viewport tearing
         window.scrollTo(0, 0);
 
         document.getElementById('mainContent').classList.remove('p-0');
@@ -537,6 +677,7 @@
         stopList.classList.add('hidden');
         searchSection.classList.remove('hidden');
         searchResults.classList.remove('hidden');
+        sentinel.classList.remove('hidden');
 
         // Anti-glitch repaint hack for iOS Safari
         setTimeout(() => {

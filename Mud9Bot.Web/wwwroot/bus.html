@@ -94,6 +94,7 @@
     </style>
 </head>
 <body class="antialiased select-none page-flip-in">
+
 <!-- Overall App Header (Sticky) -->
 <header id="appHeader" class="bg-white border-b border-gray-100 p-3 flex items-center justify-between sticky top-0 z-[60]">
     <!-- Clickable Logo/Title for Swapping to Minibus -->
@@ -152,10 +153,15 @@
 
 <!-- Main Content Area (Results / Stop List) -->
 <div id="mainContent" class="p-4 pt-2">
-    <div id="searchResults" class="space-y-3 pb-10"></div>
+    <div id="searchResults" class="space-y-3 pb-2"></div>
+
+    <!-- Infinite Scroll Sentinel -->
+    <div id="infiniteSentinel" class="h-20 flex items-center justify-center opacity-0">
+        <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+    </div>
 
     <div id="stopList" class="hidden bg-white rounded-t-3xl shadow-2xl text-black mb-10 border border-gray-100">
-        <!-- Floating Header for Route Details - Fixed docking logic -->
+        <!-- Floating Header for Route Details -->
         <div id="routeHeader" class="p-5 flex justify-between items-center sticky top-[53px] z-40 shadow-lg rounded-t-3xl text-white">
             <div class="flex flex-col pr-4">
                 <div class="flex items-center space-x-2">
@@ -241,7 +247,7 @@
         document.body.classList.add('page-flip-out');
         setTimeout(() => {
             window.location.replace(targetUrl);
-        }, 350); // Matches CSS animation timing slightly early to ensure smooth transition
+        }, 350);
     }
 
     const searchInput = document.getElementById('routeSearch');
@@ -252,30 +258,34 @@
     const keyboard = document.getElementById('customKeyboard');
     const letterPad = document.getElementById('letterPad');
     const clearSearchBtn = document.getElementById('clearSearch');
+    const sentinel = document.getElementById('infiniteSentinel');
 
-    // Updated Company Map with MTR
     const companyMap = { 'KMB': '九巴', 'LWB': '龍運', 'CTB': '城巴', 'NWFB': '新巴', 'MTR': '港鐵', 'NLB': '嶼巴' };
 
     let fullDirectory = [];
     let nearbyResults = [];
     let filteredPool = [];
-    let visibleCount = 30;
+    let visibleCount = 100;
     let currentFilter = 'ALL';
     let searchTimeout = null;
     let refreshInterval = null;
     let lastKnownPos = null;
     let visibilityObserver = null;
     let visibleElements = new Set();
-
     let displayMode = localStorage.getItem('bus_eta_mode') || 'mins';
+
+    const isBusFilter = (r) => {
+        const t = (r.type || r.Type || "").toLowerCase();
+        if (t) return t === 'bus';
+        return !(r.company || r.Company || "").toUpperCase().startsWith('GMB');
+    };
 
     window.addEventListener('DOMContentLoaded', () => {
         initApp();
         initToggles();
-        window.addEventListener('scroll', handleInfiniteScroll);
+        initPaginationObserver();
         initVisibilityObserver();
 
-        // Remove animation class after it plays so fixed elements (keyboard) behave perfectly
         setTimeout(() => {
             document.body.classList.remove('page-flip-in');
         }, 500);
@@ -291,46 +301,62 @@
         refreshVisibleEtas();
     }
 
-    // Keyboard scroll hint logic
     function handleKbScroll() {
         const el = document.getElementById('letterPad');
         const up = document.getElementById('kbUpHint');
         const down = document.getElementById('kbDownHint');
 
-        // Show up hint if we've scrolled down a bit
         up.classList.toggle('opacity-0', el.scrollTop < 10);
-
-        // Show down hint if we are NOT at the bottom
         const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
         down.classList.toggle('opacity-0', isAtBottom);
     }
 
+    function initPaginationObserver() {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && stopList.classList.contains('hidden')) {
+                if (visibleCount < filteredPool.length) {
+                    sentinel.classList.add('opacity-100');
+                    setTimeout(() => {
+                        visibleCount += 50;
+                        renderResults();
+                        sentinel.classList.remove('opacity-100');
+                    }, 50);
+                }
+            }
+        }, { rootMargin: '600px' });
+
+        observer.observe(sentinel);
+    }
+
     async function initApp() {
-        
+        // Tracker init: Using the exact line from the working version
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
         try {
-            // 1. Fetch lightweight metadata from server
             const metaRes = await fetch('/api/bus/metadata');
             const meta = await metaRes.json();
 
             const cachedData = localStorage.getItem('bus_dir_data');
             const cachedMeta = localStorage.getItem('bus_dir_meta');
 
-            // 2. Compare metadata. If they match, use cache.
             if (cachedData && cachedMeta) {
                 const localMeta = JSON.parse(cachedMeta);
-                if (localMeta.lastUpdated === meta.lastUpdated) {
-                    fullDirectory = JSON.parse(cachedData);
+                if (localMeta.lastUpdated === meta.lastUpdated && localMeta.routeCount > 0) {
+                    const raw = JSON.parse(cachedData);
+                    fullDirectory = raw.filter(isBusFilter);
                     applyLocalFilter();
-                    return; // EXIT EARLY - Database hasn't changed.
+                    return;
                 }
             }
 
-            // 3. Database has changed or cache is empty - Download fresh list.
             loading.classList.remove('hidden');
             const res = await fetch(`/api/bus/search?q=ALL`);
-            fullDirectory = await res.json();
+            const allData = await res.json();
+
+            localStorage.setItem('bus_dir_data', JSON.stringify(allData));
+            localStorage.setItem('bus_dir_meta', JSON.stringify(meta));
+
+            fullDirectory = allData.filter(isBusFilter);
 
             fullDirectory.sort((a, b) => {
                 const rc = a.route.localeCompare(b.route, undefined, { numeric: true });
@@ -341,13 +367,12 @@
                 return (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
             });
 
-            // 4. Update localStorage with new handshake markers
-            localStorage.setItem('bus_dir_data', JSON.stringify(fullDirectory));
-            localStorage.setItem('bus_dir_meta', JSON.stringify(meta));
-
             applyLocalFilter();
-        } catch (e) { console.error("Sync error:", e); }
-        finally { loading.classList.add('hidden'); }
+        } catch (e) {
+            console.error("Sync error:", e);
+        } finally {
+            loading.classList.add('hidden');
+        }
     }
 
     function initVisibilityObserver() {
@@ -364,44 +389,48 @@
         }, { threshold: 0.1 });
     }
 
-    function handleInfiniteScroll() {
-        if (!stopList.classList.contains('hidden')) return;
-        const scrollHeight = document.documentElement.scrollHeight;
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const clientHeight = window.innerHeight;
-        if (scrollTop + clientHeight >= scrollHeight - 350) {
-            if (visibleCount < filteredPool.length) {
-                visibleCount += 10;
-                renderResults();
-            }
-        }
-    }
-
     function setFilter(filter) {
         tg.HapticFeedback.selectionChanged();
         currentFilter = filter;
         document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-filter') === filter));
-        visibleCount = 30;
+        visibleCount = 100;
         window.scrollTo(0, 0);
-        if (filter === 'NEARBY') { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); requestNearby(); }
-        else { applyLocalFilter(); }
+
+        if (filter === 'NEARBY') {
+            searchInput.value = '';
+            clearSearchBtn.classList.add('hidden');
+            requestNearby();
+        } else {
+            applyLocalFilter();
+        }
     }
 
+    // Reverted to exactly match the provided working logic, while keeping isBusFilter.
     async function requestNearby() {
         loading.classList.remove('hidden');
         searchResults.innerHTML = '<div class="text-center py-20 opacity-40 text-sm font-bold animate-pulse">正在精確定位中...</div>';
+
         navigator.geolocation.getCurrentPosition(async (pos) => {
             lastKnownPos = pos;
             try {
                 const res = await fetch(`/api/bus/nearby?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`);
-                nearbyResults = await res.json();
+                const data = await res.json();
+
+                nearbyResults = data.filter(isBusFilter);
+
                 if (!nearbyResults || nearbyResults.length === 0) {
                     searchResults.innerHTML = '<div class="text-center py-24 px-10"><p class="opacity-20 text-sm font-black mb-4">附近暫時冇路線喎...</p></div>';
+                    filteredPool = [];
                 } else {
                     filteredPool = nearbyResults;
                     renderResults();
                 }
-            } catch (e) { searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>'; }
+                updateKeyboard();
+            } catch (e) {
+                searchResults.innerHTML = '<div class="text-center py-20 text-red-400 text-sm font-bold">附近路線獲取失敗。</div>';
+                filteredPool = [];
+                updateKeyboard();
+            }
             finally { loading.classList.add('hidden'); }
         }, (err) => {
             loading.classList.add('hidden');
@@ -409,18 +438,25 @@
     }
 
     function applyLocalFilter() {
-        const query = searchInput.value.trim().toUpperCase();
+        const query = (searchInput.value || "").trim().toUpperCase();
         let sourcePool = currentFilter === 'NEARBY' ? nearbyResults : fullDirectory;
         let pool = [...sourcePool];
-        if (query) pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
-        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') pool = pool.filter(r => r.company === currentFilter);
+
+        if (query) {
+            pool = pool.filter(r => r.route.toUpperCase().startsWith(query));
+        }
+
+        if (currentFilter !== 'ALL' && currentFilter !== 'NEARBY') {
+            pool = pool.filter(r => (r.company || "").toUpperCase().trim() === currentFilter.toUpperCase());
+        }
+
         filteredPool = pool;
         renderResults();
         updateKeyboard();
     }
 
     function renderResults() {
-        if (filteredPool.length === 0) {
+        if (filteredPool.length === 0 && currentFilter !== 'NEARBY') {
             searchResults.innerHTML = '<div class="text-center py-24 opacity-20 text-sm font-black">搵唔到相關路線喎...</div>';
             return;
         }
@@ -432,12 +468,12 @@
             let displayOrig = r.orig_tc || '總站';
             let displayDest = r.dest_tc || '未知';
 
-            // FIX for CTB names: Citybus API only provides one Origin/Dest pair per route.
-            // For 'inbound' (the return journey), we must visually swap them on the frontend.
             if ((r.company === 'CTB' || r.company === 'NWFB') && isReturn) {
                 displayOrig = r.dest_tc || '總站';
                 displayDest = r.orig_tc || '未知';
             }
+
+            const isSpecial = r.service_type && r.service_type !== '1' && r.company !== 'NLB' && !(r.company || "").toUpperCase().startsWith('GMB');
 
             return `
                 <div onclick="loadRoute('${r.route}', '${r.bound}', '${r.company}', '${displayDest.replace(/'/g, "\\'")}', '${r.service_type || '1'}', '${displayOrig.replace(/'/g, "\\'")}')" 
@@ -450,7 +486,7 @@
                         <div class="flex flex-col">
                             <div class="flex items-center flex-wrap">
                                 <span class="text-sm font-bold text-gray-800">往 ${displayDest}</span>
-                                ${r.service_type && r.service_type !== '1' ? '<span class="ml-1 text-[9px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">特別班次</span>' : ''}
+                                ${isSpecial ? '<span class="ml-1 text-[9px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-black">特別班次</span>' : ''}
                             </div>
                             <span class="text-[10px] text-gray-400 font-bold mt-0.5">由 ${displayOrig} 開出</span>
                         </div>
@@ -460,21 +496,28 @@
             `;
         }).join('');
 
-        searchResults.innerHTML = html;
+        if (html) {
+            searchResults.innerHTML = html;
+        }
         searchResults.classList.remove('hidden');
     }
 
     function updateKeyboard() {
-        const val = searchInput.value.trim().toUpperCase();
+        const val = (searchInput.value || "").trim().toUpperCase();
         const validLettersSet = new Set();
-        fullDirectory.forEach(r => {
+
+        let targetPool = currentFilter === 'ALL' || currentFilter === 'NEARBY' ? filteredPool : fullDirectory;
+
+        targetPool.forEach(r => {
             const route = r.route.toUpperCase();
-            if (val === "") { if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]); }
-            else if (route.startsWith(val)) {
+            if (val === "") {
+                if (/[A-Z]/.test(route[0])) validLettersSet.add(route[0]);
+            } else if (route.startsWith(val)) {
                 const next = route.slice(val.length);
                 if (next.length > 0 && /[A-Z]/.test(next[0])) validLettersSet.add(next[0]);
             }
         });
+
         const letters = Array.from(validLettersSet).sort();
         letterPad.innerHTML = letters.map(char => `<button class="kb-key bg-blue-50 text-blue-600 w-[calc(50%-4px)] shadow-inner" onclick="keyTap('${char}')">${char}</button>`).join('');
 
@@ -486,20 +529,37 @@
         if (val === 'BACK') searchInput.value = searchInput.value.slice(0, -1);
         else if (val === 'CLEAR') searchInput.value = '';
         else searchInput.value += val;
+
         clearSearchBtn.classList.toggle('hidden', searchInput.value.length === 0);
         window.scrollTo(0, 0);
         applyLocalFilter();
     }
 
     async function performSearch(query) {
-        visibleCount = 30;
+        visibleCount = 100;
         window.scrollTo(0, 0);
         applyLocalFilter();
     }
 
-    searchInput.addEventListener('click', () => { toggleKeyboard(true); setTimeout(() => { searchInput.focus(); searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length); }, 50); });
-    searchInput.addEventListener('input', (e) => { clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0); clearTimeout(searchTimeout); searchTimeout = setTimeout(() => performSearch(e.target.value.trim()), 100); });
-    clearSearchBtn.addEventListener('click', () => { searchInput.value = ''; clearSearchBtn.classList.add('hidden'); performSearch(''); });
+    searchInput.addEventListener('click', () => {
+        toggleKeyboard(true);
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+        }, 50);
+    });
+
+    searchInput.addEventListener('input', (e) => {
+        clearSearchBtn.classList.toggle('hidden', e.target.value.length === 0);
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => performSearch(e.target.value.trim()), 100);
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.classList.add('hidden');
+        performSearch('');
+    });
 
     function toggleKeyboard(show) {
         keyboard.classList.toggle('show', show);
@@ -513,24 +573,26 @@
     }
 
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
-        toggleKeyboard(false); tg.BackButton.show();
-        searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
+        toggleKeyboard(false);
+        tg.BackButton.show();
+        searchSection.classList.add('hidden');
+        searchResults.classList.add('hidden');
+        sentinel.classList.add('hidden');
+
         document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
         document.getElementById('mainContent').classList.add('p-0');
-        stopList.classList.remove('hidden'); window.scrollTo(0, 0);
+        stopList.classList.remove('hidden');
+        window.scrollTo(0, 0);
 
         document.getElementById('displayRouteName').innerText = route;
-        document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1' || company === 'NLB');
+        document.getElementById('specialTagHeader').classList.toggle('hidden', serviceType === '1' || company === 'NLB' || (company || "").toUpperCase().startsWith('GMB'));
         document.getElementById('displayRouteSub').innerText = `往 ${dest} • ${companyMap[company] || company}`;
 
         const routeMatches = fullDirectory.filter(r => r.route === route && r.company === company);
         let counterpart = null;
 
         if (company === 'NLB') {
-            counterpart = routeMatches.find(r =>
-                r.orig_tc.trim() === dest.trim() &&
-                r.dest_tc.trim() === orig.trim()
-            );
+            counterpart = routeMatches.find(r => r.orig_tc.trim() === dest.trim() && r.dest_tc.trim() === orig.trim());
         } else {
             const isCurrentlyInbound = (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND');
             const oppositeCandidates = routeMatches.filter(r => {
@@ -549,39 +611,42 @@
             let cDest = counterpart.dest_tc || '未知';
             let cOrig = counterpart.orig_tc || '總站';
             if ((counterpart.company === 'CTB' || counterpart.company === 'NWFB') && (counterpart.bound === 'I' || counterpart.bound === 'inbound')) {
-                cOrig = counterpart.dest_tc || '總站'; cDest = counterpart.orig_tc || '未知';
+                cOrig = counterpart.dest_tc || '總站';
+                cDest = counterpart.orig_tc || '未知';
             }
+
             revContainer.innerHTML = `
                 <button onclick="loadRoute('${counterpart.route}', '${counterpart.bound}', '${counterpart.company}', '${cDest.replace(/'/g, "\\'")}', '${counterpart.service_type || '1'}', '${cOrig.replace(/'/g, "\\'")}')" 
                         class="bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/30 active:scale-95 transition-transform flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                 </button>`;
         } else {
-            // SHOW PLACEHOLDER while stops load for end-to-end check
             revContainer.innerHTML = `<span id="routeTag" class="bg-black/20 backdrop-blur-md px-3 py-2 rounded-xl text-[10px] font-black text-white/50 border border-transparent whitespace-nowrap animate-pulse">讀取中...</span>`;
         }
 
         const container = document.getElementById('stopsContainer');
         container.innerHTML = '<div class="p-20 text-center"><div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div></div>';
 
+        const apiCompany = (company || "").toUpperCase().startsWith('GMB_') ? 'GMB' : company;
         const effectiveBound = (company === 'KMB' || company === 'LWB')
             ? (bound.toUpperCase() === 'I' || bound.toUpperCase() === 'INBOUND' ? 'I' : 'O')
             : bound;
-        const routeId = `${company}_${route}_${effectiveBound}_${serviceType}`;
+        const routeId = `${apiCompany}_${route}_${effectiveBound}_${serviceType}`;
 
         try {
             const res = await fetch(`/api/bus/route/${encodeURIComponent(routeId)}/stops`);
             const stops = await res.json();
-            if (!stops.length) { container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>'; return; }
 
-            // --- ROBUST END-TO-END CIRCULAR DETECTION ---
+            if (!stops.length) {
+                container.innerHTML = '<div class="p-24 text-center text-gray-400 font-black">暫時搵唔到車站資料 📭</div>';
+                return;
+            }
+
             if (!counterpart) {
                 const firstStopName = stops[0].nameTc.trim();
                 const lastStopName = stops[stops.length - 1].nameTc.trim();
-                const isCircular = firstStopName === lastStopName ||
-                    dest.includes('循環線') ||
-                    dest.includes('Circular') ||
-                    orig.trim() === dest.trim();
+                const isCircular = firstStopName === lastStopName || dest.includes('循環線') || dest.includes('Circular') || orig.trim() === dest.trim();
+
                 const tagEl = document.getElementById('routeTag');
                 if (tagEl) {
                     tagEl.innerText = isCircular ? '循環線' : '無回程';
@@ -601,7 +666,7 @@
 
             container.innerHTML = stops.map((s, idx) => `
                 <div id="stop-row-${idx}" class="stop-item p-5 flex justify-between items-start bg-white active:bg-gray-50 transition-colors ${idx === closestIdx ? 'stop-highlight' : ''}" 
-                     data-company="${company}" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
+                     data-company="${apiCompany}" data-stop="${s.stopId}" data-route="${route}" data-bound="${bound}" data-type="${serviceType}">
                     <div class="flex items-center space-x-4 pt-1">
                         <div class="w-8 h-8 rounded-full border-2 border-blue-500 flex items-center justify-center text-[11px] font-black text-blue-500 shadow-sm shrink-0">${s.sequence}</div>
                         <span class="font-bold text-gray-800 text-base leading-tight">${s.nameTc}</span>
@@ -623,12 +688,13 @@
                     const targetEl = document.getElementById(`stop-row-${scrollTargetIdx}`);
                     if (targetEl) {
                         const totalHeaderHeight = (document.getElementById('appHeader')?.offsetHeight || 53) + (document.getElementById('routeHeader')?.offsetHeight || 88);
-                        const elementAbsoluteTop = targetEl.getBoundingClientRect().top + window.pageYOffset;
-                        window.scrollTo({ top: elementAbsoluteTop - totalHeaderHeight, behavior: 'smooth' });
+                        window.scrollTo({ top: targetEl.getBoundingClientRect().top + window.pageYOffset - totalHeaderHeight, behavior: 'smooth' });
                     }
                 }, 500);
             }
-        } catch (e) { container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>'; }
+        } catch (e) {
+            container.innerHTML = '<div class="p-20 text-center text-red-500 font-bold">載入失敗</div>';
+        }
     }
 
     function refreshVisibleEtas() {
@@ -638,7 +704,9 @@
 
     function startGlobalRefresh() {
         clearInterval(refreshInterval);
-        refreshInterval = setInterval(() => { visibleElements.forEach(el => triggerEtaForElement(el, true)); }, 30000);
+        refreshInterval = setInterval(() => {
+            visibleElements.forEach(el => triggerEtaForElement(el, true));
+        }, 30000);
     }
 
     function triggerEtaForElement(el, isSilent = false) {
@@ -649,11 +717,18 @@
     async function showEta(company, stopId, route, bound, serviceType, element, isSilent = false) {
         const mainText = element.querySelector('.eta-main');
         const subsText = element.querySelector('.eta-subs');
+
         if (!isSilent) mainText.innerText = "...";
+
         try {
             const res = await fetch(`/api/bus/eta/${company}/${stopId}/${route}/${serviceType}?bound=${bound}`);
             const data = await res.json();
-            if (!data || data.length === 0) { mainText.innerText = "暫無班次"; subsText.innerText = ""; return; }
+
+            if (!data || data.length === 0) {
+                mainText.innerText = "暫無班次";
+                subsText.innerText = "";
+                return;
+            }
 
             const now = new Date();
             const formatted = data.slice(0, 3).map(e => {
@@ -670,23 +745,24 @@
 
             mainText.innerText = formatted[0].display;
             subsText.innerText = formatted.length > 1 ? formatted.slice(1).map(f => f.display).join(' / ') : "";
-        } catch (e) { mainText.innerText = "Error"; }
+        } catch (e) {
+            mainText.innerText = "Error";
+        }
     }
 
     function backToSearch() {
-        clearInterval(refreshInterval); visibleElements.clear();
+        clearInterval(refreshInterval);
+        visibleElements.clear();
         tg.BackButton.hide();
-
-        // Scroll to top BEFORE toggling classes to avoid viewport tearing
         window.scrollTo(0, 0);
 
-        // Restore container padding for search view
         document.getElementById('mainContent').classList.remove('p-0');
         document.getElementById('mainContent').classList.add('p-4', 'pt-2');
 
         stopList.classList.add('hidden');
         searchSection.classList.remove('hidden');
         searchResults.classList.remove('hidden');
+        sentinel.classList.remove('hidden');
 
         // Anti-glitch repaint hack for iOS Safari
         setTimeout(() => {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,23 +11,35 @@ using Mud9Bot.Data.Entities.Bus;
 
 namespace Mud9Bot.Transport.Services;
 
+/// <summary>
+/// Model for returning search results to the frontend.
+/// 使用 JsonPropertyName 確保輸出同前端 JS 嘅 key 完全對應 (Case-sensitive)。
+/// </summary>
 public record BusRouteSearchResult(
-    string route, 
-    string bound, 
-    string company, 
-    string dest_tc,
-    string orig_tc,
-    string service_type
+    [property: JsonPropertyName("route")] string route, 
+    [property: JsonPropertyName("bound")] string bound, 
+    [property: JsonPropertyName("company")] string company, 
+    [property: JsonPropertyName("dest_tc")] string dest_tc,
+    [property: JsonPropertyName("orig_tc")] string orig_tc,
+    [property: JsonPropertyName("service_type")] string service_type,
+    [property: JsonPropertyName("type")] string type // "bus" or "minibus"
 );
 
+/// <summary>
+/// High-performance Singleton cache for Bus and Minibus routes.
+/// Updated with Self-Healing logic and detailed diagnostics.
+/// </summary>
 public class BusDirectory(IServiceScopeFactory scopeFactory, ILogger<BusDirectory> logger)
 {
-    private static List<BusRoute> _staticRoutes = new();
-    private static DateTime _staticLastUpdated = DateTime.MinValue;
+    private List<BusRoute> _cache = new();
+    private DateTime _lastUpdated = DateTime.MinValue;
 
-    public int GetCacheCount() => _staticRoutes.Count;
-    public DateTime GetLastUpdated() => _staticLastUpdated;
+    public int GetCacheCount() => _cache.Count;
+    public DateTime GetLastUpdated() => _lastUpdated;
 
+    /// <summary>
+    /// Loads all active routes into memory. 
+    /// </summary>
     public async Task InitializeAsync()
     {
         try
@@ -34,74 +47,98 @@ public class BusDirectory(IServiceScopeFactory scopeFactory, ILogger<BusDirector
             using var scope = scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-            // 抓取所有 Active 路線並按號碼排序
-            _staticRoutes = await dbContext.Set<BusRoute>()
+            logger.LogInformation("[BusDirectory] 🔄 正在從數據庫預載路綫...");
+
+            var routes = await dbContext.Set<BusRoute>()
                 .Where(r => r.IsActive)
                 .OrderBy(r => r.RouteNumber)
                 .AsNoTracking()
                 .ToListAsync();
 
-            _staticLastUpdated = DateTime.UtcNow;
-            logger.LogInformation("[BusDirectory] ✅ 成功預載 {Count} 條路線。", _staticRoutes.Count);
+            _cache = routes;
+            _lastUpdated = DateTime.UtcNow;
+
+            // Diagnostic logging to help troubleshoot "0 results" issues
+            int busCount = _cache.Count(r => !r.Company.StartsWith("GMB", StringComparison.OrdinalIgnoreCase));
+            int gmbCount = _cache.Count(r => r.Company.StartsWith("GMB", StringComparison.OrdinalIgnoreCase));
+
+            logger.LogInformation("[BusDirectory] ✅ 預載完成！總數: {Total}, 巴士: {Buses}, 小巴: {Minibuses}", 
+                _cache.Count, busCount, gmbCount);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[BusDirectory] ❌ 初始化失敗。");
+            logger.LogError(ex, "[BusDirectory] ❌ 預載路綫失敗！請檢查數據庫連線。");
         }
     }
 
-    public Task<List<BusRouteSearchResult>> SearchRoutesAsync(string query)
+    public async Task RefreshAsync() => await InitializeAsync();
+
+    /// <summary>
+    /// Searches the memory cache. 
+    /// </summary>
+    public async Task<List<BusRouteSearchResult>> SearchRoutesAsync(string query)
     {
-        // 如果 query 為 ALL，回傳全量數據（用於前端 LocalStorage 緩存）
-        if (query.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+        // SELF-HEALING: If the cache is empty, force a load.
+        if (!_cache.Any())
         {
-            return Task.FromResult(_staticRoutes.Select(MapToResult).ToList());
+            logger.LogWarning("[BusDirectory] ⚠️ 內存快取為空，正在即時修復...");
+            await InitializeAsync();
         }
 
+        // 1. Full Cache building for frontend
+        if (query.Equals("ALL", StringComparison.OrdinalIgnoreCase))
+        {
+            return _cache.Select(MapToResult).ToList();
+        }
+
+        // 2. Default view
         if (string.IsNullOrWhiteSpace(query))
         {
-            // 預設首頁：顯示全公司前 30 條
-            return Task.FromResult(_staticRoutes.Take(30).Select(MapToResult).ToList());
+            return _cache.Select(MapToResult).ToList();
         }
 
         var q = query.Trim().ToUpper();
         
-        // 嚴格執行 StartsWith 搜尋，並按長度及號碼排序
-        var results = _staticRoutes
+        // 3. Search Logic
+        return _cache
             .Where(r => r.RouteNumber.ToUpper().StartsWith(q))
             .OrderBy(r => r.RouteNumber.Length) 
             .ThenBy(r => r.RouteNumber)
-            .Take(100) // 限制回傳量，其餘交給前端處理
+            .Take(100) 
             .Select(MapToResult)
             .ToList();
-
-        return Task.FromResult(results);
     }
 
-    private BusRouteSearchResult MapToResult(BusRoute r)
+    /// <summary>
+    /// Maps Database Entities to Frontend-friendly DTOs.
+    /// </summary>
+    public BusRouteSearchResult MapToResult(BusRoute r)
     {
-        var isCtb = r.Company == "CTB" || r.Company == "NWFB";
-        var isReturn = r.Bound.Equals("I", StringComparison.OrdinalIgnoreCase) || r.Bound.Equals("inbound", StringComparison.OrdinalIgnoreCase);
+        var comp = (r.Company ?? "").Trim();
+        var isCtb = comp.Equals("CTB", StringComparison.OrdinalIgnoreCase) || comp.Equals("NWFB", StringComparison.OrdinalIgnoreCase);
+        var bound = r.Bound ?? "O";
+        var isReturn = bound.Equals("I", StringComparison.OrdinalIgnoreCase) || bound.Equals("inbound", StringComparison.OrdinalIgnoreCase);
 
-        var orig = r.OriginTc;
-        var dest = r.DestinationTc;
+        var orig = r.OriginTc ?? "總站";
+        var dest = r.DestinationTc ?? "未知";
 
-        // Apply identical UI data normalization for CTB inbound routes
         if (isCtb && isReturn)
         {
-            orig = r.DestinationTc;
-            dest = r.OriginTc;
+            orig = r.DestinationTc ?? "總站";
+            dest = r.OriginTc ?? "未知";
         }
 
+        // Resilient type detection
+        string type = comp.StartsWith("GMB", StringComparison.OrdinalIgnoreCase) ? "minibus" : "bus";
+
         return new BusRouteSearchResult(
-            r.RouteNumber,
-            r.Bound,
-            r.Company,
+            r.RouteNumber ?? "??",
+            bound,
+            comp,
             dest,
             orig,
-            r.ServiceType
+            r.ServiceType ?? "1",
+            type
         );
     }
-
-    public async Task RefreshAsync() => await InitializeAsync();
 }
