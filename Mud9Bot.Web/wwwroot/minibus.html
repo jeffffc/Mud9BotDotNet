@@ -242,43 +242,48 @@
     }
 
     async function initApp() {
-        // Bumped cache to v2 to ensure users pull the new regional company tags (GMB_HKI, GMB_KLN, GMB_NT)
-        const cached = localStorage.getItem('minibus_dir_v2');
-        const expiry = localStorage.getItem('minibus_dir_exp_v2');
+        
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
-        if (cached && expiry && Date.now() < parseInt(expiry)) {
-            fullDirectory = JSON.parse(cached);
-            applyLocalFilter();
-        } else {
+        try {
+            const metaRes = await fetch('/api/bus/metadata');
+            const meta = await metaRes.json();
+
+            const cachedData = localStorage.getItem('bus_dir_data');
+            const cachedMeta = localStorage.getItem('bus_dir_meta');
+
+            if (cachedData && cachedMeta) {
+                const localMeta = JSON.parse(cachedMeta);
+                if (localMeta.lastUpdated === meta.lastUpdated) {
+                    fullDirectory = JSON.parse(cachedData);
+                    applyLocalFilter();
+                    return; // Handshake complete, data is fresh!
+                }
+            }
+
+            // Database changed: Clear legacy keys and download fresh GMB list
             loading.classList.remove('hidden');
-            try {
-                const res = await fetch(`/api/bus/search?q=ALL`);
-                const allData = await res.json();
+            const res = await fetch(`/api/bus/search?q=ALL`);
+            const allData = await res.json();
 
-                // Filter specifically for items starting with GMB (catches GMB_HKI, GMB_KLN, etc.)
-                fullDirectory = allData.filter(r => r.company && r.company.startsWith('GMB'));
+            // Filter specifically for GMB items for this app's pool
+            fullDirectory = allData.filter(r => r.company && r.company.startsWith('GMB'));
 
-                // MULTI-TIER SORTING: 1. Route Number -> 2. Service Type -> 3. Bound
-                fullDirectory.sort((a, b) => {
-                    const routeCompare = a.route.localeCompare(b.route, undefined, { numeric: true });
-                    if (routeCompare !== 0) return routeCompare;
+            fullDirectory.sort((a, b) => {
+                const rc = a.route.localeCompare(b.route, undefined, { numeric: true });
+                if (rc !== 0) return rc;
+                const stCompare = (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
+                if (stCompare !== 0) return stCompare;
+                const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
+                return isBoundI(a) - isBoundI(b);
+            });
 
-                    const stA = a.service_type || '1';
-                    const stB = b.service_type || '1';
-                    const stCompare = stA.localeCompare(stB, undefined, { numeric: true });
-                    if (stCompare !== 0) return stCompare;
+            localStorage.setItem('minibus_dir_data', JSON.stringify(fullDirectory));
+            localStorage.setItem('minibus_dir_meta', JSON.stringify(meta));
 
-                    const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
-                    return isBoundI(a) - isBoundI(b);
-                });
-
-                localStorage.setItem('minibus_dir_v2', JSON.stringify(fullDirectory));
-                localStorage.setItem('minibus_dir_exp_v2', (Date.now() + 86400000).toString());
-                applyLocalFilter();
-            } catch (e) { console.error(e); }
-            loading.classList.add('hidden');
-        }
+            applyLocalFilter();
+        } catch (e) { console.error("Sync error:", e); }
+        finally { loading.classList.add('hidden'); }
     }
 
     function initVisibilityObserver() {

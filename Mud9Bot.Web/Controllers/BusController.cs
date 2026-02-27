@@ -16,6 +16,19 @@ public class BusController(
     BusDirectory busDirectory,
     ILogger<BusController> logger) : ControllerBase
 {
+    /// <summary>
+    /// New Metadata endpoint for automatic cache busting on the frontend.
+    /// 回傳路綫數量同埋最後更新時間，等前端知幾時要清 Cache。
+    /// </summary>
+    [HttpGet("metadata")]
+    public IActionResult GetMetadata()
+    {
+        return Ok(new {
+            lastUpdated = busDirectory.GetLastUpdated().Ticks,
+            routeCount = busDirectory.GetCacheCount()
+        });
+    }
+    
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string? q)
     {
