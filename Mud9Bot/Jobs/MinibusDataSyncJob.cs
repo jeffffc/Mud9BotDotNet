@@ -16,7 +16,7 @@ using Quartz;
 
 namespace Mud9Bot.Jobs;
 
-[QuartzJob(Name = "Minibus Route Data Update", CronInterval = "0 30 5 * * ?", RunOnStartup = true)]
+[QuartzJob(Name = "Minibus Route Data Update", CronInterval = "0 30 5 * * ?", RunOnStartup = false)]
 public class MinibusDataSyncJob(
     BotDbContext dbContext, 
     IHttpClientFactory httpClientFactory, 

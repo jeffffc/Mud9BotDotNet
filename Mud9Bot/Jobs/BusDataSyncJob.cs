@@ -16,7 +16,7 @@ namespace Mud9Bot.Jobs;
 /// Syncs bus routes and stops. Daily at 8 AM.
 /// Fix: Optimization logic now "touches" stops to prevent accidental deactivation during cleanup.
 /// </summary>
-[QuartzJob(Name = "Bus Route Data Update", CronInterval = "0 0 8 * * ?", RunOnStartup = true)]
+[QuartzJob(Name = "Bus Route Data Update", CronInterval = "0 0 8 * * ?", RunOnStartup = false)]
 public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService, IHttpClientFactory httpClientFactory, BusDirectory busDirectory, ILogger<BusDataSyncJob> logger) : IJob
 {
     private readonly HashSet<string> _processedStopIds = new();
