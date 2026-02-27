@@ -54,25 +54,23 @@ public record BusEtaDto(
 );
 
 // =========================================================================
-// MTR BUS SPECIFIC MODELS
+// MTR BUS SPECIFIC MODELS (UPDATED FOR CORRECT JSON SCHEMA)
 // =========================================================================
 
 public record MtrBusResponse(
-    [property: JsonPropertyName("status")] int Status,
-    // 修正：MTR API 嘅陣列 Key 係 "busStop"，之前錯寫咗做 "routeStops"
+    [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("busStop")] List<MtrBusRouteStop>? RouteStops
 );
 
 public record MtrBusRouteStop(
     [property: JsonPropertyName("busStopId")] string BusStopId,
-    [property: JsonPropertyName("busStopName")] string BusStopName,
-    [property: JsonPropertyName("busStopLat")] string Latitude,
-    [property: JsonPropertyName("busStopLon")] string Longitude,
-    [property: JsonPropertyName("busEta")] List<MtrBusEta>? BusEtas
+    // 修正：JSON 裡面陣列名係 "bus"，唔係 "busEta"
+    [property: JsonPropertyName("bus")] List<MtrBusEta>? BusEtas 
 );
 
 public record MtrBusEta(
-    [property: JsonPropertyName("departureTime")] string DepartureTime, 
-    [property: JsonPropertyName("busTerminal")] string BusTerminal,
-    [property: JsonPropertyName("busRemark")] string BusRemark
+    // 修正：MTR 提供秒數同文字，而唔係確實 DateTime 字串
+    [property: JsonPropertyName("departureTimeInSecond")] string DepartureTimeInSecond, 
+    [property: JsonPropertyName("departureTimeText")] string DepartureTimeText,
+    [property: JsonPropertyName("busRemark")] string? BusRemark
 );

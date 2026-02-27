@@ -50,6 +50,8 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
     public async Task<List<BusRouteDto>> GetRoutesAsync(string company, string routeNum = "")
     {
+        if (company.ToUpper() == "MTR") return [];
+        
         var (client, baseUrl) = GetClient(company);
         string url;
 
@@ -71,6 +73,8 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
     public async Task<List<BusRouteStopDto>> GetRouteStopsAsync(string company, string routeNum, string bound, string serviceType = "1")
     {
+        if (company.ToUpper() == "MTR") return [];
+        
         var (client, baseUrl) = GetClient(company);
         string directionParam = MapDirectionForUrl(bound);
         
@@ -97,6 +101,8 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
     public async Task<BusStopDto?> GetStopDetailsAsync(string company, string stopId)
     {
+        if (company.ToUpper() == "MTR") return null;
+        
         var cacheKey = $"Stop_{stopId}";
         if (cache.TryGetValue(cacheKey, out BusStopDto? cachedStop)) return cachedStop;
 
@@ -143,8 +149,7 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
     }
     
     /// <summary>
-    /// Handles the MTR POST monolithic architecture.
-    /// Extracts specific stop data from the giant payload and maps it to our unified DTO.
+    /// Handles the MTR POST monolithic architecture using correct JSON extraction.
     /// </summary>
     private async Task<List<BusEtaDto>> GetMtrEtasAsync(string stopId, string routeNum)
     {
@@ -158,7 +163,6 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
             
             if (mtrData?.RouteStops == null) return [];
 
-            // 1. Locate the specific stop in the monolithic payload
             var stopData = mtrData.RouteStops.FirstOrDefault(s => s.BusStopId == stopId);
             if (stopData?.BusEtas == null) return [];
 
@@ -167,23 +171,30 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
 
             foreach (var eta in stopData.BusEtas)
             {
-                // Parse "yyyy-MM-dd HH:mm:ss"
-                DateTime? parsedEta = DateTime.TryParse(eta.DepartureTime, out var dt) ? dt : null;
+                // MTR returns seconds from now. We convert this to a solid UTC timestamp for the UI!
+                DateTime? estimatedTime = null;
+                if (int.TryParse(eta.DepartureTimeInSecond, out int seconds) && seconds > 0)
+                {
+                    estimatedTime = DateTime.UtcNow.AddSeconds(seconds);
+                }
 
-                // Determine logical direction from MTR's stopId (e.g., "K52-U-1" -> 'U')
+                // Get Direction identically to Sync Job
                 var parts = stopId.Split('-');
-                string dir = parts.Length > 1 ? parts[1] : "O";
-                string mappedDir = dir.ToUpper() == "U" ? "O" : "I"; // Map U(Up) to O(Outbound), D(Down) to I(Inbound)
+                string dirCode = (parts.Length > 1 && parts[1].Length >= 1) ? parts[1].Substring(0, 1).ToUpper() : "O";
+                string mappedDir = dirCode == "D" ? "I" : "O";
+
+                // MTR text fallback (e.g. "3 分鐘" or "即將開出")
+                string remark = eta.DepartureTimeText ?? "";
 
                 results.Add(new BusEtaDto(
                     Route: routeNum,
                     Direction: mappedDir,
                     Sequence: seq++,
                     StopId: stopId,
-                    DestinationTc: eta.BusTerminal ?? "總站",
-                    EtaTime: parsedEta,
-                    RemarkTc: eta.BusRemark ?? "",
-                    RemarkEn: eta.BusRemark ?? ""
+                    DestinationTc: "終點站", // MTR JSON API omits destination terminal
+                    EtaTime: estimatedTime,
+                    RemarkTc: remark,
+                    RemarkEn: remark
                 ));
             }
 
@@ -191,7 +202,6 @@ public class BusApiService(IHttpClientFactory httpClientFactory, IMemoryCache ca
         }
         catch 
         {
-            // Silently fail and return empty array if MTR API is down
             return [];
         }
     }

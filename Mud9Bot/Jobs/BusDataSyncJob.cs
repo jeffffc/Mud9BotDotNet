@@ -185,9 +185,6 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         logger.LogInformation("大佬！所有巴士資料同步完畢！🚌✨");
     }
     
-    /// <summary>
-    /// Processes MTR routes by extracting static topology from the monolithic ETA endpoint.
-    /// </summary>
     private async Task SyncMtrRoutesAsync(BotDbContext dbContext, DateTime syncTime)
     {
         logger.LogInformation("[BusSync] 🚆 開始同步 MTR 港鐵巴士路線資料...");
@@ -204,19 +201,31 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
 
                 var mtrData = await response.Content.ReadFromJsonAsync<MtrBusResponse>();
                 
-                // 加上防呆機制：如果 Data Model 解析出嚟係 null，馬上提醒！
                 if (mtrData?.RouteStops == null || !mtrData.RouteStops.Any()) 
                 {
-                    logger.LogWarning("[BusSync] [MTR] ⚠️ {Route} 解析唔到站點資料 (可能係 BusApiModels 嘅 JSON 名唔啱，搵唔到 'busStop' 欄位)。", route);
+                    logger.LogInformation("[BusSync] [MTR] ℹ️ {Route} 目前無站點資料 (可能非服務時間)。", route);
                     continue;
                 }
 
-                // MTR groups bounds inside the busStopId (e.g., "K52-U-1" for Up/Outbound, "K52-D-1" for Down/Inbound)
-                var upStops = mtrData.RouteStops.Where(s => s.BusStopId.Contains("-U-")).ToList();
-                var downStops = mtrData.RouteStops.Where(s => s.BusStopId.Contains("-D-")).ToList();
+                // FIXED: 終極防彈 GroupBy，精準抽出 "D" 同 "U"
+                var groupedStops = mtrData.RouteStops
+                    .Where(s => !string.IsNullOrEmpty(s.BusStopId) && s.BusStopId.Contains("-"))
+                    .GroupBy(s => {
+                        var parts = s.BusStopId.Split('-');
+                        // parts[1] is "D010", we need just "D"
+                        if (parts.Length > 1 && parts[1].Length >= 1) {
+                            return parts[1].Substring(0, 1).ToUpper(); 
+                        }
+                        return "O";
+                    });
 
-                await ProcessMtrBound(dbContext, syncTime, route, "O", upStops);
-                await ProcessMtrBound(dbContext, syncTime, route, "I", downStops);
+                foreach (var group in groupedStops)
+                {
+                    string rawBound = group.Key;
+                    string mappedBound = rawBound == "D" ? "I" : "O"; 
+                    
+                    await ProcessMtrBound(dbContext, syncTime, route, mappedBound, group.ToList());
+                }
             }
             catch (Exception ex)
             {
@@ -240,9 +249,8 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
             dbContext.Add(dbRoute);
         }
         
-        // MTR doesn't explicitly provide Origin/Dest fields, so we infer them from the first and last stop names
-        dbRoute.OriginTc = stops.First().BusStopName;
-        dbRoute.DestinationTc = stops.Last().BusStopName;
+        dbRoute.OriginTc = $"{route} 總站";
+        dbRoute.DestinationTc = $"{route} 終點站";
         dbRoute.OriginEn = dbRoute.OriginTc; 
         dbRoute.DestinationEn = dbRoute.DestinationTc;
         dbRoute.IsActive = true;
@@ -252,6 +260,7 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         foreach (var stop in stops)
         {
             string stopId = stop.BusStopId;
+            if (string.IsNullOrEmpty(stopId)) continue;
             
             var dbStop = await dbContext.Set<BusStop>().FindAsync(stopId);
             if (dbStop == null)
@@ -259,10 +268,12 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
                 dbStop = new BusStop { StopId = stopId };
                 dbContext.Add(dbStop);
             }
-            dbStop.NameTc = stop.BusStopName;
-            dbStop.NameEn = stop.BusStopName;
-            dbStop.Latitude = double.TryParse(stop.Latitude, out var lat) ? lat : null;
-            dbStop.Longitude = double.TryParse(stop.Longitude, out var lon) ? lon : null;
+            
+            // 修正：API 冇畀車站中文名，唯有硬食 StopId (e.g. "K12-D010")
+            dbStop.NameTc = stopId;
+            dbStop.NameEn = stopId;
+            dbStop.Latitude = null; // API 無站點坐標
+            dbStop.Longitude = null;
             dbStop.IsActive = true;
             dbStop.LastUpdated = syncTime;
             
