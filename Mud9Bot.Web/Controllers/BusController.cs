@@ -138,7 +138,6 @@ public class BusController(
         try
         {
             var etas = await busApiService.GetEtasAsync(company, stopId, route, serviceType);
-
             if (etas == null || !etas.Any()) return Ok(new List<object>());
 
             if (!string.IsNullOrEmpty(bound))
