@@ -169,6 +169,7 @@ public class BusController(
         catch (Exception ex)
         {
             logger.LogError(ex, "[BusAPI] ❌ ETA Fetching crashed for {Route}", route);
+            
             return StatusCode(500, new { error = "Internal server error during ETA fetch" });
         }
     }
