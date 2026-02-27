@@ -14,6 +14,19 @@
 
         .stop-highlight { background-color: rgba(22, 163, 74, 0.08) !important; border-left: 4px solid #16a34a; }
 
+        /* Page Flip Animations - Fixed for mobile Safari 3D context bug */
+        .page-flip-in { animation: flipIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .page-flip-out { animation: flipOut 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards !important; }
+
+        @keyframes flipIn {
+            0% { transform: perspective(1200px) rotateY(-90deg); opacity: 0; }
+            100% { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
+        }
+        @keyframes flipOut {
+            0% { transform: perspective(1200px) rotateY(0deg); opacity: 1; }
+            100% { transform: perspective(1200px) rotateY(90deg); opacity: 0; }
+        }
+
         #customKeyboard {
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             transform: translateY(100%);
@@ -59,11 +72,19 @@
         input:checked + .toggle-bg .toggle-dot { transform: translateX(100%); }
     </style>
 </head>
-<body class="antialiased select-none">
+<body class="antialiased select-none page-flip-in">
 <header id="appHeader" class="bg-white border-b border-gray-100 p-3 flex items-center justify-between sticky top-0 z-[60]">
-    <div class="flex items-center space-x-2">
+    <div onclick="switchApp('/bus')" class="flex items-center space-x-2 cursor-pointer active:scale-95 transition-all bg-gray-50 hover:bg-gray-100 pl-3 pr-2 py-1.5 -ml-2 rounded-xl border border-gray-100/50">
         <span class="text-xl">🚐</span>
         <span class="font-black text-gray-800 tracking-tight">Mud9Bot <span class="text-green-600">MINIBUS</span></span>
+
+        <!-- Wrapped Swap Badge -->
+        <div class="flex items-center space-x-1 bg-gray-200/80 text-gray-600 px-2 py-0.5 rounded-lg ml-1">
+            <span class="text-[10px] font-black tracking-wide">巴士</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+        </div>
     </div>
     <div class="flex items-center space-x-2">
         <span class="text-[11px] font-black text-gray-400">分鐘</span>
@@ -160,6 +181,16 @@
     tg.ready(); tg.expand();
     tg.BackButton.onClick(() => backToSearch());
 
+    // Switch App Function with Animation
+    function switchApp(targetUrl) {
+        tg.HapticFeedback.impactOccurred('medium');
+        document.body.classList.remove('page-flip-in');
+        document.body.classList.add('page-flip-out');
+        setTimeout(() => {
+            window.location.replace(targetUrl);
+        }, 350); // Matches CSS animation timing slightly early to ensure smooth transition
+    }
+
     const searchInput = document.getElementById('routeSearch');
     const searchResults = document.getElementById('searchResults');
     const searchSection = document.getElementById('searchSection');
@@ -188,6 +219,11 @@
         document.getElementById('displayModeToggle').checked = displayMode === 'time';
         initVisibilityObserver();
         window.addEventListener('scroll', handleInfiniteScroll);
+
+        // Remove animation class after it plays so fixed elements (keyboard) behave perfectly
+        setTimeout(() => {
+            document.body.classList.remove('page-flip-in');
+        }, 500);
     });
 
     function toggleDisplayMode() {
@@ -381,7 +417,10 @@
     async function loadRoute(route, bound, company, dest, serviceType, orig) {
         toggleKeyboard(false); tg.BackButton.show();
         searchSection.classList.add('hidden'); searchResults.classList.add('hidden');
+
+        document.getElementById('mainContent').classList.remove('p-4', 'pt-2');
         document.getElementById('mainContent').classList.add('p-0');
+
         stopList.classList.remove('hidden'); window.scrollTo(0, 0);
 
         document.getElementById('displayRouteName').innerText = route;
@@ -483,8 +522,22 @@
 
     function backToSearch() {
         clearInterval(refreshInterval); visibleElements.clear(); tg.BackButton.hide();
+
+        // Scroll to top BEFORE toggling classes to avoid viewport tearing
+        window.scrollTo(0, 0);
+
         document.getElementById('mainContent').classList.remove('p-0');
-        stopList.classList.add('hidden'); searchSection.classList.remove('hidden'); searchResults.classList.remove('hidden'); window.scrollTo(0, 0);
+        document.getElementById('mainContent').classList.add('p-4', 'pt-2');
+
+        stopList.classList.add('hidden');
+        searchSection.classList.remove('hidden');
+        searchResults.classList.remove('hidden');
+
+        // Anti-glitch repaint hack for iOS Safari
+        setTimeout(() => {
+            searchSection.style.transform = 'translateZ(0)';
+            setTimeout(() => { searchSection.style.transform = ''; }, 50);
+        }, 10);
     }
 </script>
 </body>

@@ -164,7 +164,6 @@ public class BusController(
             // which causes ties/randomness if used for ETAs. This ensures closest bus is first.
             
             etas = etas.OrderBy(e => e.EtaTime ?? DateTime.MaxValue).ToList();
-
             return Ok(etas);
         }
         catch (Exception ex)
