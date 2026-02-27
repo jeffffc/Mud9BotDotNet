@@ -143,6 +143,7 @@ public class BusController(
             if (!string.IsNullOrEmpty(bound))
             {
                 var targetBound = bound.ToLower();
+                
                 string[] inboundMatch = ["i", "inbound"];
                 string[] outboundMatch = ["o", "outbound"];
 

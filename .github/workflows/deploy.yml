@@ -22,9 +22,11 @@ jobs:
             bot:
               - 'Mud9Bot/**'
               - 'Mud9Bot.Data/**'
+              - 'Mud9Bot.Transport/**'
             web:
               - 'Mud9Bot.Web/**'
               - 'Mud9Bot.Data/**'
+              - 'Mud9Bot.Transport/**'
 
       # 🚀 修正：使用 %2B 代替 +，防止被 curl 轉換成空格
       - name: Send Bot Notification

@@ -269,8 +269,8 @@
 
     async function initApp() {
         // BUMPED: version changed from v2 to v3 to clear legacy local cache and force MTR download
-        const cached = localStorage.getItem('bus_dir_v3');
-        const expiry = localStorage.getItem('bus_dir_exp_v3');
+        const cached = localStorage.getItem('bus_dir_v4');
+        const expiry = localStorage.getItem('bus_dir_exp_v4');
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
         if (cached && expiry && Date.now() < parseInt(expiry)) {
@@ -281,15 +281,35 @@
             // Clean up old v2 cache keys if they exist
             localStorage.removeItem('bus_dir_v2');
             localStorage.removeItem('bus_dir_exp_v2');
+            localStorage.removeItem('bus_dir_v3');
+            localStorage.removeItem('bus_dir_exp_v3');
 
             try {
                 const res = await fetch(`/api/bus/search?q=ALL`);
                 fullDirectory = await res.json();
-                fullDirectory.sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }));
+                
+                // FIXED: Multi-tier ordering logic
+                // 1. Route Number (Numeric)
+                // 2. Bound (Outbound 'O' first, then Inbound 'I')
+                // 3. Service Type (Ascending, '1' is default)
+                fullDirectory.sort((a, b) => {
+                    // Level 1: Route Number
+                    const routeCompare = a.route.localeCompare(b.route, undefined, { numeric: true });
+                    if (routeCompare !== 0) return routeCompare;
+
+                    // Level 2: Bound (Outbound first)
+                    // Map O/outbound to 0, I/inbound to 1
+                    const isBoundI = (x) => (x.bound === 'I' || x.bound === 'inbound') ? 1 : 0;
+                    const boundCompare = isBoundI(a) - isBoundI(b);
+                    if (boundCompare !== 0) return boundCompare;
+
+                    // Level 3: Service Type
+                    return (a.service_type || '1').localeCompare(b.service_type || '1', undefined, { numeric: true });
+                });
 
                 // Store in v3
-                localStorage.setItem('bus_dir_v3', JSON.stringify(fullDirectory));
-                localStorage.setItem('bus_dir_exp_v3', (Date.now() + 86400000).toString());
+                localStorage.setItem('bus_dir_v4', JSON.stringify(fullDirectory));
+                localStorage.setItem('bus_dir_exp_v4', (Date.now() + 86400000).toString());
                 applyLocalFilter();
             } catch (e) { console.error(e); }
             loading.classList.add('hidden');
