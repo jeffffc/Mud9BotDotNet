@@ -268,8 +268,9 @@
     }
 
     async function initApp() {
-        const cached = localStorage.getItem('bus_dir_v2');
-        const expiry = localStorage.getItem('bus_dir_exp_v2');
+        // BUMPED: version changed from v2 to v3 to clear legacy local cache and force MTR download
+        const cached = localStorage.getItem('bus_dir_v3');
+        const expiry = localStorage.getItem('bus_dir_exp_v3');
         navigator.geolocation.getCurrentPosition(pos => lastKnownPos = pos, null, { timeout: 3000 });
 
         if (cached && expiry && Date.now() < parseInt(expiry)) {
@@ -277,12 +278,18 @@
             applyLocalFilter();
         } else {
             loading.classList.remove('hidden');
+            // Clean up old v2 cache keys if they exist
+            localStorage.removeItem('bus_dir_v2');
+            localStorage.removeItem('bus_dir_exp_v2');
+
             try {
                 const res = await fetch(`/api/bus/search?q=ALL`);
                 fullDirectory = await res.json();
                 fullDirectory.sort((a, b) => a.route.localeCompare(b.route, undefined, { numeric: true }));
-                localStorage.setItem('bus_dir_v2', JSON.stringify(fullDirectory));
-                localStorage.setItem('bus_dir_exp_v2', (Date.now() + 86400000).toString());
+
+                // Store in v3
+                localStorage.setItem('bus_dir_v3', JSON.stringify(fullDirectory));
+                localStorage.setItem('bus_dir_exp_v3', (Date.now() + 86400000).toString());
                 applyLocalFilter();
             } catch (e) { console.error(e); }
             loading.classList.add('hidden');

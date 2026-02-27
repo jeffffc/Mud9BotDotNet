@@ -7,6 +7,7 @@ using Mud9Bot.Data;
 using Mud9Bot.Data.Entities.Bus;
 using Mud9Bot.Transport.Interfaces;
 using Mud9Bot.Transport.Models;
+using Mud9Bot.Transport.Services;
 using Quartz;
 
 namespace Mud9Bot.Jobs;
@@ -16,7 +17,7 @@ namespace Mud9Bot.Jobs;
 /// Fix: Optimization logic now "touches" stops to prevent accidental deactivation during cleanup.
 /// </summary>
 [QuartzJob(Name = "Bus Route Data Update", CronInterval = "0 0 8 * * ?", RunOnStartup = true)]
-public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService, IHttpClientFactory httpClientFactory, ILogger<BusDataSyncJob> logger) : IJob
+public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService, IHttpClientFactory httpClientFactory, BusDirectory busDirectory, ILogger<BusDataSyncJob> logger) : IJob
 {
     private readonly HashSet<string> _processedStopIds = new();
     private Dictionary<string, DateTime> _existingStopsMap = new();
@@ -182,6 +183,10 @@ public class BusDataSyncJob(BotDbContext dbContext, IBusApiService busApiService
         await dbContext.Set<BusStop>().Where(r => r.IsActive && r.LastUpdated < syncTime).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
         await dbContext.Set<BusRouteStop>().Where(r => r.IsActive && r.LastUpdated < syncTime).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
 
+        // FIXED: Refresh the Singleton memory cache after DB update is complete!
+        // 確保 DB 同步完之後，即刻話比 BusDirectory 聽要重新載入 Memory 資料。
+        await busDirectory.RefreshAsync();
+        
         logger.LogInformation("大佬！所有巴士資料同步完畢！🚌✨");
     }
     
