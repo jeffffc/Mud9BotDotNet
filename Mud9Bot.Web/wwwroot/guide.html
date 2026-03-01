@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mud9Bot 功能與指令大全</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        telegram: {
+                            light: '#E5EBDF',
+                            dark: '#0E1621',
+                            bubbleLightUser: '#E1FFC7',
+                            bubbleLightBot: '#FFFFFF',
+                            bubbleDarkUser: '#2B5278',
+                            bubbleDarkBot: '#182533',
+                            blue: '#2AABEE'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        /* Nav & Scrollbar utilities */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Adaptive Sticky Nav Blur */
+        .nav-scrolled {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .dark .nav-scrolled {
+            background-color: rgba(15, 23, 42, 0.85);
+            border-bottom: 1px solid rgba(51, 65, 85, 0.8);
+        }
+
+        /* Section Header Glow (Transform removed to allow sticky positioning) */
+        .section-header {
+            position: relative;
+        }
+        .section-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: #2AABEE;
+            box-shadow: 0 0 12px rgba(42, 171, 238, 0.8);
+            transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
+            border-radius: 2px;
+        }
+        .section-header.is-visible::after {
+            width: 120px;
+        }
+
+        /* Staggered Grid Entrance */
+        .animate-card {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .animate-card.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Sequential Chat Bubble Reveal */
+        .chat-bubble {
+            opacity: 0;
+            transform: translateY(15px) scale(0.95);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .animate-card.is-visible .bubble-user { transition-delay: 0.2s; opacity: 1; transform: translateY(0) scale(1); }
+        .animate-card.is-visible .bubble-bot { transition-delay: 0.45s; opacity: 1; transform: translateY(0) scale(1); }
+
+        /* Floating Copied Tooltip */
+        @keyframes floatUpFade {
+            0% { opacity: 1; transform: translate(-50%, 0) scale(0.9); }
+            100% { opacity: 0; transform: translate(-50%, -20px) scale(1.1); }
+        }
+        .copied-tooltip {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2AABEE;
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            animation: floatUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            box-shadow: 0 4px 10px rgba(42, 171, 238, 0.4);
+            white-space: nowrap;
+        }
+
+        /* Smart FAB Base */
+        #back-to-top {
+            opacity: 0;
+            transform: translateY(20px) scale(0.8);
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #back-to-top.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .nav-link { position: relative; }
+        .nav-link.active { color: #2AABEE; font-weight: 600; }
+        .dark .nav-link.active { color: #60A5FA; }
+
+        /* Carousel Track Transition */
+        .carousel-track {
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* Base button ripple effect helper */
+        .btn-ripple { position: relative; overflow: hidden; }
+        .btn-ripple::after {
+            content: ""; display: block; position: absolute; width: 100%; height: 100%;
+            top: 0; left: 0; pointer-events: none; background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+            background-repeat: no-repeat; background-position: 50%; transform: scale(10, 10);
+            opacity: 0; transition: transform .5s, opacity 1s;
+        }
+        .btn-ripple:active::after { transform: scale(0, 0); opacity: .3; transition: 0s; }
+
+        /* Carousel Arrow specific styling */
+        .carousel-arrow {
+            opacity: 0.4;
+            transition: all 0.2s ease;
+        }
+        .group\/carousel:hover .carousel-arrow {
+            opacity: 0.9;
+        }
+        .carousel-arrow:hover {
+            opacity: 1 !important;
+            transform: translateY(-50%) scale(1.1);
+        }
+    </style>
+    <!-- Prevent FOUC for dark mode -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-slate-50 dark:bg-[#121212] text-slate-800 dark:text-slate-200 transition-colors duration-300">
+
+<!-- Navbar -->
+<nav id="main-nav" class="fixed top-0 w-full z-50 transition-all duration-300 bg-transparent border-b border-transparent">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+
+            <!-- Left: Logo & Title (FIXED: Title is now perfectly visible on mobile) -->
+            <a href="index.html" title="返回主頁" class="flex-shrink-0 flex items-center gap-3 group relative cursor-pointer">
+                <img class="h-10 w-10 rounded-xl border-2 border-white dark:border-slate-700 shadow-sm object-cover group-hover:scale-105 transition-transform"
+                     src="mud9bot_logo.jpg" alt="Mud9Bot"
+                     onerror="this.outerHTML='<div class=\'h-10 w-10 rounded-xl bg-telegram-blue flex items-center justify-center text-white font-bold border-2 border-white dark:border-slate-700\'>M</div>'">
+                <span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">Mud9Bot</span>
+            </a>
+
+            <!-- Middle: Page Sections (Desktop) -->
+            <div class="hidden lg:flex relative h-full items-center space-x-2" id="desktop-nav-links">
+                <!-- Links injected by JS -->
+                <div id="magic-line" class="absolute bottom-[2px] h-[3px] rounded-t-md bg-telegram-blue transition-all duration-300 w-0 left-0"></div>
+            </div>
+
+            <!-- Right: Buttons -->
+            <div class="hidden lg:flex items-center gap-4">
+                <button class="theme-toggle-btn p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors focus:outline-none">
+                    <svg class="dark-icon hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                    <svg class="light-icon hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path></svg>
+                </button>
+                <a href="https://t.me/mud9bot" target="_blank" class="btn-ripple bg-telegram-blue text-white px-5 py-2 rounded-full font-medium hover:bg-blue-600 transition shadow-lg shadow-blue-500/30 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.664 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                    加我入谷
+                </a>
+            </div>
+
+            <!-- Mobile Hamburger -->
+            <div class="lg:hidden flex items-center gap-2">
+                <button class="theme-toggle-btn p-2 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none">
+                    <svg class="dark-icon hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                    <svg class="light-icon hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path></svg>
+                </button>
+                <button id="mobile-menu-btn" class="p-2 text-slate-600 dark:text-slate-300 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Scroll Progress Bar -->
+    <div id="scroll-progress" class="h-[2px] bg-telegram-blue w-0 absolute bottom-0 left-0 shadow-[0_0_8px_#2AABEE]"></div>
+</nav>
+
+<!-- Mobile Menu Dropdown -->
+<div id="mobile-menu" class="hidden lg:hidden fixed top-16 left-0 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-40 shadow-xl overflow-y-auto" style="max-height: calc(100vh - 64px);">
+    <div class="px-4 py-4 flex flex-col space-y-2" id="mobile-nav-links">
+        <!-- Mobile links injected here -->
+    </div>
+    <div class="px-4 pb-6 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <a href="https://t.me/mud9bot" target="_blank" class="block w-full text-center bg-telegram-blue text-white px-5 py-3 rounded-xl font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-transform">
+            加我入谷 (Open Telegram)
+        </a>
+    </div>
+</div>
+
+<!-- Parallax Hero Section -->
+<header class="pt-32 pb-16 px-4 text-center overflow-hidden">
+    <div id="hero-content" class="max-w-3xl mx-auto will-change-transform">
+        <div class="inline-flex items-center justify-center p-2 bg-blue-50 dark:bg-blue-900/20 rounded-2xl mb-6 text-telegram-blue font-semibold text-sm shadow-inner border border-blue-100 dark:border-blue-800/50">
+            🚀 最新支援超過 20+ 項生活功能
+        </div>
+        <h1 class="text-4xl md:text-6xl font-black mb-6 tracking-tight text-slate-900 dark:text-white leading-tight">
+            全能香港生活 <span class="text-transparent bg-clip-text bg-gradient-to-r from-telegram-blue to-blue-400">Mud9Bot</span>
+        </h1>
+        <p class="text-slate-500 dark:text-slate-400 text-lg md:text-xl leading-relaxed max-w-2xl mx-auto">
+            一文睇清所有交通、實用工具、娛樂同埋群組管理指令。無廣告、免安裝，即刻加落你個 Group 體驗！
+        </p>
+    </div>
+</header>
+
+<!-- Main Content Grid -->
+<main id="content-container" class="max-w-7xl mx-auto px-4 py-8 pb-16 space-y-24">
+    <!-- Sections dynamically generated via JS -->
+</main>
+
+<!-- 🚀 Open Source & Tech Stack Section -->
+<section id="repo" class="py-16 px-6 max-w-7xl mx-auto overflow-hidden">
+    <div class="text-center mb-16">
+        <h2 class="text-4xl font-black mb-4 text-slate-900 dark:text-white">開源生態，透明運作</h2>
+        <p class="text-slate-500 dark:text-slate-400">採用現代化技術架構，源代碼全開源，歡迎社群貢獻。</p>
+
+        <div class="flex flex-wrap justify-center gap-2 mt-6">
+            <a href="https://t.me/Mud9Bot?startgroup=start">
+                <img src="https://img.shields.io/badge/Telegram-Add%20to%20Group-26A5E4?style=for-the-badge&logo=telegram" class="rounded-lg hover:opacity-90 transition-opacity" alt="Add to Group">
+            </a>
+            <img src="https://img.shields.io/github/actions/workflow/status/jeffffc/Mud9BotDotNet/deploy.yml?branch=main&label=CI%2FCD&style=for-the-badge" class="rounded-lg" alt="Build Status">
+            <img src="https://img.shields.io/badge/.NET-10.0-512bd4?style=for-the-badge&logo=dotnet" class="rounded-lg" alt="Dotnet Version">
+        </div>
+    </div>
+
+    <div class="bg-white/50 dark:bg-slate-800/50 backdrop-blur-xl p-8 md:p-12 rounded-[3rem] border border-slate-200 dark:border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 relative shadow-lg group">
+        <div class="flex items-center space-x-6 z-10">
+            <div class="w-20 h-20 bg-slate-100 dark:bg-slate-900 rounded-[2rem] flex items-center justify-center text-4xl shadow-inner border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-white">
+                <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
+            </div>
+            <div>
+                <h3 class="text-2xl font-black mb-1 text-slate-900 dark:text-white">Mud9Bot Source Code</h3>
+                <p class="text-slate-500 dark:text-slate-400 font-mono text-sm">jeffffc / Mud9BotDotNet</p>
+                <div class="flex space-x-3 mt-3">
+                    <img src="https://img.shields.io/github/stars/jeffffc/Mud9BotDotNet?style=flat-square&color=yellow&label=Stars" alt="Stars">
+                    <img src="https://img.shields.io/github/last-commit/jeffffc/Mud9BotDotNet?style=flat-square&label=Updated" alt="Updated">
+                </div>
+            </div>
+        </div>
+
+        <a href="https://github.com/jeffffc/Mud9BotDotNet" target="_blank" class="w-full md:w-auto px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black text-center hover:opacity-90 transition-all shadow-xl active:scale-95 z-10 flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
+            瀏覽原始碼
+        </a>
+
+        <div class="absolute -right-20 -bottom-20 w-64 h-64 bg-purple-500/20 dark:bg-purple-600/20 rounded-full blur-3xl pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
+        <div class="p-6 bg-white/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl text-center border border-slate-200 dark:border-white/5 hover:border-blue-500/30 dark:hover:border-blue-500/30 transition-all group">
+            <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/dotnetcore/dotnetcore-original.svg" class="w-12 h-12 mx-auto mb-4 group-hover:scale-110 transition-transform" alt=".NET">
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 dark:text-blue-400">Core Logic</span>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 font-bold">.NET 10.0</p>
+        </div>
+        <div class="p-6 bg-white/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl text-center border border-slate-200 dark:border-white/5 hover:border-emerald-500/30 dark:hover:border-emerald-500/30 transition-all group">
+            <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/postgresql/postgresql-original.svg" class="w-12 h-12 mx-auto mb-4 group-hover:scale-110 transition-transform" alt="Postgres">
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400">Database</span>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 font-bold">PostgreSQL</p>
+        </div>
+        <div class="p-6 bg-white/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl text-center border border-slate-200 dark:border-white/5 hover:border-slate-500/30 dark:hover:border-slate-500/30 transition-all group">
+            <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/github/github-original.svg" class="w-12 h-12 mx-auto mb-4 group-hover:scale-110 transition-transform dark:invert opacity-70 dark:opacity-100" alt="Actions">
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">Automation</span>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 font-bold">GH Actions CI/CD</p>
+        </div>
+        <div class="p-6 bg-white/50 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl text-center border border-slate-200 dark:border-white/5 hover:border-purple-500/30 dark:hover:border-purple-500/30 transition-all group">
+            <div class="w-12 h-12 mx-auto mb-4 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">⏰</div>
+            <span class="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 dark:text-purple-400">Scheduling</span>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 font-bold">Quartz.NET</p>
+        </div>
+    </div>
+</section>
+
+<!-- Stats CTA -->
+<section class="py-12 px-6">
+    <div class="max-w-5xl mx-auto bg-slate-100 dark:bg-slate-800/80 p-10 md:p-20 rounded-[3rem] text-center relative overflow-hidden border border-slate-200 dark:border-white/5">
+        <div class="relative z-10">
+            <h2 class="text-3xl md:text-5xl font-black mb-8 leading-tight text-slate-900 dark:text-white">睇下大家有幾鍾意 <br> 玩賜酒派膠？</h2>
+            <a href="/stats" class="inline-flex items-center px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black hover:opacity-90 transition-all shadow-xl hover:-translate-y-1">
+                進入 Live Dashboard
+                <svg class="w-5 h-5 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-12 border-t border-slate-200 dark:border-slate-800/50 text-center transition-colors duration-300">
+    <div class="flex justify-center items-center space-x-3 mb-6">
+        <img src="mud9bot_logo.jpg" class="w-6 h-6 rounded-xl" alt="Logo" onerror="this.outerHTML='<div class=\'w-6 h-6 rounded-xl bg-telegram-blue flex items-center justify-center text-white font-bold text-xs\'>M</div>'">
+        <span class="font-black tracking-tighter text-slate-900 dark:text-white">Mud9Bot Revival</span>
+    </div>
+    <p class="text-slate-500 text-xs mb-6">&copy; 2026 Mud9Bot Project. Maintain by the community with ❤️.</p>
+    <div class="flex flex-wrap justify-center gap-x-8 gap-y-4 px-6">
+        <a href="https://t.me/Mud9BotDev" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors text-sm font-bold">公告頻道</a>
+        <a href="https://t.me/Mud9BotSupport" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors text-sm font-bold">技術支援</a>
+        <a href="/stats" class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors text-sm font-bold">數據中心</a>
+        <a href="/admin" class="text-slate-600 hover:text-telegram-blue dark:text-slate-400 dark:hover:text-blue-400 transition-colors text-sm font-bold border-l border-slate-300 dark:border-white/10 pl-8 flex items-center">
+            <svg class="w-3 h-3 mr-2 opacity-50" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path></svg> 管理後台
+        </a>
+    </div>
+</footer>
+
+<!-- Smart "Back to Top" FAB -->
+<button id="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="fixed bottom-6 right-6 p-4 rounded-full bg-slate-800 dark:bg-slate-700 text-white shadow-xl hover:bg-slate-700 dark:hover:bg-slate-600 focus:outline-none z-50 flex items-center justify-center group">
+    <svg class="w-6 h-6 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+</button>
+
+<!-- Full Telegram App Modal (Hidden by Default) -->
+<div id="telegram-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-900/60 transition-opacity opacity-0" style="backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);">
+    <!-- App Container -->
+    <div class="bg-telegram-light dark:bg-telegram-dark w-full h-full sm:max-w-md sm:h-[85vh] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden transform scale-95 translate-y-4 transition-all duration-300" id="telegram-modal-content">
+
+        <!-- App Header -->
+        <div class="bg-white dark:bg-[#1c242d] px-4 py-3 flex items-center gap-4 border-b border-slate-200 dark:border-slate-800/50 shadow-sm z-10 shrink-0">
+            <button onclick="closeModal()" class="text-slate-400 hover:text-telegram-blue p-1 -ml-1 transition-colors rounded-full focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+            <div class="flex items-center gap-3">
+                <img src="mud9bot_logo.jpg" class="w-10 h-10 rounded-xl object-cover shadow-sm border border-slate-100 dark:border-slate-700" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-xl bg-telegram-blue flex items-center justify-center text-white font-bold\'>M</div>'">
+                <div class="flex flex-col">
+                    <h3 class="font-bold text-slate-900 dark:text-white text-[15px] leading-tight flex items-center gap-1" id="modal-title">
+                        Mud9Bot <svg class="w-3.5 h-3.5 text-telegram-blue" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    </h3>
+                    <p class="text-[13px] text-telegram-blue font-medium">bot</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scrollable Chat Area (Injected dynamically) -->
+        <!-- FIXED: Changed to simple block layout without forcing items to bottom, allowing native scrolling -->
+        <div class="flex-1 overflow-y-auto p-4 sm:p-5" id="modal-chat-area">
+            <!-- Content injected via JS -->
+        </div>
+
+        <!-- Fake Message Input Area -->
+        <div class="bg-[#f4f4f5] dark:bg-[#1c242d] p-2.5 flex items-center gap-2 border-t border-slate-200 dark:border-slate-800/50 shrink-0">
+            <button class="p-2 text-slate-400 hover:text-telegram-blue transition-colors focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+            <div class="flex-1 bg-white dark:bg-[#2b3643] border border-slate-200 dark:border-transparent rounded-full h-10 px-4 flex items-center text-slate-400 text-[15px] shadow-sm cursor-text selection:bg-transparent">
+                Message
+            </div>
+            <button class="p-2 text-telegram-blue bg-blue-50 dark:bg-blue-500/10 rounded-full hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors focus:outline-none">
+                <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- FALLBACK DATA (UPDATED: 3 Clear Examples to test all layout scenarios) ---
+    const guideData = {
+        "categories": [
+            {
+                "categoryName": "🚦 測試分類 (Test Category)",
+                "categoryId": "test",
+                "commands": [
+                    {
+                        "title": "短指令連按鈕",
+                        "icon": "🕹️",
+                        "command": ["/test1"],
+                        "description": "純指令，帶有 Inline Keyboard。",
+                        "mockups": [
+                            {
+                                "input": "/test1",
+                                "response": "這是一個簡短的回應：",
+                                "inlineKeyboard": [[{"text": "按鈕 A"}, {"text": "按鈕 B"}]]
+                            }
+                        ]
+                    },
+                    {
+                        "title": "超長文字訊息",
+                        "icon": "📜",
+                        "command": ["/test2"],
+                        "description": "超長文字，無按鈕，用來測試 Expand 展開功能。",
+                        "mockups": [
+                            {
+                                "input": "/test2",
+                                "response": "這是一段非常長的訊息。\n\n獅子山隧道往九龍方向，近隧道口多車，龍尾：沙田閣。\n觀塘繞道往油塘方向，近偉發道多車，龍尾：機電工程署。\n屯門公路往大欖隧道方向，近深井多車，龍尾：汀九。\n東區走廊往柴灣方向，近北角消防局多車，龍尾：鰂魚涌公園。\n大老山隧道往九龍方向，交通暢順。\n\n請繼續留意最新交通消息。"
+                            }
+                        ]
+                    },
+                    {
+                        "title": "長文字連按鈕",
+                        "icon": "🔥",
+                        "command": ["/test3"],
+                        "description": "超長文字加上 Inline Keyboard。",
+                        "mockups": [
+                            {
+                                "input": "/test3",
+                                "response": "⚙️ Mud9Bot 群組設定:\n\n請選擇你想要設定的項目：\n1. 管理群組過濾器 (字詞封鎖)\n2. 設定自動通知時間\n3. 修改管理員權限\n4. 重置所有設定\n5. 查看系統日誌\n6. 離開選單\n\n(這是一段很長很長的說明文字，用來強制觸發漸變層)",
+                                "inlineKeyboard": [
+                                    [{"text": "🛡 管理過濾器"}],
+                                    [{"text": "🔔 通知設定"}, {"text": "↩️ 返回主選單"}],
+                                    [{"text": "⚠️ 危險操作"}]
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    // Global state 
+    const carouselState = {};
+    window.mockupDataMap = {}; // Maps mockupId -> data for modals
+
+    // --- THEME LOGIC ---
+    const themeToggleBtns = document.querySelectorAll('.theme-toggle-btn');
+    function updateThemeIcons() {
+        const isDark = document.documentElement.classList.contains('dark');
+        themeToggleBtns.forEach(btn => {
+            const darkIcon = btn.querySelector('.dark-icon');
+            const lightIcon = btn.querySelector('.light-icon');
+            if (isDark) { lightIcon.classList.remove('hidden'); darkIcon.classList.add('hidden'); }
+            else { lightIcon.classList.add('hidden'); darkIcon.classList.remove('hidden'); }
+        });
+    }
+    updateThemeIcons();
+    themeToggleBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            updateThemeIcons();
+        });
+    });
+
+    // --- MOBILE MENU TOGGLE ---
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    mobileMenuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden');
+    });
+
+    // Setup smooth scroll for Nav Links
+    function setupSmoothNav(linkElement, targetId) {
+        linkElement.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = document.getElementById(targetId);
+            if (target) {
+                const topPos = target.getBoundingClientRect().top + window.scrollY - 100;
+                window.scrollTo({ top: topPos, behavior: 'smooth' });
+            }
+            mobileMenu.classList.add('hidden');
+        });
+    }
+
+    // --- MODAL LOGIC (Telegram View) ---
+    function openModal(mockupId) {
+        const data = window.mockupDataMap[mockupId];
+        if (!data) return;
+
+        // 1. Populate Header
+        document.getElementById('modal-title').innerHTML = `
+                ${data.title} <svg class="w-3.5 h-3.5 text-telegram-blue" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            `;
+
+        // 2. Format Response and Keyboard securely
+        let formatResp = '';
+        if (data.response) {
+            formatResp = data.response.replace(/\n/g, '<br>');
+        }
+
+        let keyboardHTML = '';
+        if (data.inlineKeyboard) {
+            keyboardHTML += '<div class="w-full flex flex-col gap-[2px] mt-1">';
+            data.inlineKeyboard.forEach(row => {
+                keyboardHTML += '<div class="flex gap-[2px] w-full">';
+                row.forEach(btn => {
+                    keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-sm py-2 px-2 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm cursor-pointer hover:bg-slate-900/20 dark:hover:bg-white/20 transition-colors">${btn.text}</div>`;
+                });
+                keyboardHTML += '</div>';
+            });
+            keyboardHTML += '</div>';
+        }
+
+        // 3. Inject Chat Content
+        // FIXED: Removed mt-auto so the content flows naturally from top to bottom, keeping everything perfectly visible and scrollable
+        document.getElementById('modal-chat-area').innerHTML = `
+                <div class="flex flex-col gap-4 pb-4 w-full">
+                    <div class="chat-bubble bubble-user self-end w-fit max-w-[85%] bg-telegram-bubbleLightUser dark:bg-telegram-bubbleDarkUser text-slate-900 dark:text-slate-100 px-3.5 py-2.5 rounded-2xl rounded-tr-none text-[15px] shadow-sm origin-bottom-right break-words text-left">
+                        ${data.input}
+                    </div>
+                    <div class="chat-bubble bubble-bot self-start w-fit max-w-[95%] flex flex-col gap-1.5 origin-bottom-left">
+                        <div class="bg-telegram-bubbleLightBot dark:bg-telegram-bubbleDarkBot text-slate-900 dark:text-slate-100 px-3.5 py-2.5 rounded-2xl rounded-tl-none text-[15px] leading-relaxed border border-black/5 dark:border-white/5 break-words text-left shadow-sm">
+                            ${formatResp}
+                        </div>
+                        ${keyboardHTML}
+                    </div>
+                </div>
+            `;
+
+        // 4. Animate Modal In
+        const modal = document.getElementById('telegram-modal');
+        const content = document.getElementById('telegram-modal-content');
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        void modal.offsetWidth; // Force CSS reflow
+
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-95', 'translate-y-4');
+        content.classList.add('scale-100', 'translate-y-0');
+
+        document.body.style.overflow = 'hidden'; // Stop background scrolling
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('telegram-modal');
+        const content = document.getElementById('telegram-modal-content');
+
+        modal.classList.add('opacity-0');
+        content.classList.remove('scale-100', 'translate-y-0');
+        content.classList.add('scale-95', 'translate-y-4');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }, 300); // Matches Tailwind transition duration
+    }
+
+    // Close modal when clicking on the blurred background
+    document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.getElementById('telegram-modal');
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        loadData(); // Start fetching data
+    });
+
+    // --- AUTO DETECT OVERFLOW FADES ---
+    function setupOverflowFades() {
+        setTimeout(() => {
+            Object.keys(window.mockupDataMap).forEach(id => {
+                const contentEl = document.getElementById(`bot-content-${id}`);
+                const fadeEl = document.getElementById(`fade-${id}`);
+                if (contentEl && fadeEl) {
+                    // Determine if content is larger than container
+                    if (contentEl.scrollHeight > contentEl.clientHeight + 2) {
+                        fadeEl.classList.remove('hidden');
+                    }
+                }
+            });
+        }, 150);
+    }
+
+    // --- RENDER UI ---
+    async function loadData() {
+        try {
+            const res = await fetch('commands.json');
+            if (res.ok) {
+                const jsonRes = await res.json();
+                renderUI(jsonRes.categories);
+            } else {
+                console.error("Failed to load JSON. Using fallback.");
+                renderUI(guideData.categories);
+            }
+        } catch (e) {
+            console.error("Error fetching commands.json, using fallback:", e);
+            renderUI(guideData.categories);
+        }
+    }
+
+    function renderUI(categories) {
+        const deskNav = document.getElementById('desktop-nav-links');
+        const mobNav = document.getElementById('mobile-nav-links');
+        const content = document.getElementById('content-container');
+        const magicLine = document.getElementById('magic-line');
+
+        window.mockupDataMap = {};
+
+        categories.forEach((cat, index) => {
+            // Desktop Nav Item
+            const dLink = document.createElement('a');
+            dLink.href = `#${cat.categoryId}`;
+            dLink.className = `nav-link px-3 py-5 text-sm font-medium hover:text-telegram-blue transition-colors z-10 ${index===0 ? 'active' : ''}`;
+            dLink.innerText = cat.categoryName;
+            setupSmoothNav(dLink, cat.categoryId);
+            deskNav.insertBefore(dLink, magicLine);
+
+            // Mobile Nav Item
+            const mLink = document.createElement('a');
+            mLink.href = `#${cat.categoryId}`;
+            mLink.className = `nav-link block px-4 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 font-medium ${index===0 ? 'text-telegram-blue bg-blue-50 dark:bg-blue-900/20' : ''}`;
+            mLink.innerText = cat.categoryName;
+            setupSmoothNav(mLink, cat.categoryId);
+            mobNav.appendChild(mLink);
+
+            // Section HTML
+            let sectionHTML = `
+                    <section id="${cat.categoryId}">
+                        <h2 class="section-header sticky top-[64px] z-30 bg-slate-50/95 dark:bg-[#121212]/95 backdrop-blur-md text-2xl font-bold pt-4 pb-3 mb-6 flex items-center gap-2 text-slate-900 dark:text-white">
+                            ${cat.categoryName}
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                `;
+
+            cat.commands.forEach((cmd, cIdx) => {
+                const commandClass = "bg-slate-800 dark:bg-black text-green-400 font-mono"; // Unified styling
+                const delay = (cIdx % 3) * 0.1;
+                const cardId = `card-${cat.categoryId}-${cIdx}`;
+
+                // Format commands array for triggers panel
+                let commandsList = Array.isArray(cmd.command) ? cmd.command : [cmd.command];
+                let commandTriggersHTML = `<div class="flex flex-wrap gap-2 w-full mt-auto">`;
+                commandsList.forEach(cmdStr => {
+                    commandTriggersHTML += `
+                            <div class="flex items-center justify-between p-1 pl-2 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700/80 group/cmd flex-1 min-w-0 max-w-full overflow-hidden">
+                                <code class="text-xs sm:text-sm ${commandClass} px-2 py-0.5 rounded tracking-tight truncate flex-1 min-w-0 block text-left" title="${cmdStr}">${cmdStr}</code>
+                                <button onclick="copyToClipboard(this, '${cmdStr.replace(/'/g, "\\'")}')" class="btn-ripple shrink-0 relative p-1.5 ml-1 text-slate-400 hover:text-telegram-blue transition-colors rounded-md bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 group-hover/cmd:border-telegram-blue/30" title="複製指令">
+                                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    <svg class="w-4 h-4 check-icon hidden text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                </button>
+                            </div>
+                        `;
+                });
+                commandTriggersHTML += `</div>`;
+
+                // Setup multiple mockups HTML
+                let slidesHTML = '';
+                let dotsHTML = '';
+                const totalSlides = cmd.mockups.length;
+                carouselState[cardId] = { current: 0, total: totalSlides };
+
+                cmd.mockups.forEach((mockup, mIdx) => {
+                    const mockupId = `mockup-${cat.categoryId}-${cIdx}-${mIdx}`;
+                    window.mockupDataMap[mockupId] = { title: cmd.title, ...mockup };
+
+                    const formatResp = mockup.response.replace(/\n/g, '<br>');
+
+                    let keyboardHTML = '';
+                    if (mockup.inlineKeyboard) {
+                        keyboardHTML += '<div class="w-full flex flex-col gap-[2px] mt-1">';
+                        mockup.inlineKeyboard.forEach(row => {
+                            keyboardHTML += '<div class="flex gap-[2px] w-full">';
+                            row.forEach(btn => {
+                                keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-xs py-1.5 px-1 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm">${btn.text}</div>`;
+                            });
+                            keyboardHTML += '</div>';
+                        });
+                        keyboardHTML += '</div>';
+                    }
+
+                    // FIXED: Overlay sits directly inside the relative slide container to span 100% of the card horizontally.
+                    slidesHTML += `
+                            <div class="w-full flex-none h-full px-9 sm:px-11 pt-4 pb-7 flex flex-col justify-end gap-2.5 relative">
+                                <!-- User Bubble -->
+                                <div class="chat-bubble bubble-user self-end w-fit max-w-[85%] bg-telegram-bubbleLightUser dark:bg-telegram-bubbleDarkUser text-slate-900 dark:text-slate-100 px-3 py-2 rounded-2xl rounded-tr-none text-sm shadow-sm origin-bottom-right break-words text-left">
+                                    ${mockup.input}
+                                </div>
+                                
+                                <!-- Bot Bubble Wrapper -->
+                                <div class="chat-bubble bubble-bot self-start w-fit max-w-[95%] relative origin-bottom-left">
+                                    <!-- Measured Content Box -->
+                                    <div id="bot-content-${mockupId}" class="max-h-[160px] overflow-hidden flex flex-col gap-1.5 relative w-full pb-1">
+                                        <div class="bg-telegram-bubbleLightBot dark:bg-telegram-bubbleDarkBot text-slate-900 dark:text-slate-100 px-3 py-2 rounded-2xl rounded-tl-none text-sm leading-relaxed border border-black/5 dark:border-white/5 break-words text-left shadow-sm">
+                                            ${formatResp}
+                                        </div>
+                                        ${keyboardHTML}
+                                    </div>
+                                </div>
+                                
+                                <!-- FIXED Overlay: Spans full width of slide, centered content, glowing pulse animation -->
+                                <div id="fade-${mockupId}" class="hidden absolute bottom-0 left-0 w-full h-[140px] bg-gradient-to-t from-[#E5EBDF] dark:from-[#0E1621] via-[#E5EBDF]/90 dark:via-[#0E1621]/90 to-transparent cursor-pointer flex items-end justify-center transition-all z-10 pb-5" onclick="openModal('${mockupId}')">
+                                    <span class="text-white bg-telegram-blue text-[15px] font-bold px-8 py-3 rounded-full shadow-[0_0_20px_rgba(42,171,238,0.5)] transition-transform border border-blue-400 flex items-center gap-2 hover:scale-105 animate-pulse">
+                                        <svg class="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                        點擊展開全部
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+
+                    if (totalSlides > 1) {
+                        const activeClass = mIdx === 0 ? 'bg-telegram-blue w-4 opacity-100' : 'bg-slate-400 dark:bg-slate-500 w-2 opacity-60';
+                        dotsHTML += `<div class="h-2 rounded-full transition-all duration-300 dot-${cardId} ${activeClass}"></div>`;
+                    }
+                });
+
+                // Navigation arrows (z-20 to sit above overlay)
+                let navButtonsHTML = '';
+                if (totalSlides > 1) {
+                    navButtonsHTML = `
+                            <button onclick="slideCarousel('${cardId}', -1)" class="carousel-arrow absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-white flex items-center justify-center shadow-md border border-slate-200 dark:border-slate-700 z-20">
+                                <svg class="w-5 h-5 pr-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+                            </button>
+                            <button onclick="slideCarousel('${cardId}', 1)" class="carousel-arrow absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-white flex items-center justify-center shadow-md border border-slate-200 dark:border-slate-700 z-20">
+                                <svg class="w-5 h-5 pl-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        `;
+                }
+
+                sectionHTML += `
+                        <div class="animate-card bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-md border border-slate-200 dark:border-slate-700/80 overflow-hidden flex flex-col cursor-default transition-all duration-300 hover:-translate-y-1" style="transition-delay: ${delay}s">
+                            
+                            <!-- Chat Mockup Area -->
+                            <div class="h-[240px] bg-telegram-light dark:bg-telegram-dark relative overflow-hidden group/carousel">
+                                <div id="track-${cardId}" class="carousel-track flex h-full w-full">
+                                    ${slidesHTML}
+                                </div>
+                                <!-- dots (z-20 to sit above overlay) -->
+                                <div class="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5 z-20" id="dots-${cardId}">
+                                    ${dotsHTML}
+                                </div>
+                                ${navButtonsHTML}
+                            </div>
+
+                            <!-- Card Content -->
+                            <div class="p-5 flex-1 flex flex-col bg-white dark:bg-slate-800 relative z-10 border-t border-slate-100 dark:border-slate-700/50">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-xl drop-shadow-sm">${cmd.icon}</span>
+                                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">${cmd.title}</h3>
+                                </div>
+                                <p class="text-slate-600 dark:text-slate-400 text-sm mb-5 leading-relaxed">
+                                    ${cmd.description}
+                                </p>
+                                
+                                <!-- Rendered Command Triggers (Side-by-Side Flex) -->
+                                ${commandTriggersHTML}
+                            </div>
+                        </div>
+                    `;
+            });
+
+            sectionHTML += `</div></section>`;
+            content.insertAdjacentHTML('beforeend', sectionHTML);
+        });
+
+        setupObservers();
+        setupScrollDynamics();
+        setupSwipe();
+        updateMagicLine(deskNav.querySelector('.nav-link.active'));
+        setupOverflowFades();
+    }
+
+    // --- CAROUSEL LOGIC ---
+    function slideCarousel(cardId, direction) {
+        const state = carouselState[cardId];
+        if (!state || state.total <= 1) return;
+
+        state.current += direction;
+        if (state.current < 0) state.current = state.total - 1;
+        if (state.current >= state.total) state.current = 0;
+
+        const track = document.getElementById(`track-${cardId}`);
+        if (track) track.style.transform = `translateX(-${state.current * 100}%)`;
+
+        const dots = document.querySelectorAll(`.dot-${cardId}`);
+        dots.forEach((dot, idx) => {
+            if (idx === state.current) {
+                dot.classList.add('bg-telegram-blue', 'opacity-100', 'w-4');
+                dot.classList.remove('bg-slate-400', 'dark:bg-slate-500', 'opacity-60', 'w-2');
+            } else {
+                dot.classList.remove('bg-telegram-blue', 'opacity-100', 'w-4');
+                dot.classList.add('bg-slate-400', 'dark:bg-slate-500', 'opacity-60', 'w-2');
+            }
+        });
+    }
+
+    function setupSwipe() {
+        Object.keys(carouselState).forEach(cardId => {
+            if (carouselState[cardId].total <= 1) return;
+            const track = document.getElementById(`track-${cardId}`);
+            if (!track) return;
+
+            let startX = 0;
+            let endX = 0;
+
+            track.addEventListener('touchstart', e => { startX = e.changedTouches[0].screenX; }, { passive: true });
+            track.addEventListener('touchend', e => {
+                endX = e.changedTouches[0].screenX;
+                if (startX - endX > 40) slideCarousel(cardId, 1);
+                if (endX - startX > 40) slideCarousel(cardId, -1);
+            }, { passive: true });
+        });
+    }
+
+    // --- OBSERVERS FOR ANIMATIONS ---
+    function setupObservers() {
+        const cardObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    cardObserver.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '0px 0px -50px 0px', threshold: 0.1 });
+        document.querySelectorAll('.animate-card').forEach(c => cardObserver.observe(c));
+
+        const headerObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    headerObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+        document.querySelectorAll('.section-header').forEach(h => headerObserver.observe(h));
+    }
+
+    // --- SCROLL DYNAMICS ---
+    function setupScrollDynamics() {
+        const nav = document.getElementById('main-nav');
+        const hero = document.getElementById('hero-content');
+        const progressBar = document.getElementById('scroll-progress');
+        const fab = document.getElementById('back-to-top');
+        const sections = document.querySelectorAll('section[id]');
+        const dLinks = document.querySelectorAll('#desktop-nav-links .nav-link');
+        const mLinks = document.querySelectorAll('#mobile-nav-links .nav-link');
+
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+
+            if (scrollY > 50) nav.classList.add('nav-scrolled');
+            else nav.classList.remove('nav-scrolled');
+
+            if (scrollY < 600 && hero) {
+                hero.style.transform = `translateY(${scrollY * 0.3}px)`;
+                hero.style.opacity = 1 - (scrollY / 350);
+            }
+
+            const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = (scrollY / totalHeight) * 100;
+            if(progressBar) progressBar.style.width = `${progress}%`;
+
+            if (scrollY > 500) fab.classList.add('show');
+            else fab.classList.remove('show');
+
+            let current = '';
+            sections.forEach(section => {
+                if (scrollY >= section.offsetTop - 150) current = section.getAttribute('id');
+            });
+
+            dLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                    updateMagicLine(link);
+                }
+            });
+
+            mLinks.forEach(link => {
+                link.classList.remove('text-telegram-blue', 'bg-blue-50', 'dark:bg-blue-900/20');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('text-telegram-blue', 'bg-blue-50', 'dark:bg-blue-900/20');
+                }
+            });
+        });
+    }
+
+    function updateMagicLine(activeLink) {
+        const line = document.getElementById('magic-line');
+        if (!activeLink || !line) return;
+        line.style.width = `${activeLink.offsetWidth}px`;
+        line.style.left = `${activeLink.offsetLeft}px`;
+    }
+
+    // --- FLOATING COPIED TOOLTIP ---
+    function copyToClipboard(btn, text) {
+        const cleanText = text.replace(/^「|」$/g, '');
+        const temp = document.createElement("input");
+        temp.value = cleanText;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+
+        const badge = document.createElement('span');
+        badge.textContent = '已複製!';
+        badge.className = 'copied-tooltip';
+        btn.appendChild(badge);
+
+        setTimeout(() => { if(badge.parentNode) badge.remove(); }, 800);
+    }
+
+</script>
+</body>
+</html>

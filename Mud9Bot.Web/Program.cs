@@ -126,12 +126,13 @@ app.Use(async (context, next) =>
         string? targetSub = path switch {
             "/admin" or "/admin.html" => "admin",
             "/stats" or "/dashboard" or "/dashboard.html" => "stats",
+            "/guide" or "/guide.html" => "guide",
             _ => null
         };
 
         if (targetSub != null && !host.StartsWith($"{targetSub}."))
         {
-            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "").Replace("mtr.", "").Replace("transport.", "");
+            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "").Replace("mtr.", "").Replace("transport.", "").Replace("guide", "");
             context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
             return;
         }
@@ -175,6 +176,11 @@ var serveHtmlDelegate = async (HttpContext context) => {
     {
         await context.Response.SendFileAsync("wwwroot/dashboard.html");
     }
+    else if (host.StartsWith("guide.") || path.StartsWith("/guide"))
+    {
+        await context.Response.SendFileAsync("wwwroot/guide.html");
+    }
+    
     else if (path.StartsWith("/transport/bus") || path.StartsWith("/bus") || host.StartsWith("bus."))
     {
         await context.Response.SendFileAsync("wwwroot/bus.html");
