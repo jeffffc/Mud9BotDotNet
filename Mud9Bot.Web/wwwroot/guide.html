@@ -89,6 +89,12 @@
         .animate-card.is-visible .bubble-user { transition-delay: 0.2s; opacity: 1; transform: translateY(0) scale(1); }
         .animate-card.is-visible .bubble-bot { transition-delay: 0.45s; opacity: 1; transform: translateY(0) scale(1); }
 
+        #telegram-modal-content .chat-bubble {
+            opacity: 1;
+            transform: none;
+            transition: none; /* Optional: removes the fade delay inside the modal */
+        }
+        
         /* Floating Copied Tooltip */
         @keyframes floatUpFade {
             0% { opacity: 1; transform: translate(-50%, 0) scale(0.9); }
@@ -506,7 +512,7 @@
             data.inlineKeyboard.forEach(row => {
                 keyboardHTML += '<div class="flex gap-[2px] w-full">';
                 row.forEach(btn => {
-                    keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-sm py-2 px-2 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm cursor-pointer hover:bg-slate-900/20 dark:hover:bg-white/20 transition-colors">${btn.text}</div>`;
+                    keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-sm py-2 px-2 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm cursor-pointer hover:bg-slate-900/20 dark:hover:bg-white/20 transition-colors active:scale-[0.97] active:opacity-80 transition-all duration-100 select-none">${btn.text}</div>`;
                 });
                 keyboardHTML += '</div>';
             });
@@ -674,7 +680,7 @@
                         mockup.inlineKeyboard.forEach(row => {
                             keyboardHTML += '<div class="flex gap-[2px] w-full">';
                             row.forEach(btn => {
-                                keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-xs py-1.5 px-1 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm">${btn.text}</div>`;
+                                keyboardHTML += `<div class="flex-1 bg-slate-900/10 dark:bg-white/10 text-telegram-blue text-xs py-1.5 px-1 rounded-md font-medium text-center truncate backdrop-blur-sm shadow-sm active:scale-[0.97] active:opacity-80 transition-all duration-100 select-none">${btn.text}</div>`;
                             });
                             keyboardHTML += '</div>';
                         });
