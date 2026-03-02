@@ -8,27 +8,18 @@
           "title": "巴士到站時間",
           "icon": "🚌",
           "command": ["/bus"],
-          "description": "即時查詢九巴、城巴、新巴到站時間。支援路線搜尋同車站選擇。",
+          "description": "即時查詢九巴、城巴、龍運、嶺巴同港鐵巴士嘅到站時間。",
           "mockups": [
             {
-              "input": "/bus 1A",
-              "response": "請選擇方向：",
+              "input": "/bus",
+              "response": "想知架車幾時到？撳下面粒掣入去睇吓啦，唔使再喺條街度戇居居等喇！🚀",
               "inlineKeyboard": [
                 [
                   {
-                    "text": "往 尖沙咀碼頭"
-                  }
-                ],
-                [
-                  {
-                    "text": "往 中秀茂坪"
+                    "text": "撳我睇巴士到站 🚌💨"
                   }
                 ]
               ]
-            },
-            {
-              "input": "往 尖沙咀碼頭",
-              "response": "🚌 九巴 1A (往: 尖沙咀碼頭)\n📍 旺角鐵路站\n🕒 2分鐘 (14:30)\n🕒 8分鐘 (14:36)"
             }
           ]
         },
@@ -39,8 +30,15 @@
           "description": "港鐵下一班車幾點到？打個指令即刻知，唔使開 MTR App。",
           "mockups": [
             {
-              "input": "/mtr TKL",
-              "response": "🚇 將軍澳綫 (調景嶺站)\n➡️ 往: 寶琳 🕒 1分鐘\n➡️ 往: 北角 🕒 3分鐘"
+              "input": "/mtr",
+              "response": "想知下一班港鐵幾時有？撳下面粒掣入去睇吓啦，唔使衝落去月台跑喇！🚀",
+              "inlineKeyboard" : [
+                [
+                  {
+                    "text": "撳我睇港鐵到站 🚇💨"
+                  }
+                ]
+              ]
             }
           ]
         },
@@ -52,24 +50,59 @@
           "mockups": [
             {
               "input": "/minibus 8",
-              "response": "🚐 綠色小巴 8 (往: 尖沙咀)\n📍 何文田站\n🕒 3分鐘\n🕒 10分鐘"
+              "response": "想知小巴幾時到？撳下面粒掣入去睇吓啦，費事排長龍等呀！🚀",
+              "inlineKeyboard" : [
+                [
+                  {
+                    "text": "撳我睇小巴到站 🚐💨"
+                  }
+                ]
+              ]
             }
           ]
         },
         {
-          "title": "交通消息與快拍",
-          "icon": "📸",
-          "command": ["交通消息", "/snapshot"],
+          "title": "即時交通消息",
+          "icon": "🚦",
+          "command": ["交通消息", "/traffic"],
           "isTextTrigger": true,
           "description": "獲取最新 RTHK 交通消息，或睇吓各大隧道、公路路面快拍。",
           "mockups": [
             {
               "input": "交通消息",
-              "response": "📻 獅子山隧道往九龍方向，近隧道口多車，龍尾：沙田閣。"
+              "response": "🚦 RTHK 交通消息\n\n14:20: 較早前汀九橋往九龍方向，因突發事故一度封閉慢線現已重開，一帶慢車。\n\n14:06: 較早前大角咀塘尾道往尖沙咀方向，近旺角道的意外已清理，一帶慢車。"
             },
             {
-              "input": "/snapshot CHT",
-              "response": "📸 海底隧道 (九龍入口)\n[即時影像擷取中...]"
+              "input": "/traffic",
+              "response": "🚦 RTHK 交通消息\n\n14:20: 較早前汀九橋往九龍方向，因突發事故一度封閉慢線現已重開，一帶慢車。\n\n14:06: 較早前大角咀塘尾道往尖沙咀方向，近旺角道的意外已清理，一帶慢車。"
+            }
+          ]
+        },
+        {
+          "title": "交通快拍",
+          "icon": "📸",
+          "command": ["/snapshot"],
+          "isTextTrigger": true,
+          "description": "獲取最新本港各大隧道、公路路面快拍。",
+          "mockups": [
+            {
+              "input": "/snapshot",
+              "response": "【交通快拍】\n你想睇邊個區域？",
+              "inlineKeyboard" : [
+                [
+                  {
+                    "text": "九龍"
+                  },
+                  {
+                    "text": "新界"
+                  }
+                ],
+                [
+                  {
+                    "text": "港島"
+                  }
+                ]
+              ]
             }
           ]
         },
@@ -81,7 +114,7 @@
           "mockups": [
             {
               "input": "/gas",
-              "response": "⛽ 今日油價 (折扣後):\nEsso: $18.59/L\nShell: $18.64/L\nCaltex: $18.60/L"
+              "response": "⛽ 本港即時牌價參考 (每升)\n(更新時間：2026-03-02 01:00)\n\n🔹 無鉛汽油\n├ 中石化  ：$29.69\n├ 中國石油 ：$29.69\n├ 加德士  ：$29.69\n├ 埃索   ：$29.69\n├ 蜆殼   ：$29.69"
             }
           ]
         }
@@ -94,16 +127,46 @@
         {
           "title": "天氣資訊",
           "icon": "🌤",
-          "command": ["/weather", "/forecast"],
-          "description": "香港天文台最新天氣報告同埋雷達圖。",
+          "command": ["而家天氣", "/weather"],
+          "description": "香港天文台最新天氣報告。",
           "mockups": [
             {
               "input": "而家天氣",
-              "response": "🌡 現時氣溫: 28°C\n💧 相對濕度: 75%\n⚠️ 酷熱天氣警告現正生效。"
+              "response": "【本港現時天氣】\n🌡 氣溫：23℃\n💧 濕度：93%\n🕒 更新：16:02",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "睇各區氣溫 🗺️"
+                  }
+                ]
+              ]
+            },
+            {
+              "input": "/weather",
+              "response": "【本港現時天氣】\n🌡 氣溫：23℃\n💧 濕度：93%\n🕒 更新：16:02",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "睇各區氣溫 🗺️"
+                  }
+                ]
+              ]
             },
             {
               "input": "/forecast",
-              "response": "📅 九天天氣預報:\n星期一: 27-31°C 🌧\n星期二: 28-32°C ⛅"
+              "response": "【氣象概況】\n受冷鋒隨後的東北季候風影響，未來一兩日廣東地區天氣轉涼，而高空擾動亦會為該區帶來有雨的天氣。受較乾燥的季候風補充影響，本週後期及週末期間華南天色逐漸好轉。\n\n【九天天氣預報】\n03月03日(星期二): 多雲，間中有驟雨，局部地區有雷暴。天氣轉涼。 (17-22℃)\n03月04日(星期三): 大致多雲，有幾陣雨，早上清涼。 (16-19℃)\n03月05日(星期四): 大致多雲。初時有一兩陣微雨，日間部分時間天色明朗。 (17-22℃)\n03月06日(星期五): 部分時間有陽光。日間乾燥。 (18-23℃)\n03月07日(星期六): 部分時間有陽光。日間乾燥。 (17-21℃)"
+            }
+          ]
+        },
+        {
+          "title": "天氣預報",
+          "icon": "🌤",
+          "command": ["/forecast"],
+          "description": "香港天文台最新天氣報告。",
+          "mockups": [
+            {
+              "input": "/forecast",
+              "response": "【氣象概況】\n受冷鋒隨後的東北季候風影響，未來一兩日廣東地區天氣轉涼，而高空擾動亦會為該區帶來有雨的天氣。受較乾燥的季候風補充影響，本週後期及週末期間華南天色逐漸好轉。\n\n【九天天氣預報】\n03月03日(星期二): 多雲，間中有驟雨，局部地區有雷暴。天氣轉涼。 (17-22℃)\n03月04日(星期三): 大致多雲，有幾陣雨，早上清涼。 (16-19℃)\n03月05日(星期四): 大致多雲。初時有一兩陣微雨，日間部分時間天色明朗。 (17-22℃)\n03月06日(星期五): 部分時間有陽光。日間乾燥。 (18-23℃)\n03月07日(星期六): 部分時間有陽光。日間乾燥。 (17-21℃)"
             }
           ]
         },
@@ -116,7 +179,7 @@
           "mockups": [
             {
               "input": "100 JPY to HKD",
-              "response": "💱 匯率換算:\n100 JPY = 5.24 HKD\n(匯率更新時間: 14:00)"
+              "response": "💰 匯率轉換結果\n\n100.00 日元(JPY) = 5.013 港幣(HKD)\n\n(匯率更新於：2026-03-02 03:00 | 來源：fixer.io)"
             }
           ]
         },
@@ -124,11 +187,19 @@
           "title": "翻譯小幫手",
           "icon": "🌍",
           "command": ["/translate", "/t"],
-          "description": "支援多國語言互譯，群組吹水遇到外星文都可以即刻翻譯。",
+          "description": "支援多國語言互譯，群組吹水遇到外星文都可以即刻翻譯。(預設是由任何語言翻譯做繁體中文，如偵測到原句為中文，則翻譯成英文。）",
           "mockups": [
             {
               "input": "/t おはようございます",
-              "response": "🈯 翻譯結果 (日文 ➡️ 繁體中文):\n早晨"
+              "response": "🌍 日本語 -> 繁體中文\n\n早安"
+            },
+            {
+              "input": "/t 你食左飯未？",
+              "response": "🌍 English -> 繁體中文\n\n你好世界！"
+            },
+            {
+              "input": "/t Hello World!",
+              "response": "🌍 繁體中文 -> English\n\nHave you eaten yet?"
             }
           ]
         },
@@ -136,11 +207,11 @@
           "title": "中文字元辨識",
           "icon": "🀄",
           "command": ["/ch"],
-          "description": "分析同辨識中文字元屬性及拆碼。",
+          "description": "分析同辨識中文字元屬性及拆碼。（每次最多十個字）",
           "mockups": [
             {
-              "input": "/ch 鳩",
-              "response": "字: 鳩 (jiu1)\n倉頡: 竹弓大弓 (HNKU)\n部首: 鳥"
+              "input": "/ch 你好",
+              "response": "字 | 碼    | 倉頡根\n---|-----|-------\n你  | ONF   | 人弓火\n好  | VND   | 女弓木"
             }
           ]
         },
@@ -148,24 +219,24 @@
           "title": "文字轉語音",
           "icon": "🗣",
           "command": ["/speech"],
-          "description": "將你打嘅文字轉換成語音訊息（Voice Message）發送出嚟。",
+          "description": "將語音訊息（Voice Message）轉換成文字。",
           "mockups": [
             {
-              "input": "/speech 大家好！",
-              "response": "🎤 [語音訊息 0:02]"
+              "input": "/speech",
+              "response": "???"
             }
           ]
         },
         {
           "title": "智能提醒事項",
           "icon": "⏰",
-          "command": ["「.+提我.+」"],
+          "command": ["XXX 提我 YYY"],
           "isTextTrigger": true,
-          "description": "幫你記住重要事項，夠鐘自動喺群組 Tag 返你。",
+          "description": "幫你記住重要事項，夠鐘自動喺 PM / 群組 Tag 返你。",
           "mockups": [
             {
-              "input": "聽朝九點提我開會",
-              "response": "✅ 收到！我會喺聽日 09:00 提醒你：開會。"
+              "input": "聽日9點提我開會",
+              "response": "✅ 收到，我會喺 2026/03/03 09:00 提你。 #reminder"
             }
           ]
         }
@@ -183,7 +254,7 @@
           "mockups": [
             {
               "input": "/marksix",
-              "response": "🎱 六合彩結果 (第 24/052 期)\n號碼: 4, 12, 18, 22, 35, 48 (特: 9)\n💰 下期估計頭獎: $8,000,000"
+              "response": "🎰 六合彩最新開獎結果\n第 023  期 28/02/2026\n\n正碼：5 , 15 , 37 , 39 , 46 , 47\n特別號碼：29 🔴\n\n【派彩詳情】\n• 頭奬：無人中\n• 二奬：獎金 $547,560 / 3.5 注中\n• 三奬：獎金 $89,660 / 57.0 注中\n\n【下期資訊】\n⏳ 截止售票：2026年3月3日下午9時15分\n💰 估計彩金：2千萬元"
             }
           ]
         },
@@ -196,7 +267,33 @@
           "mockups": [
             {
               "input": "有咩戲睇",
-              "response": "🎬 今日熱門上映:\n1. 九龍城寨之圍城\n2. 芙莉歐莎：瘋狂麥斯傳奇篇章\n👉 輸入 /movies 查看場次"
+              "response": "現在上映（撳制查詢詳情）\n1. 夜王 (6.9 分)\n2. 金多寶 (6.9 分)\n3. 鏢人：風起大漠 (8.4 分)\n4. 犯罪101 (8.5 分)\n5. 雙囍 (-- 分)\n6. 尋秦記 (-- 分)",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "1. 夜王"
+                  },
+                  {
+                    "text": "2. 金多寶"
+                  }
+                ],
+                [
+                  {
+                    "text": "3. 鏢人：風起大漠"
+                  },
+                  {
+                    "text": "4. 犯罪101"
+                  }
+                ],
+                [
+                  {
+                    "text": "5. 雙囍"
+                  },
+                  {
+                    "text": "6. 尋秦記"
+                  }
+                ]
+              ]
             }
           ]
         },
@@ -209,7 +306,28 @@
           "mockups": [
             {
               "input": "有咩新聞",
-              "response": "📰 最新頭條:\n1. 港鐵宣佈下月起調整票價...\n2. 天文台預計週末有狂風雷暴..."
+              "response": "【新聞短打】\n你想睇邊類新聞？",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "本地"
+                  },
+                  {
+                    "text": "大中華"
+                  },
+                  {
+                    "text": "國際"
+                  }
+                ],
+                [
+                  {
+                    "text": "財經"
+                  },
+                  {
+                    "text": "體育"
+                  }
+                ]
+              ]
             }
           ]
         },
@@ -220,8 +338,52 @@
           "description": "查詢每日星座運程預測。",
           "mockups": [
             {
-              "input": "/zodiac Aries",
-              "response": "♈ 白羊座今日運程:\n整體運勢：★★★★☆\n今日事業運唔錯，把握機會表現自己！"
+              "input": "/zodiac",
+              "response": "♈ 白羊座今日運程:\n整體運勢：★★★★☆\n今日事業運唔錯，把握機會表現自己！",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "白羊"
+                  },
+                  {
+                    "text": "金牛"
+                  },
+                  {
+                    "text": "雙子"
+                  },
+                  {
+                    "text": "巨蟹"
+                  }
+                ],
+                [
+                  {
+                    "text": "獅子"
+                  },
+                  {
+                    "text": "處女"
+                  },
+                  {
+                    "text": "天秤"
+                  },
+                  {
+                    "text": "天蝎"
+                  }
+                ],
+                [
+                  {
+                    "text": "人馬"
+                  },
+                  {
+                    "text": "山羊"
+                  },
+                  {
+                    "text": "水瓶"
+                  },
+                  {
+                    "text": "雙魚"
+                  }
+                ]
+              ]
             }
           ]
         },
@@ -233,7 +395,7 @@
           "mockups": [
             {
               "input": "/fortune",
-              "response": "✨ 黃大仙靈籤 第三十八籤\n【中吉】陶淵明辭縣\n籤文：歸去來兮仕官閒，室家愛樂一生安..."
+              "response": "第○三靈籤：魯班開山\n求籤吉凶：中平靈籤\n算命籤詩：\n牛山之木皆常美..."
             }
           ]
         },
@@ -245,19 +407,31 @@
           "mockups": [
             {
               "input": "/dice",
-              "response": "🎲 骨碌骨碌... 你擲出咗：5！"
+              "response": "🎲 幫你擲咗 1 粒 6 面骰，結果係：5\n💡 提示：你可以用 /dice 2d20 3 嚟自訂數量同面數㗎！"
+            },
+            {
+              "input": "/dice 2d8",
+              "response": "🎲 擲骰結果 (2d8)\n[ 8, 8 ] ➔ 總和：16"
+            },
+            {
+              "input": "/dice 4d12 3",
+              "response": "🎲 擲骰結果 (4d12)\n重複 3 次：\n\n1. [ 3, 5, 11, 7 ] ➔ 總和：26\n2. [ 1, 1, 9, 2 ] ➔ 總和：13\n3. [ 5, 8, 7, 10 ] ➔ 總和：30"
             }
           ]
         },
         {
-          "title": "拋硬幣",
+          "title": "拋硬幣 / 選擇困難症解決器",
           "icon": "🪙",
           "command": ["/toss"],
-          "description": "幫你拋硬幣決定事情。",
+          "description": "幫你拋硬幣決定事情。或者幫你解決選擇困難症，喺你畀嘅選項入面隨機抽出一個！",
           "mockups": [
             {
               "input": "/toss",
-              "response": "🪙 拋硬幣結果：公！"
+              "response": "公！"
+            },
+            {
+              "input": "/toss A B C D E",
+              "response": "E！"
             }
           ]
         }
@@ -275,25 +449,7 @@
           "mockups": [
             {
               "input": "/welcome",
-              "response": "請選擇動作：",
-              "inlineKeyboard": [
-                [
-                  {
-                    "text": "設定歡迎詞"
-                  },
-                  {
-                    "text": "清除歡迎詞"
-                  }
-                ],
-                [
-                  {
-                    "text": "開啟功能"
-                  },
-                  {
-                    "text": "關閉功能"
-                  }
-                ]
-              ]
+              "response": "【設定歡迎訊息】\n請輸入歡迎訊息內容，或對住一則包含文字/相片/GIF 嘅訊息回覆 /welcome。\n\n可用變數：\n$name - 新成員名稱\n$username - 新成員 Username\n$id - 新成員 ID\n$title - 群組名稱\n$language - 語言代碼\n\n停用方法： /welcome no 或 /welcome -"
             }
           ]
         },
@@ -301,28 +457,56 @@
           "title": "賜酒 / 派膠與統計",
           "icon": "🍷",
           "command": ["/z", "/groupstat"],
-          "description": "致敬討論區文化！用 /z 賜酒或派膠。使用 /groupstat 可以查看群組內嘅賜酒/派膠數據統計。",
+          "description": "致敬高登／連登文化！用 /z 賜酒或派膠。使用 /groupstat 可以查看群組內嘅賜酒/派膠數據統計。",
           "mockups": [
             {
-              "input": "酒",
-              "response": "🍷 你賜咗酒畀 user123！(累積: 5杯)"
+              "input": "/z",
+              "response": "你想對【乜鳩BOT】賜酒 🍻 定派膠 🌚?",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "賜酒 🍻"
+                  },
+                  {
+                    "text": "派膠 🌚"
+                  }
+                ]
+              ]
+            },
+            {
+              "input": "/z 10",
+              "response": "你想對【乜鳩BOT】賜酒 🍻 定派膠 🌚?",
+              "inlineKeyboard": [
+                [
+                  {
+                    "text": "賜 10 杯酒 🍻"
+                  },
+                  {
+                    "text": "派 10 粒膠 🌚"
+                  }
+                ]
+              ]
             },
             {
               "input": "/groupstat",
-              "response": "📊 群組統計 (本月):\n🏆 賜酒王: user123 (50杯)\n🤡 膠神: user456 (99膠)"
+              "response": "喺【Mud9bot 之家】呢個群，\n最多酒嘅五個人係︰\n【乜鳩BOT】︰7 杯酒\n【Jeff】︰1 杯酒\n\n而最多膠嘅五個人係︰\n【Jeff】︰2 粒膠"
             }
           ]
         },
         {
           "title": "群組用語過濾",
           "icon": "🚫",
-          "command": ["「吾系甘牙」", "\\p{IsCJKUnifiedIdeographs}"],
+          "command": ["「吾系甘牙」", "「任何簡體字」"],
           "isTextTrigger": true,
           "description": "偵測群組內嘅火星文、5P 字或簡體字，維持群組質素。",
           "mockups": [
             {
-              "input": "吾系甘牙",
-              "response": "⚠️ 偵測到 5P 字 / 火星文！請注意群組用語。"
+              "input": "你吾愛我啦？",
+              "response": "吾你老母？！"
+            },
+            {
+              "input": "爱无心",
+              "response": "用乜撚嘢殘體啊，當呢度大陸啊？"
             }
           ]
         }
@@ -339,23 +523,56 @@
           "description": "查看 Bot 嘅基本資訊同完整功能清單。",
           "mockups": [
             {
+              "input": "/info",
+              "response": "發現問題／諗到建議？/feedback Your Feedback\n想緊貼我嘅更新？@Mud9BotDev"
+            },
+            {
               "input": "/help",
-              "response": "🤖 Mud9Bot 功能清單\n/bus - 巴士到站時間\n/weather - 天氣資訊\n👉 點擊按鈕查看更多",
+              "response": "🤖 Mud9Bot 指令教學選單\n\n請按以下分類查看詳細教學：\n同時請 follow @Mud9BotDev 緊貼更新！",
               "inlineKeyboard": [
                 [
                   {
-                    "text": "🚦 交通"
+                    "text": "賜酒派膠 🍻"
                   },
                   {
-                    "text": "🛠 實用"
+                    "text": "天氣資訊 ☁️"
                   }
                 ],
                 [
                   {
-                    "text": "🎲 娛樂"
+                    "text": "交通消息 🚗"
                   },
                   {
-                    "text": "⚙️ 設定"
+                    "text": "新聞短打 📰"
+                  }
+                ],
+                [
+                  {
+                    "text": "運程命理 🔮"
+                  },
+                  {
+                    "text": "電影資訊 🎬"
+                  }
+                ],
+                [
+                  {
+                    "text": "提醒功能 ⏰"
+                  },
+                  {
+                    "text": "實用工具 🛠️"
+                  }
+                ],
+                [
+                  {
+                    "text": "垃雜功能 🗑"
+                  },
+                  {
+                    "text": "群組管理 ⚙️"
+                  }
+                ],
+                [
+                  {
+                    "text": "贊助條款 💖"
                   }
                 ]
               ]
@@ -370,35 +587,70 @@
           "mockups": [
             {
               "input": "/msettings",
-              "response": "⚙️ Mud9Bot 群組設定ddddddasdsadasdasdasdasdasdsadasdsadsa asdas dasdas dsa dasdsa dsadsa dasd sad sad sad sad sad sad asd asd asd :",
+              "response": "【Mud9bot 之家】\n\n注意一︰直接撳酒膠個數字，之後可以直接打數字。\n注意二︰最底三行顯示嘅係而家嘅狀態",
               "inlineKeyboard": [
                 [
                   {
-                    "text": "🛡 管理過濾器"
+                    "text": "每日酒數 🍻"
                   }
                 ],
                 [
                   {
-                    "text": "🔔 通知設定"
+                    "text": "➖"
                   },
                   {
-                    "text": "↩️ 返回主選單"
+                    "text": "10 杯"
+                  },
+                  {
+                    "text": "➕"
                   }
                 ],
                 [
                   {
-                    "text": "🔔 通知設定"
-                  },
-                  {
-                    "text": "↩️ 返回主選單"
+                    "text": "每日膠數 🌚"
                   }
                 ],
                 [
                   {
-                    "text": "🔔 通知設定"
+                    "text": "➖"
                   },
                   {
-                    "text": "↩️ 返回主選單"
+                    "text": "8 粒"
+                  },
+                  {
+                    "text": "➕"
+                  }
+                ],
+                [
+                  {
+                    "text": "求籤 🙏"
+                  },
+                  {
+                    "text": "開 ✅"
+                  }
+                ],
+                [
+                  {
+                    "text": "星座 🔮"
+                  },
+                  {
+                    "text": "開 ✅"
+                  }
+                ],
+                [
+                  {
+                    "text": "驅逐 5P 🖕"
+                  },
+                  {
+                    "text": "關 🚫"
+                  }
+                ],
+                [
+                  {
+                    "text": "驅逐殘體 🇨🇳"
+                  },
+                  {
+                    "text": "開 ✅"
                   }
                 ]
               ]
@@ -413,7 +665,7 @@
           "mockups": [
             {
               "input": "/feedback 個天氣指令壞咗",
-              "response": "✅ 感謝你嘅意見！我哋已經記錄低，開發者會盡快跟進。"
+              "response": "多謝你嘅意見！我已經轉告咗畀開發者聽喇，如果有需要我哋會私訊回覆你。💖"
             }
           ]
         },
@@ -424,15 +676,12 @@
           "description": "了解贊助詳情及條款，支持開發者維持伺服器運作。",
           "mockups": [
             {
-              "input": "/donate",
-              "response": "感謝你考慮贊助 Mud9Bot！❤️\n伺服器營運成本全靠大家支持。",
+              "input": "/donate 100",
+              "response": "多謝你捐款俾 @Mud9Bot 啊！感激不盡！\n💡 溫馨提示：100 Stars 大約等於 2 USD / 16 HKD。\n如果你唔夠 Stars，可以去 Settings > Stars (設定 > 我的星星) 買咗先。\n\n請檢查下下面啲資料啱唔啱，睇清楚先好撳制俾錢！\n詳細 T&C 請按 /terms，有問題亦可搵 @Mud9BotSupport ，或者用 /feedback <內容>",
               "inlineKeyboard": [
                 [
                   {
-                    "text": "☕ 請我飲杯咖啡"
-                  },
-                  {
-                    "text": "📜 閱讀條款"
+                    "text": "Pay ⭐ 100"
                   }
                 ]
               ]
@@ -447,7 +696,7 @@
           "mockups": [
             {
               "input": "/ping",
-              "response": "🏓 Pong!\n伺服器延遲: 12ms\nUptime: 14 days"
+              "response": "Pong!"
             }
           ]
         }

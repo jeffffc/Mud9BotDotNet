@@ -43,7 +43,7 @@ public class TransportEtaModule(IConfiguration config, ILogger<TransportEtaModul
             bot, 
             message, 
             path: "bus", 
-            buttonText: "撳我搵車 🚌💨", 
+            buttonText: "撳我睇巴士到站 🚌💨", 
             replyText: "想知架車幾時到？撳下面粒掣入去睇吓啦，唔使再喺條街度戇居居等喇！🚀", 
             ct
         );
@@ -60,7 +60,7 @@ public class TransportEtaModule(IConfiguration config, ILogger<TransportEtaModul
             bot, 
             message, 
             path: "mtr", 
-            buttonText: "撳我睇港鐵 🚇💨", 
+            buttonText: "撳我睇港鐵到站 🚇💨", 
             replyText: "想知下一班港鐵幾時有？撳下面粒掣入去睇吓啦，唔使衝落去月台跑喇！🚀", 
             ct
         );
@@ -73,7 +73,7 @@ public class TransportEtaModule(IConfiguration config, ILogger<TransportEtaModul
             bot, 
             message, 
             path: "minibus", 
-            buttonText: "撳我搵小巴 🚐💨", 
+            buttonText: "撳我睇小巴到站 🚐💨", 
             replyText: "想知小巴幾時到？撳下面粒掣入去睇吓啦，費事排長龍等呀！🚀", 
             ct
         );
