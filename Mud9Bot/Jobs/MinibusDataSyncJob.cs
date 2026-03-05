@@ -90,6 +90,8 @@ public class MinibusDataSyncJob(
                             // 3. Fetch variants for this route number
                             string encodedRoute = Uri.EscapeDataString(routeCode);
                             var variantsRes = await client.GetFromJsonAsync<GmbRouteDetailResponse>($"{BaseUrl}/route/{region}/{encodedRoute}");
+                            await Task.Delay(50); // Add a 50ms delay to prevent API bans
+                            
                             if (variantsRes?.Data == null) continue;
 
                             foreach (var variant in variantsRes.Data)
@@ -139,11 +141,20 @@ public class MinibusDataSyncJob(
                 }
             }
 
-            var cleanupThreshold = syncTime.AddSeconds(-1);
+            
+            // Only run the destructive cleanup if we actually processed a healthy amount of routes
+            if (_processedVariantCount > 500) 
+            {
+                var cleanupThreshold = syncTime.AddSeconds(-1);
+                await dbContext.Set<BusRoute>().Where(r => r.Company.StartsWith("GMB") && r.IsActive && r.LastUpdated < cleanupThreshold).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
+                await dbContext.Set<BusRouteStop>().Where(r => r.RouteId.StartsWith("GMB") && r.IsActive && r.LastUpdated < cleanupThreshold).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
+            }
+            else 
+            {
+                logger.LogWarning("[MinibusSync] ⚠️ API seems to have failed. Skipping cleanup to protect existing data!");
+            }
             
             // Clean up any old GMB records
-            await dbContext.Set<BusRoute>().Where(r => r.Company.StartsWith("GMB") && r.IsActive && r.LastUpdated < cleanupThreshold).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
-            await dbContext.Set<BusRouteStop>().Where(r => r.RouteId.StartsWith("GMB") && r.IsActive && r.LastUpdated < cleanupThreshold).ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
             
             await busDirectory.RefreshAsync();
             logger.LogInformation("[MinibusSync] ✅ 綠色小巴同步完畢！");
@@ -168,7 +179,7 @@ public class MinibusDataSyncJob(
 
         // OPTIMIZATION: Light Update Fast-Lane
         // 如果尋日已經同步過，直接用 SQL Update 更新時間戳，完全跳過後面嘅 API calls！
-        if (dbRoute != null && dbRoute.LastUpdated > syncTime.AddHours(-20) && _routesWithStops.Contains(dbRouteId))
+        if (dbRoute != null && dbRoute.LastUpdated > syncTime.AddHours(-48) && _routesWithStops.Contains(dbRouteId))
         {
             // Ensure company is updated from legacy "GMB" to regional format
             dbRoute.Company = regionalCompany;
