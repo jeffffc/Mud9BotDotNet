@@ -132,7 +132,7 @@ app.Use(async (context, next) =>
 
         if (targetSub != null && !host.StartsWith($"{targetSub}."))
         {
-            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "").Replace("mtr.", "").Replace("transport.", "").Replace("guide", "");
+            string baseDomain = host.Replace("stats.", "").Replace("admin.", "").Replace("bus.", "").Replace("mtr.", "").Replace("transport.", "").Replace("guide.", "");
             context.Response.Redirect($"{context.Request.Scheme}://{targetSub}.{baseDomain}/", false);
             return;
         }
