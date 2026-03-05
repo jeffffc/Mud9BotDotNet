@@ -535,7 +535,7 @@ app.MapGet("/api/admin/logs/audit", async (BotDbContext db) =>
 
 app.MapGet("/api/admin/logs/system", async (IConfiguration config) =>
 {
-    var serviceName = config["SystemLogs:ServiceName"] ?? "mud9bot.service";
+    var serviceName = config["SystemLogs:ServiceName"] ?? "mud9bot-prod.service";
     var lines = config["SystemLogs:LinesToFetch"] ?? "50";
 
     // 🚀 Check if we are running on Linux
