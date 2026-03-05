@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; }
+        body { background-color: var(--tg-theme-bg-color, #ffffff); color: var(--tg-theme-text-color, #222); overflow-x: hidden; overscroll-behavior-y: none; }
         .secondary-bg { background-color: var(--tg-theme-secondary-bg-color, #f4f4f4); }
         .accent-btn { background-color: #16a34a; color: #ffffff; }
         .stop-item:active { background-color: rgba(0,0,0,0.05); }
@@ -36,8 +36,8 @@
         .kb-key {
             display: flex; align-items: center; justify-content: center;
             background: white; border-radius: 12px; font-weight: 800;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 54px;
-            user-select: none; transition: all 0.1s; color: #333;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 44px;
+            user-select: none; transition: all 0.1s; color: #333; touch-action: manipulation;
         }
         .kb-key:active { transform: scale(0.95); background-color: #f0f0f0; }
 
@@ -63,7 +63,7 @@
         ::-webkit-scrollbar { display: none; }
         .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
         #mainContent { padding-bottom: 20px; }
-        #mainContent.keyboard-open { padding-bottom: 420px; }
+        #mainContent.keyboard-open { padding-bottom: 320px; }
         #routeHeader { background-color: #16a34a; }
 
         .toggle-bg { background-color: #e5e7eb; transition: background-color 0.2s; }
@@ -151,9 +151,9 @@
     </div>
 </div>
 
-<div id="customKeyboard" class="fixed bottom-0 left-0 right-0 bg-gray-200 shadow-[0_-15px_50px_rgba(0,0,0,0.2)] z-[100] border-t border-gray-300 p-3 safe-area-bottom rounded-t-[2.5rem]">
+<div id="customKeyboard" class="fixed bottom-0 left-0 right-0 bg-gray-200 shadow-[0_-15px_50px_rgba(0,0,0,0.2)] z-[100] border-t border-gray-300 p-2 safe-area-bottom rounded-t-3xl">
     <div class="flex">
-        <div class="grid grid-cols-3 gap-2.5 w-[65%] pr-2.5 border-r border-gray-300">
+        <div class="grid grid-cols-3 gap-2 w-[65%] pr-2 border-r border-gray-300">
             <button class="kb-key" onclick="keyTap('1')">1</button>
             <button class="kb-key" onclick="keyTap('2')">2</button>
             <button class="kb-key" onclick="keyTap('3')">3</button>
@@ -173,13 +173,13 @@
             <div id="kbUpHint" class="absolute top-2 left-1/2 -translate-x-1/2 scroll-hint-up opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" /></svg>
             </div>
-            <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[238px] pb-4" onscroll="handleKbScroll()"></div>
+            <div id="letterPad" class="flex flex-wrap content-start gap-2 overflow-y-auto h-[190px] pb-4" onscroll="handleKbScroll()"></div>
             <div id="kbDownHint" class="absolute bottom-6 left-1/2 -translate-x-1/2 scroll-hint-down opacity-0 pointer-events-none z-10 transition-opacity">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" /></svg>
             </div>
         </div>
     </div>
-    <button onclick="toggleKeyboard(false)" class="w-full mt-3 py-3 text-[10px] text-gray-400 font-black uppercase tracking-[0.4em]">收起鍵盤</button>
+    <button onclick="toggleKeyboard(false)" class="w-full mt-2 py-2 text-[10px] text-gray-400 font-black uppercase tracking-[0.4em]">收起鍵盤</button>
 </div>
 
 <script>
